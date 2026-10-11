@@ -1,4 +1,6 @@
 export type SignedInTab =
+  | "review"
+  | "today"
   | "daily-planner"
   | "record-library"
   | "workspace"
@@ -30,7 +32,9 @@ export type SignedInTab =
   | "devices"
   | "conflict-review"
   | "sync-status"
-  | "school-branding";
+  | "school-branding"
+  | "learning-support"
+  | "schedule-planner";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -40,6 +44,8 @@ export type SignedInTab =
  * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
+  review: "Review completeness",
+  today: "Today",
   "daily-planner": "Daily teaching planner",
   "record-library": "Record management",
   workspace: "Dashboard",
@@ -72,6 +78,8 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "conflict-review": "Review Sync Conflicts",
   "sync-status": "Sync Status",
   "school-branding": "School Logo",
+  "learning-support": "Learning Support",
+  "schedule-planner": "Teacher Load Maker",
 };
 
 interface NavGroup {
@@ -105,6 +113,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Class Overview",
     tabs: [
+      tab("review"),
       tab("subject-monitor"),
       tab("adviser-view"),
       tab("teacher-load"),
@@ -139,9 +148,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
 ];
 
-/** The six deliberately small destinations of the class-folio shell. Detailed
+/** The seven deliberately small destinations of the class-folio shell. Detailed
  * tools remain in NAV_GROUPS and are reached through the More workspace. */
 export const PRIMARY_NAV: readonly { id: SignedInTab; label: string }[] = [
+  tab("today"),
   tab("workspace"),
   tab("adviser-view"),
   tab("class-records"),
@@ -151,7 +161,7 @@ export const PRIMARY_NAV: readonly { id: SignedInTab; label: string }[] = [
 ];
 export const HOME_DESTINATION = { id: "workspace" as const, label: "Dashboard" };
 export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
-  { id: "workspace", label: "Today" },
+  { id: "today", label: "Today" },
   { id: "my-day", label: "Classes" },
   { id: "school-forms", label: "Forms" },
   { id: "account", label: "Account" },
@@ -159,7 +169,16 @@ export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
 
 /** Keeps a meaningful primary destination selected while using its tools. */
 export function primaryTabFor(tab: SignedInTab): SignedInTab {
-  if (tab === "workspace" || tab === "my-day" || tab === "today-classes") return "workspace";
+  if (["today", "daily-planner", "learning-support"].includes(tab)) return "today";
+  if (
+    tab === "workspace" ||
+    tab === "my-day" ||
+    tab === "today-classes" ||
+    tab === "subject-attendance" ||
+    tab === "subject-monitor" ||
+    tab === "teacher-load"
+  )
+    return "workspace";
   if (["adviser-view", "attendance", "section-adviser"].includes(tab)) return "adviser-view";
   if (["class-records", "grading-periods"].includes(tab)) return "class-records";
   if (["school-forms", "monthly-summary", "sf1-import"].includes(tab)) return "school-forms";
@@ -172,6 +191,10 @@ const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
   "teaching-assignments": "sections",
   "section-adviser": "sections",
   "schedule-meetings": "sections",
+  "schedule-planner": "sections",
+  // Reached only from My Day's attention rail, with the occurrence and the
+  // marker already selected — see `App.tsx`'s `supportContext`.
+  "learning-support": "my-day",
 };
 
 /** Collapses a contextual sub-screen tab to the group destination it was
@@ -190,4 +213,13 @@ export function groupLabelForTab(tab: SignedInTab): string | null {
     if (group.tabs.some((t) => t.id === id)) return group.label;
   }
   return null;
+}
+
+/** Every phone destination has a visible task parent, including secondary tools. */
+export function bottomTabFor(tab: SignedInTab): SignedInTab {
+  const parent = primaryTabFor(tab);
+  if (parent === "today") return "today";
+  if (parent === "school-forms") return "school-forms";
+  if (["workspace", "class-records", "adviser-view", "calendar"].includes(parent)) return "my-day";
+  return "account";
 }

@@ -2010,6 +2010,426 @@ pub fn migrations() -> Migrations<'static> {
             CHECK (review_reason IN ('concurrent_edit', 'apply_rejected'));
         "#,
         ),
+        M::up(
+            r#"
+        -- CTOS M01 — score correction history (schema version 42).
+        -- CTOS.md section 5: "corrections preserve previous values, reason,
+        -- author, and time where required." Until now `learner_score::record`
+        -- was an INSERT ... ON CONFLICT DO UPDATE that destroyed the prior
+        -- value, its author, and its time. This migration adds an
+        -- append-only audit table; the live `learner_scores` row stays the
+        -- current truth, and every superseded state is retained here.
+        --
+        -- Append-only is enforced structurally: there is no UPDATE or DELETE
+        -- path in the repository, and no trigger is needed because the table
+        -- is only ever written by `learner_score::record`'s correction
+        -- branch. `previous_id` chains consecutive corrections of the same
+        -- score so a full correction lineage can be walked.
+        CREATE TABLE learner_score_corrections (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            assessment_item_id TEXT NOT NULL REFERENCES assessment_items(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            -- The state being superseded: exactly what the live row held
+            -- before this correction. `previous_score` is NULL when the
+            -- prior state was 'excused' or 'not_applicable', matching
+            -- learner_scores' own CHECK convention.
+            previous_status TEXT NOT NULL CHECK (previous_status IN ('scored', 'excused', 'not_applicable')),
+            previous_score REAL,
+            previous_recorded_by_user_id TEXT NOT NULL REFERENCES users(id),
+            previous_recorded_at TEXT NOT NULL,
+            -- The incoming state that replaced it.
+            new_status TEXT NOT NULL CHECK (new_status IN ('scored', 'excused', 'not_applicable')),
+            new_score REAL,
+            corrected_by_user_id TEXT NOT NULL REFERENCES users(id),
+            -- CTOS.md section 5 requires the correction reason be preserved.
+            reason TEXT NOT NULL,
+            corrected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            previous_id TEXT REFERENCES learner_score_corrections(id),
+            CHECK (
+                (previous_status = 'scored' AND previous_score IS NOT NULL) OR
+                (previous_status <> 'scored' AND previous_score IS NULL)
+            ),
+            CHECK (
+                (new_status = 'scored' AND new_score IS NOT NULL) OR
+                (new_status <> 'scored' AND new_score IS NULL)
+            )
+        );
+
+        CREATE INDEX idx_learner_score_corrections_item_learner
+            ON learner_score_corrections(school_id, assessment_item_id, learner_id, corrected_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- CTOS M06 — classroom occurrences (schema version 43).
+        -- CTOS.md §5's scheduling invariant names three distinct things --
+        -- assignment ≠ planned meeting ≠ actual class occurrence. The first
+        -- two already exist (`teaching_assignments`, `schedule_meetings`).
+        -- The third did not: nothing in this schema recorded that a class
+        -- *actually occurred*, let alone that it deviated from the recurring
+        -- plan or was called off. `subject_attendance_sessions` is an
+        -- *attendance* record ("was a mark taken?"), not an occurrence
+        -- record ("did this class happen?") -- a held session with zero
+        -- entries is not proof a class was delivered, and `no_class` is an
+        -- attendance decision, not a schedule fact. This table is that
+        -- third term.
+        --
+        -- `status` stores exactly the four states M06's acceptance clause
+        -- names, so the distinction is enforced by the schema rather than by
+        -- whichever query happens to be reading it:
+        --   planned    — opened, on its recurring slot, not yet deviated
+        --   changed    — an actual slot is recorded and it does not match the
+        --                recurring plan (including a class recorded with no
+        --                plan row at all: an off-schedule class)
+        --   cancelled  — the class did not occur
+        --   delivered  — the class occurred and the teacher finished it
+        CREATE TABLE class_occurrences (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            occurrence_date TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN (
+                'planned', 'changed', 'cancelled', 'delivered'
+            )),
+            -- The recurring-plan snapshot taken when this occurrence was
+            -- started. NULL when no `schedule_meetings` row existed for this
+            -- weekday at all (an ad-hoc class). Snapshotted rather than
+            -- live-joined because a later schedule edit must not rewrite what
+            -- this occurrence was planned as; full versioned/effective-dated
+            -- schedules are CTOS M09's scope, and a snapshot is the honest
+            -- minimum until then.
+            planned_starts_at TEXT,
+            planned_ends_at TEXT,
+            planned_room TEXT,
+            -- What actually happened. NULL until the teacher records it.
+            actual_starts_at TEXT,
+            actual_ends_at TEXT,
+            actual_room TEXT,
+            -- M06's required capture fields. All free-text teacher input;
+            -- `learning_target` is seeded from `lesson_plans` for this
+            -- assignment+date when one exists (a snapshot, not a join -- the
+            -- plan can be edited later, and this occurrence records what was
+            -- targeted *in this class*).
+            learning_target TEXT NOT NULL DEFAULT '',
+            quick_evidence TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            summary TEXT NOT NULL DEFAULT '',
+            -- CTOS.md §5: "weather/advisory information does not
+            -- automatically cancel class". A cancellation is a human
+            -- decision, so it records its reason. NOT NULL DEFAULT '' rather
+            -- than nullable so the column always exists; the repository
+            -- requires a non-empty reason to make the transition at all.
+            cancelled_reason TEXT NOT NULL DEFAULT '',
+            started_at TEXT,
+            finished_at TEXT,
+            cancelled_at TEXT,
+            -- Bumped each time a delivered/cancelled occurrence is reopened.
+            -- M06's occurrence is working data, not an issued record: a full
+            -- amendment history (issued-snapshot immutability) is M11's
+            -- scope. The attendance entries underneath are untouched by a
+            -- reopen and remain the real per-learner audit trail.
+            revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (teaching_assignment_id, occurrence_date)
+        );
+
+        CREATE INDEX idx_class_occurrences_school_date
+            ON class_occurrences(school_id, occurrence_date);
+
+        -- CTOS M06 — the learner follow-up marker. CTOS.md §6.1 lists
+        -- "learner follow-up due where appropriate" and §6.4 asks "What
+        -- requires learner follow-up?" -- a question about history, not just
+        -- the current moment, so a marker is *cleared* (`cleared_at`) rather
+        -- than deleted. `subject_attendance`'s computed absence streak is a
+        -- derived signal and deliberately stays one; this is the teacher's
+        -- explicit, persisted decision, keyed to one occurrence and one
+        -- enrollment membership (the span, not a bare `learner_id`, matching
+        -- `subject_attendance_entries`'s own keying).
+        CREATE TABLE learner_followup_markers (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_occurrence_id TEXT NOT NULL REFERENCES class_occurrences(id) ON DELETE CASCADE,
+            section_membership_id TEXT NOT NULL REFERENCES section_memberships(id) ON DELETE CASCADE,
+            reason TEXT NOT NULL DEFAULT '',
+            cleared_at TEXT,
+            marked_by_user_id TEXT NOT NULL REFERENCES users(id),
+            marked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (class_occurrence_id, section_membership_id)
+        );
+
+        CREATE INDEX idx_learner_followup_markers_occurrence
+            ON learner_followup_markers(class_occurrence_id);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- CTOS M08 — the learning-support case: what a teacher decided to
+        -- *do* about a learner they marked for follow-up. CTOS.md §M08's
+        -- required loop is Evidence → identified need → goal → intervention
+        -- → participation → follow-up → outcome. The evidence and the
+        -- follow-up marker already existed (migration 43/44); this table is
+        -- the middle of that loop, and its outcome end.
+        --
+        -- Every case is anchored to the one class occurrence whose evidence
+        -- gave rise to it, so the same ownership rule that protects a
+        -- follow-up marker (the occurrence's own teacher) protects a case,
+        -- and the authorization re-derives it on every transition rather
+        -- than trusting a client-supplied case id. Keyed to the enrollment
+        -- membership, not a bare learner_id, matching the marker's own
+        -- convention -- the span is who was actually in the section.
+        --
+        -- The status CHECK is the loop's spine, and it is the schema that
+        -- enforces it, not whichever query happens to be writing: `open`
+        -- (need/goal/intervention recorded) can only move to `in_progress`
+        -- once the teacher has recorded `participation`, and only
+        -- `in_progress` can move to `resolved`, which requires `outcome`.
+        -- A resolved case is immutable — the outcome is a historical fact
+        -- about that intervention, not a value a later edit may reinterpret.
+        CREATE TABLE learner_support_cases (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_occurrence_id TEXT NOT NULL REFERENCES class_occurrences(id) ON DELETE CASCADE,
+            section_membership_id TEXT NOT NULL REFERENCES section_memberships(id) ON DELETE CASCADE,
+            need TEXT NOT NULL CHECK (length(trim(need)) > 0),
+            goal TEXT NOT NULL CHECK (length(trim(goal)) > 0),
+            intervention TEXT NOT NULL CHECK (length(trim(intervention)) > 0),
+            status TEXT NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open', 'in_progress', 'resolved')),
+            participation TEXT
+                CHECK (participation IS NULL OR length(trim(participation)) > 0),
+            outcome TEXT
+                CHECK (outcome IS NULL OR length(trim(outcome)) > 0),
+            opened_by_user_id TEXT NOT NULL REFERENCES users(id),
+            opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            -- The loop's ordering is expressed in the data, not inferred:
+            -- participation belongs to an in_progress case only, and an
+            -- outcome only to a resolved one. A CHECK can reference another
+            -- column's value, which is what makes this enforceable at the
+            -- schema rather than only in Rust.
+            CHECK (participation IS NULL OR status <> 'open'),
+            CHECK (outcome IS NULL OR status = 'resolved'),
+            CHECK (resolved_at IS NULL OR status = 'resolved')
+        );
+
+        CREATE INDEX idx_learner_support_cases_occurrence
+            ON learner_support_cases(class_occurrence_id);
+        CREATE INDEX idx_learner_support_cases_membership
+            ON learner_support_cases(section_membership_id);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- CTOS M09 — Teacher Load Maker + Smart Scheduling. The
+        -- scheduling this codebase already had (migration 18) is
+        -- *manual* row-by-row placement with per-write conflict checks;
+        -- it has no constraint inputs, no generation, no validation
+        -- independent of the writer, and no notion of a published
+        -- revision. This migration supplies those four missing pieces.
+        --
+        -- Every constraint here is an explicit, human-confirmable input
+        -- (docs/research/deped-mandaue-teacher-load-2026.md §"M09 product
+        -- constraints derived from the evidence", item 3): the engine never
+        -- invents eligibility, availability, bell times or room limits. No
+        -- Mandaue-specific rule is encoded anywhere (item 8) — the one
+        -- numeric default that comes from national policy is
+        -- `max_daily_teaching_minutes` = 360, DepEd Order No. 005 s. 2024's
+        -- six-hour classroom-teaching ceiling, and it is an editable
+        -- school input, not an enforcement the engine imposes silently.
+        -- Advisory and ancillary duties remain out of instructional load
+        -- exactly as ADR-0039 decided; nothing in this migration counts
+        -- them.
+
+        -- The school's own scheduling parameters: one row per school,
+        -- created on first read (see `scheduling_inputs::ensure`). The
+        -- school day bounds, period length and `school_days` are the grid
+        -- the generator lays meetings onto; the two caps are the
+        -- weekly/daily minutes constraints; `passing_minutes` is the
+        -- break/setup/travel buffer that must separate two consecutive
+        -- meetings of the same teacher. `school_days` counts weekdays
+        -- starting from Monday (5 = Mon-Fri, 6 = Mon-Sat), so Saturday
+        -- make-up classes are an explicit input rather than a hidden
+        -- generator assumption.
+        CREATE TABLE schedule_settings (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            day_starts_at TEXT NOT NULL DEFAULT '07:30'
+                CHECK (day_starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            day_ends_at TEXT NOT NULL DEFAULT '17:00'
+                CHECK (day_ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            school_days INTEGER NOT NULL DEFAULT 5
+                CHECK (school_days BETWEEN 1 AND 7),
+            period_minutes INTEGER NOT NULL DEFAULT 50
+                CHECK (period_minutes BETWEEN 5 AND 240),
+            passing_minutes INTEGER NOT NULL DEFAULT 10
+                CHECK (passing_minutes BETWEEN 0 AND 240),
+            max_daily_teaching_minutes INTEGER NOT NULL DEFAULT 360
+                CHECK (max_daily_teaching_minutes BETWEEN 30 AND 1440),
+            max_weekly_teaching_minutes INTEGER NOT NULL DEFAULT 1800
+                CHECK (max_weekly_teaching_minutes BETWEEN 30 AND 10080),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            -- A school day that ends at or before it starts has no grid to
+            -- place anything onto, so this is a schema-level rule, not a
+            -- repository-level hope.
+            CHECK (day_starts_at < day_ends_at)
+        );
+
+        -- Teacher availability, modelled as the *blocked* windows a
+        -- teacher is not scheduled for classroom teaching (a meeting,
+        -- a fixed ancillary duty, a plantilla obligation). Additive and
+        -- small — a fully-available teacher simply has no rows, which is
+        -- the common case, so the table stays empty rather than having to
+        -- be seeded with a full week for every teacher.
+        CREATE TABLE teacher_unavailability (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+            starts_at TEXT NOT NULL CHECK (starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            ends_at TEXT NOT NULL CHECK (ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            reason TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            CHECK (starts_at < ends_at),
+            UNIQUE (teacher_user_id, weekday, starts_at, ends_at)
+        );
+
+        CREATE INDEX idx_teacher_unavailability_teacher
+            ON teacher_unavailability(teacher_user_id);
+
+        -- The room/lab registry. Before M09 `schedule_meetings.room` was
+        -- free text with no list behind it, so a room conflict could only
+        -- ever be detected when a second class happened to type the same
+        -- string. A registry makes a room a real schedulable resource the
+        -- generator can pick from and the checker can reason about, and
+        -- `is_lab` carries the lab/room distinction the required-constraint
+        -- list names explicitly.
+        CREATE TABLE schedule_rooms (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            is_lab INTEGER NOT NULL DEFAULT 0 CHECK (is_lab IN (0, 1)),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (school_id, name)
+        );
+
+        CREATE INDEX idx_schedule_rooms_school_id ON schedule_rooms(school_id);
+
+        -- Subject requirements: how many weekly instructional minutes a
+        -- subject is scheduled for. Deliberately a *separate* table from
+        -- `subjects` rather than a new column on it — `subjects` is a
+        -- synced entity (EntityKind::Subject, ADR-0067/0069) and a column
+        -- added there without a payload mapping would silently fail to
+        -- propagate between a teacher's devices; scheduling inputs are
+        -- school-setup data that the plan's own fingerprint guards, not
+        -- per-device teacher work, so they stay local.
+        CREATE TABLE subject_schedule_requirements (
+            subject_id TEXT PRIMARY KEY REFERENCES subjects(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            required_weekly_minutes INTEGER NOT NULL
+                CHECK (required_weekly_minutes BETWEEN 0 AND 2400),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_subject_schedule_requirements_school_id
+            ON subject_schedule_requirements(school_id);
+
+        -- The publication ledger. One row per plan revision; `revision`
+        -- is monotonic per school and `input_fingerprint` is the Lock step
+        -- of CTOS.md §M09's workflow — the SHA-256 of the canonical form of
+        -- every constraint input the generation ran against, frozen at
+        -- plan creation. Publication recomputes it and refuses to write
+        -- when it no longer matches, which is the acceptance clause's
+        -- "stale-generation publication rejection".
+        CREATE TABLE schedule_plans (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            revision INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published', 'superseded')),
+            input_fingerprint TEXT NOT NULL,
+            generator_note TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            published_at TEXT,
+            published_by_user_id TEXT,
+            UNIQUE (school_id, revision)
+        );
+
+        -- At most one draft and at most one published plan per school.
+        -- These are partial unique indexes (SQLite 3.8+), and they are what
+        -- makes "version-consistent teacher/section/room views" a provable
+        -- schema property rather than a query convention: there is always
+        -- exactly zero or one live revision, so the three views cannot
+        -- disagree about which revision they resolved from.
+        CREATE UNIQUE INDEX idx_schedule_plans_one_draft
+            ON schedule_plans(school_id) WHERE status = 'draft';
+        CREATE UNIQUE INDEX idx_schedule_plans_one_published
+            ON schedule_plans(school_id) WHERE status = 'published';
+
+        -- The proposal: every placement a generation produced, staged
+        -- before it is live. Deliberately a separate table from
+        -- `schedule_meetings` — the live table is what My Day, Subject
+        -- Attendance and the occurrence stack already read, and staging
+        -- drafts there would mean a half-repaired plan was visible to
+        -- every teacher mid-edit. Publication copies these rows into
+        -- `schedule_meetings` inside one transaction; until then, nothing
+        -- else in the codebase can see them at all.
+        CREATE TABLE schedule_plan_meetings (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            plan_id TEXT NOT NULL REFERENCES schedule_plans(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL
+                REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+            starts_at TEXT NOT NULL CHECK (starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            ends_at TEXT NOT NULL CHECK (ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            room TEXT,
+            CHECK (starts_at < ends_at),
+            UNIQUE (plan_id, teaching_assignment_id, weekday, starts_at, ends_at)
+        );
+
+        CREATE INDEX idx_schedule_plan_meetings_plan_id
+            ON schedule_plan_meetings(plan_id);
+        CREATE INDEX idx_schedule_plan_meetings_assignment_id
+            ON schedule_plan_meetings(teaching_assignment_id);
+
+        -- Links a live meeting to the revision that published it. NULL for
+        -- every row created by the pre-M09 manual path, which is exactly
+        -- right: those rows are the school's existing valid schedule and
+        -- are never deleted by a plan. `REFERENCES` is registered on the
+        -- ADD COLUMN (verified: `pragma_foreign_key_list` reports it), and
+        -- it is deliberately non-cascading — deleting a *superseded* plan
+        -- row must not delete the meetings that were live under it, and
+        -- publication deletes the superseded plan's meetings explicitly
+        -- and in the same transaction.
+        ALTER TABLE schedule_meetings
+            ADD COLUMN plan_id TEXT REFERENCES schedule_plans(id);
+        "#,
+        ),
+        M::up(r#"
+        -- Device-local drafts live inside the existing encrypted SQLCipher database.
+        -- No sync-outbox entry: these are private unconfirmed work, not school records.
+        CREATE TABLE classroom_drafts (
+            owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            occurrence_date TEXT NOT NULL,
+            occurrence_revision INTEGER NOT NULL CHECK (occurrence_revision >= 0),
+            fields_json TEXT NOT NULL,
+            saved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (owner_user_id, school_id, teaching_assignment_id, occurrence_date, occurrence_revision)
+        );
+        "#),
+        M::up(r#"
+        -- Scope changes reset the transport scan, enabling newly authorized
+        -- history to backfill without disclosing previously filtered records.
+        CREATE TABLE sync_pull_scope (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            scope_token TEXT NOT NULL
+        );
+        "#),
     ])
 }
 
@@ -2051,6 +2471,94 @@ mod tests {
                 []
             )
             .is_err());
+    }
+
+    #[test]
+    fn migration_42_creates_an_append_only_correction_history_with_status_score_consistency() {
+        // The correction table's foreign-key graph (schools / assessment_items
+        // / learners / users) is exercised end-to-end by `repository::
+        // learner_score`'s correction tests, which build real rows. What only
+        // this test can prove cheaply is the table's own structural
+        // guarantees — so foreign_keys is deliberately turned off and the
+        // CHECK constraints are probed directly.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "OFF").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        // A valid correction row: a 'scored' superseded state carries a
+        // score, and so does the incoming 'scored' state.
+        conn.execute(
+            "INSERT INTO learner_score_corrections \
+             (id, school_id, assessment_item_id, learner_id, \
+              previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+              new_status, new_score, corrected_by_user_id, reason) \
+             VALUES ('c1', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                     'scored', 19.0, 'u1', 'Rechecked the paper')",
+            [],
+        )
+        .unwrap();
+
+        // The status/score consistency CHECK mirrors learner_scores' own: a
+        // non-'scored' status must not carry a score, in either direction.
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c2', 's1', 'ai1', 'l1', 'excused', 12.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'scored', 19.0, 'u1', 'Should have no previous score')",
+                [],
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c3', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'excused', 19.0, 'u1', 'Should have no new score')",
+                [],
+            )
+            .is_err());
+
+        // The schema's structural guarantee on the reason is NOT NULL; a
+        // reason that is merely blank is rejected one layer up, at the
+        // repository boundary, where the rule is also tested.
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c4', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'scored', 19.0, 'u1', NULL)",
+                [],
+            )
+            .is_err());
+
+        // The lineage chain is self-referential and walkable.
+        conn.execute(
+            "INSERT INTO learner_score_corrections \
+             (id, school_id, assessment_item_id, learner_id, \
+              previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+              new_status, new_score, corrected_by_user_id, reason, previous_id) \
+             VALUES ('c5', 's1', 'ai1', 'l1', 'scored', 19.0, 'u1', '2026-10-02T00:00:00Z', \
+                     'scored', 20.0, 'u1', 'Graded the missing item', 'c1')",
+            [],
+        )
+        .unwrap();
+        let chained: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM learner_score_corrections c1 \
+                 JOIN learner_score_corrections c2 ON c2.previous_id = c1.id \
+                 WHERE c1.id = 'c1' AND c2.id = 'c5'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(chained, 1);
     }
 
     #[test]

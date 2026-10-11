@@ -27,27 +27,9 @@ use crate::sync_client::{self, SyncClientConfig};
 /// "Learner identity, enrollment, attendance, and grading records never
 /// use silent last-write-wins").
 ///
-/// **Who may view/resolve conflicts**: ADR-0067's own conflict-review
-/// design notes name a "conflict-review ownership" responsibility as part
-/// of the school-laptop operations gate, but do not assign it to a
-/// specific role tier -- unlike device revocation (ADR-0069), which is a
-/// security action over a *shared* credential every other teacher's sync
-/// depends on, resolving a conflict is a decision about a *specific
-/// record* a teacher is already trusted to read/write day to day (their
-/// own attendance entries, learners in their own school, sections they
-/// teach). Gatekeeping it behind `SCHOOL_HEAD`/`ManageSchoolMembership`
-/// would block the exact person named in the task -- "a regular teacher
-/// may need to resolve conflicts on their own class records" -- from
-/// doing so without an admin's involvement, for no compensating security
-/// benefit (this device already trusts its authenticated session with
-/// full read/write of every entity kind that can conflict). So this
-/// module follows `list_device_sync_credentials`' "any active school
-/// member, same-school reference data" convention for viewing, AND
-/// extends it to resolving: any authenticated member of the conflict's
-/// own school (session-derived `school_id`, never a parameter) may
-/// resolve it. `school_id` isolation is still enforced at the repository
-/// boundary (`find_open_by_id_in_school`/`mark_resolved`), never by UI
-/// hiding, matching `.claude/rules/security-privacy.md`.
+/// Conflicts are filtered by current entity write authority before previews
+/// are decrypted. Resolution rechecks both current ownership and incoming
+/// parent relationships at the trusted boundary.
 #[derive(Debug, Clone, Serialize)]
 #[serde(
     tag = "kind",
@@ -291,8 +273,11 @@ pub fn list_conflict_reviews(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<ConflictReviewSummary>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
-    let rows = sync_conflict_review::list_open_for_school(&conn, &school_id)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    let mut rows = Vec::new();
+    for row in sync_conflict_review::list_open_for_school(&conn, &school_id)? {
+        if crate::auth::data_scope::can_resolve_entity(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id)? { rows.push(row); }
+    }
     let sspk = resolve_sspk_for_school(&conn, &school_id);
     rows.iter()
         .map(|row| to_summary(row, &conn, &school_id, sspk))
@@ -390,13 +375,17 @@ pub fn resolve_conflict_review(
     resolution: ConflictResolutionChoice,
 ) -> AppResult<bool> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
 
     let Some(row) =
         sync_conflict_review::find_open_by_id_in_school(&conn, &school_id, &conflict_id)?
     else {
         return Ok(false);
     };
+
+    if !crate::auth::data_scope::can_resolve_entity(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id)? {
+        return Err(AppError::Unauthorized);
+    }
 
     match resolution {
         ConflictResolutionChoice::KeepLocal => {
@@ -437,6 +426,13 @@ pub fn resolve_conflict_review(
                 ));
             };
 
+            let plaintext = payload_key::decrypt_payload(&sspk, &row.encrypted_payload)
+                .map_err(|_| AppError::Unauthorized)?;
+            let payload: serde_json::Value = serde_json::from_slice(&plaintext)
+                .map_err(|_| AppError::Unauthorized)?;
+            if !crate::auth::data_scope::can_apply_incoming(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id, &payload)? {
+                return Err(AppError::Unauthorized);
+            }
             apply_incoming_review(&conn, &school_id, &row, &sspk)
         }
     }

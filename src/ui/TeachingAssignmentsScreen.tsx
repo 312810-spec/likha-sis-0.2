@@ -13,6 +13,8 @@ import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TeachingAssignmentsScreenProps {
+  roles?: readonly string[];
+  onAssignmentRemoved?: (assignmentId: string) => void;
   teachingAssignmentService: TeachingAssignmentApplicationService;
   subjectService: SubjectApplicationService;
   schoolMemberService: SchoolMemberApplicationService;
@@ -32,20 +34,11 @@ interface TeachingAssignmentsScreenProps {
   onManageSchedule: (teachingAssignmentId: string, subjectName: string) => void;
 }
 
-/** Wave 2Y: a School Head assigns and unassigns which teacher teaches a
- * subject for this section. Reassignment is deliberately explicit
- * remove-then-create, not a one-step "replace" -- see
- * `docs/adr/0039-teacher-load-class-schedule-foundation.md`'s own
- * reasoning and the Wave 2Y addendum to `docs/adr/0055-*`. Any
- * authenticated school member may view this screen (matching
- * `list_teaching_assignments_by_section`'s reference-data convention);
- * the backend alone enforces that only a School Head may create or
- * remove -- security must not rely on UI hiding, so this screen shows
- * the same form to everyone and surfaces a generic error if the
- * backend declines, the same convention `SectionsScreen`'s own
- * "Create a section" form already uses. */
+/** Role-aware management presentation; native authorization remains authoritative. */
 export function TeachingAssignmentsScreen({
   teachingAssignmentService,
+  roles = [],
+  onAssignmentRemoved,
   subjectService,
   schoolMemberService,
   sectionId,
@@ -54,6 +47,7 @@ export function TeachingAssignmentsScreen({
   onManageSchedule,
 }: TeachingAssignmentsScreenProps) {
   const { mode } = useTeacherMode();
+  const canManage = roles.includes("school_head");
 
   const [assignments, setAssignments] = useState<TeachingAssignmentDetail[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -68,6 +62,12 @@ export function TeachingAssignmentsScreen({
   const [assigning, setAssigning] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  const [removeCandidate, setRemoveCandidate] = useState<TeachingAssignmentDetail | null>(null);
+  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (removeCandidate) cancelRemoveRef.current?.focus();
+  }, [removeCandidate]);
   const requestRef = useRef(0);
 
   function load() {
@@ -98,6 +98,9 @@ export function TeachingAssignmentsScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teachingAssignmentService, subjectService, schoolMemberService, sectionId]);
 
@@ -109,7 +112,7 @@ export function TeachingAssignmentsScreen({
 
   async function handleAssign(event: FormEvent) {
     event.preventDefault();
-    if (assigning || subjects.length === 0 || teachers.length === 0) return;
+    if (!canManage || assigning || subjects.length === 0 || teachers.length === 0) return;
     setError(null);
     setConfirmation(null);
     setAssigning(true);
@@ -141,13 +144,14 @@ export function TeachingAssignmentsScreen({
   }
 
   async function handleRemove(assignment: TeachingAssignmentDetail) {
-    if (removingId === assignment.id) return;
+    if (!canManage || removingId) return;
     setError(null);
     setConfirmation(null);
     setRemovingId(assignment.id);
     try {
       const removed = await teachingAssignmentService.remove(assignment.id);
       if (removed) {
+        onAssignmentRemoved?.(assignment.id);
         setAssignments((current) => current.filter((a) => a.id !== assignment.id));
         setConfirmation(
           `${teacherName(assignment.teacherUserId)} was unassigned from ${assignment.subjectName}.`,
@@ -159,6 +163,7 @@ export function TeachingAssignmentsScreen({
       setError(err instanceof ValidationError ? err.message : "Could not remove this assignment.");
     } finally {
       setRemovingId(null);
+      setRemoveCandidate(null);
     }
   }
 
@@ -166,7 +171,7 @@ export function TeachingAssignmentsScreen({
     <Page
       title={`${sectionName} — teaching assignments`}
       hint={
-        mode === "guided" ? (
+        mode === "guided" && canManage ? (
           <p className="field-hint">
             Assign one teacher per subject for this section. To change who teaches a subject, remove
             the current assignment first, then assign the new teacher.
@@ -188,6 +193,37 @@ export function TeachingAssignmentsScreen({
       )}
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+
+      {canManage && removeCandidate && (
+        <section aria-label="Confirm removal" className="workspace-link-row">
+          <div>
+            <h3>Confirm removal</h3>
+            <p>
+              Remove {teacherName(removeCandidate.teacherUserId)} from {removeCandidate.subjectName}{" "}
+              — {sectionName}. Its weekly meetings will also be removed. Review any unfinished class
+              work before continuing.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!!removingId}
+            ref={cancelRemoveRef}
+            onClick={() => {
+              setRemoveCandidate(null);
+              removeTriggerRef.current?.focus();
+            }}
+          >
+            Cancel removal
+          </button>
+          <button
+            type="button"
+            disabled={!!removingId}
+            onClick={() => handleRemove(removeCandidate)}
+          >
+            {removingId ? "Removing…" : "Confirm remove"}
+          </button>
+        </section>
+      )}
 
       {loading ? (
         <Loading label="Loading teaching assignments…" />
@@ -217,14 +253,20 @@ export function TeachingAssignmentsScreen({
                       >
                         Manage schedule
                       </button>{" "}
-                      <button
-                        type="button"
-                        aria-disabled={removingId === assignment.id}
-                        onClick={() => handleRemove(assignment)}
-                        aria-label={`Remove ${teacherName(assignment.teacherUserId)} from ${assignment.subjectName}`}
-                      >
-                        {removingId === assignment.id ? "Removing…" : "Remove"}
-                      </button>
+                      {canManage && (
+                        <button
+                          type="button"
+                          aria-disabled={removingId === assignment.id}
+                          disabled={!!removingId}
+                          onClick={(event) => {
+                            removeTriggerRef.current = event.currentTarget;
+                            setRemoveCandidate(assignment);
+                          }}
+                          aria-label={`Remove ${teacherName(assignment.teacherUserId)} from ${assignment.subjectName}`}
+                        >
+                          {removingId === assignment.id ? "Removing…" : "Remove"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -232,60 +274,67 @@ export function TeachingAssignmentsScreen({
             </table>
           )}
 
-          <form onSubmit={handleAssign} aria-label="Assign a teacher">
-            <h3>Assign a teacher</h3>
-            {subjects.length === 0 ? (
-              <p className="field-hint">No subjects exist yet — create one first.</p>
-            ) : teachers.length === 0 ? (
-              <p className="field-hint">No teachers are members of this school yet.</p>
-            ) : (
-              <div className="form-row">
-                <div className="field">
-                  <label htmlFor="assignment-subject">Subject</label>
-                  <select
-                    id="assignment-subject"
-                    value={assignSubjectId}
-                    onChange={(event) => setAssignSubjectId(event.target.value)}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select a subject
-                    </option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.name}
+          {!canManage && (
+            <p className="field-hint">
+              Your school head manages these assignments and schedule changes.
+            </p>
+          )}
+          {canManage && (
+            <form onSubmit={handleAssign} aria-label="Assign a teacher">
+              <h3>Assign a teacher</h3>
+              {subjects.length === 0 ? (
+                <p className="field-hint">No subjects exist yet — create one first.</p>
+              ) : teachers.length === 0 ? (
+                <p className="field-hint">No teachers are members of this school yet.</p>
+              ) : (
+                <div className="form-row">
+                  <div className="field">
+                    <label htmlFor="assignment-subject">Subject</label>
+                    <select
+                      id="assignment-subject"
+                      value={assignSubjectId}
+                      onChange={(event) => setAssignSubjectId(event.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select a subject
                       </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="assignment-teacher">Teacher</label>
-                  <select
-                    id="assignment-teacher"
-                    value={assignTeacherId}
-                    onChange={(event) => setAssignTeacherId(event.target.value)}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select a teacher
-                    </option>
-                    {teachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.displayName}
+                      {subjects.map((subject) => (
+                        <option key={subject.id} value={subject.id}>
+                          {subject.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="assignment-teacher">Teacher</label>
+                    <select
+                      id="assignment-teacher"
+                      value={assignTeacherId}
+                      onChange={(event) => setAssignTeacherId(event.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select a teacher
                       </option>
-                    ))}
-                  </select>
+                      {teachers.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            )}
-            <button
-              type="submit"
-              className="button-primary"
-              aria-disabled={assigning || subjects.length === 0 || teachers.length === 0}
-            >
-              {assigning ? "Assigning…" : "Assign teacher"}
-            </button>
-          </form>
+              )}
+              <button
+                type="submit"
+                className="button-primary"
+                aria-disabled={assigning || subjects.length === 0 || teachers.length === 0}
+              >
+                {assigning ? "Assigning…" : "Assign teacher"}
+              </button>
+            </form>
+          )}
         </>
       )}
     </Page>

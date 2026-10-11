@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GradingApplicationService } from "../application/grading-service";
 import { ValidationError } from "../domain/errors";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
@@ -29,6 +29,13 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
   const [policyId, setPolicyId] = useState("");
   const [policyPeriods, setPolicyPeriods] = useState<GradingPolicyPeriod[]>([]);
   const [existingPeriods, setExistingPeriods] = useState<GradingPeriod[]>([]);
+  const contextRef = useRef("");
+  const [loadedContext, setLoadedContext] = useState("");
+  const [retry, setRetry] = useState(0);
+  const contextKey = JSON.stringify([schoolYear.trim(), policyId]);
+  useEffect(() => {
+    contextRef.current = contextKey;
+  }, [contextKey]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -43,42 +50,36 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
         if (cancelled) return;
         setPolicies(result);
         const defaultPolicy = result.find((p) => p.isDefault) ?? result[0];
-        if (defaultPolicy) setPolicyId(defaultPolicy.id);
+        if (defaultPolicy) setPolicyId((current) => current || defaultPolicy.id);
+        else setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load grading policies.");
+        if (!cancelled) {
+          setError("Could not load grading policies.");
+          setLoading(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [gradingService]);
+  }, [gradingService, retry]);
 
   useEffect(() => {
-    if (!policyId) return;
+    if (!policyId || !schoolYear.trim()) return;
     let cancelled = false;
-    gradingService
-      .listPolicyPeriods(policyId)
-      .then((result) => {
-        if (!cancelled) setPolicyPeriods(result);
+    Promise.all([
+      gradingService.listPolicyPeriods(policyId),
+      gradingService.listPeriodsBySchoolYear(schoolYear.trim()),
+    ])
+      .then(([periods, existing]) => {
+        if (cancelled) return;
+        setPolicyPeriods(periods.filter((period) => period.policyId === policyId));
+        setExistingPeriods(existing.filter((period) => period.schoolYear === schoolYear.trim()));
+        setLoadedContext(contextKey);
+        setError(null);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this policy's periods.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [gradingService, policyId]);
-
-  useEffect(() => {
-    if (!schoolYear) return;
-    let cancelled = false;
-    gradingService
-      .listPeriodsBySchoolYear(schoolYear)
-      .then((result) => {
-        if (!cancelled) setExistingPeriods(result);
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load grading periods for this school year.");
+        if (!cancelled) setError("Could not load grading periods for this school year and policy.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -86,38 +87,44 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
     return () => {
       cancelled = true;
     };
-  }, [gradingService, schoolYear]);
+  }, [gradingService, schoolYear, policyId, contextKey, retry]);
 
   function handleSchoolYearChange(value: string) {
     setError(null);
     setLoading(true);
+    setConfirmation(null);
     setSchoolYear(value);
   }
 
   function draftFor(policyPeriodId: string) {
-    return drafts[policyPeriodId] ?? { startsOn: "", endsOn: "" };
+    return drafts[JSON.stringify([contextKey, policyPeriodId])] ?? { startsOn: "", endsOn: "" };
   }
 
   function updateDraft(policyPeriodId: string, field: "startsOn" | "endsOn", value: string) {
     setDrafts((current) => ({
       ...current,
-      [policyPeriodId]: { ...draftFor(policyPeriodId), [field]: value },
+      [JSON.stringify([contextKey, policyPeriodId])]: {
+        ...draftFor(policyPeriodId),
+        [field]: value,
+      },
     }));
   }
 
   async function handleSave(policyPeriodId: string) {
-    if (savingPeriodId === policyPeriodId) return;
+    if (savingPeriodId || loadedContext !== contextKey || loading || !schoolYear.trim()) return;
+    const savedContext = contextKey;
     setError(null);
     setConfirmation(null);
     setSavingPeriodId(policyPeriodId);
     const draft = draftFor(policyPeriodId);
     try {
       const created = await gradingService.createPeriod(
-        schoolYear,
+        schoolYear.trim(),
         policyPeriodId,
         draft.startsOn,
         draft.endsOn,
       );
+      if (contextRef.current !== savedContext) return;
       if (created === null) {
         setError("Could not save this grading period.");
       } else {
@@ -125,6 +132,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
         setConfirmation(`${created.label} saved.`);
       }
     } catch (err) {
+      if (contextRef.current !== savedContext) return;
       setError(
         err instanceof ValidationError ? err.message : "Could not save this grading period.",
       );
@@ -152,7 +160,20 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
         </p>
       )}
 
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <Alert tone="error">
+          {error}
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setRetry((value) => value + 1);
+            }}
+          >
+            Retry
+          </button>
+        </Alert>
+      )}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       <div className="form-row">
@@ -163,6 +184,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
             type="text"
             placeholder="2026-2027"
             value={schoolYear}
+            disabled={savingPeriodId !== null}
             onChange={(event) => handleSchoolYearChange(event.target.value)}
           />
         </div>
@@ -171,7 +193,13 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
           <select
             id="grading-policy"
             value={policyId}
-            onChange={(event) => setPolicyId(event.target.value)}
+            disabled={savingPeriodId !== null}
+            onChange={(event) => {
+              setPolicyId(event.target.value);
+              setLoading(true);
+              setError(null);
+              setConfirmation(null);
+            }}
           >
             {policies.map((policy) => (
               <option key={policy.id} value={policy.id}>
@@ -187,9 +215,11 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
         <p className="field-hint">{policies.find((p) => p.id === policyId)?.sourceCitation}</p>
       )}
 
-      {loading ? (
+      {!schoolYear.trim() ? (
+        <p className="field-hint">Enter a school year to load its grading periods.</p>
+      ) : loading ? (
         <Loading label="Loading grading periods…" />
-      ) : (
+      ) : loadedContext !== contextKey || error ? null : (
         <table className="attendance-roster">
           <thead>
             <tr>
@@ -243,7 +273,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
                       <td>
                         <button
                           type="button"
-                          aria-disabled={savingPeriodId === period.id}
+                          aria-disabled={savingPeriodId !== null}
                           onClick={() => handleSave(period.id)}
                         >
                           {savingPeriodId === period.id ? "Saving…" : "Save"}

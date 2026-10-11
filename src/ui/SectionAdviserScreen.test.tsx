@@ -102,6 +102,7 @@ class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {
 
 function renderScreen(
   options: {
+    roles?: string[];
     current?: SectionAdvisory | null;
     members?: SchoolMember[];
     onBack?: () => void;
@@ -116,6 +117,7 @@ function renderScreen(
   const result = render(
     <ModeProvider>
       <SectionAdviserScreen
+        roles={options.roles ?? ["school_head"]}
         sectionAdvisoryService={sectionAdvisoryService}
         schoolMemberService={schoolMemberService}
         sectionId="sec-1"
@@ -235,4 +237,11 @@ describe("SectionAdviserScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("shows teachers adviser information without assignment or ending controls", async () => {
+  renderScreen({ roles: ["teacher"] });
+  await screen.findByText("No adviser is currently assigned to this section.");
+  expect(screen.queryByRole("button", { name: "Assign adviser" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "End advisory" })).not.toBeInTheDocument();
 });

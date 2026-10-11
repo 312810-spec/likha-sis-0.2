@@ -17,6 +17,7 @@ const CONTEXT = {
 function renderScreen() {
   const onCheckAttendance = vi.fn();
   const onOpenClassRecord = vi.fn();
+  const onStartClassroom = vi.fn();
   const onBackToToday = vi.fn();
   const rendered = render(
     <ModeProvider>
@@ -24,11 +25,12 @@ function renderScreen() {
         context={CONTEXT}
         onCheckAttendance={onCheckAttendance}
         onOpenClassRecord={onOpenClassRecord}
+        onStartClassroom={onStartClassroom}
         onBackToToday={onBackToToday}
       />
     </ModeProvider>,
   );
-  return { ...rendered, onCheckAttendance, onOpenClassRecord, onBackToToday };
+  return { ...rendered, onCheckAttendance, onOpenClassRecord, onStartClassroom, onBackToToday };
 }
 
 describe("ClassWorkspaceScreen", () => {

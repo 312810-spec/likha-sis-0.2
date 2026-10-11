@@ -165,12 +165,15 @@ export function AttendanceScreen({
     setSectionId(newSectionId);
   }
 
-  async function handleMark(learnerId: string, status: AttendanceStatus) {
+  /** CTOS M07: resolves to whether the mark actually landed, so keyboard
+   * auto-advance can move focus only on a successful save — a failed mark
+   * leaves the teacher on the row that needs them, not two rows past it. */
+  async function handleMark(learnerId: string, status: AttendanceStatus): Promise<boolean> {
     const entry = roster.find((candidate) => candidate.learnerId === learnerId);
     // Selecting the already-active status is a no-op, not a write -- both
     // to avoid an unnecessary round trip and so a stray duplicate click
     // can never surface a false "saving" state.
-    if (entry && entry.status === status) return;
+    if (entry && entry.status === status) return false;
 
     setConfirmation(null);
     setRowErrors((current) => {
@@ -188,7 +191,7 @@ export function AttendanceScreen({
       // An older write's response must never overwrite a newer one's
       // result -- only apply this response if nothing newer started for
       // this learner while it was in flight.
-      if (writeGenerationRef.current.get(learnerId) !== generation) return;
+      if (writeGenerationRef.current.get(learnerId) !== generation) return false;
       setRoster((current) =>
         current.map((candidate) =>
           candidate.learnerId === learnerId
@@ -196,8 +199,9 @@ export function AttendanceScreen({
             : candidate,
         ),
       );
+      return true;
     } catch (err) {
-      if (writeGenerationRef.current.get(learnerId) !== generation) return;
+      if (writeGenerationRef.current.get(learnerId) !== generation) return false;
       setRowErrors((current) => ({
         ...current,
         [learnerId]: {
@@ -205,6 +209,7 @@ export function AttendanceScreen({
           status,
         },
       }));
+      return false;
     } finally {
       if (writeGenerationRef.current.get(learnerId) === generation) {
         setSavingLearnerIds((current) => {
@@ -239,6 +244,13 @@ export function AttendanceScreen({
     }
   }
 
+  function focusNeighborStatus(learnerId: string, status: AttendanceStatus, direction: 1 | -1) {
+    const index = roster.findIndex((candidate) => candidate.learnerId === learnerId);
+    const target = roster[index + direction];
+    if (!target) return;
+    buttonRefs.current.get(buttonKey(target.learnerId, status))?.focus();
+  }
+
   function handleRosterKeyDown(
     event: React.KeyboardEvent<HTMLButtonElement>,
     learnerId: string,
@@ -247,19 +259,22 @@ export function AttendanceScreen({
     const key = event.key;
     if (key === "p" || key === "P") {
       event.preventDefault();
-      void handleMark(learnerId, "present");
+      void handleMark(learnerId, "present").then((marked) => {
+        if (marked) focusNeighborStatus(learnerId, status, 1);
+      });
     } else if (key === "a" || key === "A") {
       event.preventDefault();
-      void handleMark(learnerId, "absent");
+      void handleMark(learnerId, "absent").then((marked) => {
+        if (marked) focusNeighborStatus(learnerId, status, 1);
+      });
     } else if (key === "t" || key === "T") {
       event.preventDefault();
-      void handleMark(learnerId, "tardy");
+      void handleMark(learnerId, "tardy").then((marked) => {
+        if (marked) focusNeighborStatus(learnerId, status, 1);
+      });
     } else if (key === "ArrowDown" || key === "ArrowUp") {
       event.preventDefault();
-      const index = roster.findIndex((candidate) => candidate.learnerId === learnerId);
-      const target = roster[key === "ArrowDown" ? index + 1 : index - 1];
-      if (!target) return;
-      buttonRefs.current.get(buttonKey(target.learnerId, status))?.focus();
+      focusNeighborStatus(learnerId, status, key === "ArrowDown" ? 1 : -1);
     }
   }
 
@@ -376,8 +391,9 @@ export function AttendanceScreen({
                 Only fills in learners with no mark yet — never changes a mark you've already made.
               </p>
               <p className="field-hint">
-                Keyboard: P Present · A Absent · T Tardy · ↑/↓ move between learners (while focus is
-                on a status button).
+                Keyboard: P Present · A Absent · T Tardy · ↑/↓ move between learners. A letter marks
+                the learner and moves to the next one, so a full roster is one keystroke per learner
+                (while focus is on a status button).
               </p>
               <table className="attendance-roster">
                 <thead>

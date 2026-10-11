@@ -11,6 +11,8 @@ interface AppLayoutProps {
   activeTab: SignedInTab;
   onNavigate: (tab: SignedInTab) => void;
   onLogout: () => void;
+  logoutPending?: boolean;
+  logoutError?: string | null;
   /** In-app school branding (2026-09-06): fetched once here so both
    * `Sidebar` and `TopBar` can show the same logo without each making
    * its own request. Absent from any test that constructs `AppLayout`
@@ -40,6 +42,8 @@ export function AppLayout({
   activeTab,
   onNavigate,
   onLogout,
+  logoutPending,
+  logoutError,
   schoolLogoService,
   children,
 }: AppLayoutProps) {
@@ -203,14 +207,14 @@ export function AppLayout({
           session={session}
           activeTab={activeTab}
           onLogout={onLogout}
+          logoutPending={logoutPending}
+          logoutError={logoutError}
           onOpenDrawer={() => setDrawerOpen(true)}
           logoUrl={logoUrl}
         />
         <main id="main-content" tabIndex={-1} className="app-canvas">
           {(activeTab === "workspace" || activeTab === "my-day") && (
-            <h1 className="app-mobile-title">
-              {activeTab === "workspace" ? "Today" : TAB_LABELS[activeTab]}
-            </h1>
+            <h1 className="app-mobile-title">{TAB_LABELS[activeTab]}</h1>
           )}
           {children}
         </main>

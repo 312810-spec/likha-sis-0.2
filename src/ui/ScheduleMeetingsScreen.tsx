@@ -10,6 +10,8 @@ import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ScheduleMeetingsScreenProps {
+  roles?: readonly string[];
+  onScheduleChanged?: (assignmentId: string) => void;
   teachingAssignmentService: TeachingAssignmentApplicationService;
   /** The class to schedule. Supplied by the Teaching Assignments
    * workflow (App.tsx state handoff), never a URL/route param -- the
@@ -39,12 +41,15 @@ const CONFLICT_MESSAGES: Record<string, string> = {
  * 6=Saturday convention `TodaysClassesScreen` (Wave 2X) already reads. */
 export function ScheduleMeetingsScreen({
   teachingAssignmentService,
+  roles = [],
+  onScheduleChanged,
   teachingAssignmentId,
   subjectName,
   sectionName,
   onBack,
 }: ScheduleMeetingsScreenProps) {
   const { mode } = useTeacherMode();
+  const canManage = roles.includes("school_head");
 
   const [meetings, setMeetings] = useState<ScheduleMeeting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +64,12 @@ export function ScheduleMeetingsScreen({
   const [creating, setCreating] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  const [removeCandidate, setRemoveCandidate] = useState<ScheduleMeeting | null>(null);
+  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (removeCandidate) cancelRemoveRef.current?.focus();
+  }, [removeCandidate]);
   const requestRef = useRef(0);
 
   function load() {
@@ -84,12 +95,15 @@ export function ScheduleMeetingsScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teachingAssignmentService, teachingAssignmentId]);
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
-    if (creating) return;
+    if (!canManage || creating) return;
     setError(null);
     setConfirmation(null);
     setCreating(true);
@@ -102,6 +116,7 @@ export function ScheduleMeetingsScreen({
         room,
       );
       if (outcome.outcome === "created") {
+        onScheduleChanged?.(teachingAssignmentId);
         setMeetings((current) => [...current, outcome.meeting]);
         setConfirmation("Meeting scheduled.");
         setStartsAt("");
@@ -118,13 +133,14 @@ export function ScheduleMeetingsScreen({
   }
 
   async function handleRemove(meeting: ScheduleMeeting) {
-    if (removingId === meeting.id) return;
+    if (!canManage || removingId) return;
     setError(null);
     setConfirmation(null);
     setRemovingId(meeting.id);
     try {
       const removed = await teachingAssignmentService.removeMeeting(meeting.id);
       if (removed) {
+        onScheduleChanged?.(teachingAssignmentId);
         setMeetings((current) => current.filter((m) => m.id !== meeting.id));
         setConfirmation("Meeting removed.");
       } else {
@@ -134,6 +150,7 @@ export function ScheduleMeetingsScreen({
       setError(err instanceof ValidationError ? err.message : "Could not remove this meeting.");
     } finally {
       setRemovingId(null);
+      setRemoveCandidate(null);
     }
   }
 
@@ -141,7 +158,7 @@ export function ScheduleMeetingsScreen({
     <Page
       title={`${subjectName} — ${sectionName} — schedule`}
       hint={
-        mode === "guided" ? (
+        mode === "guided" && canManage ? (
           <p className="field-hint">
             Add each weekly meeting time for this class. A teacher, section, or room can&rsquo;t be
             double-booked for overlapping times.
@@ -163,6 +180,38 @@ export function ScheduleMeetingsScreen({
       )}
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+
+      {canManage && removeCandidate && (
+        <section aria-label="Confirm removal" className="workspace-link-row">
+          <div>
+            <h3>Confirm removal</h3>
+            <p>
+              Remove {subjectName} — {sectionName}: {WEEKDAY_LABELS[removeCandidate.weekday]}{" "}
+              {removeCandidate.startsAt}–{removeCandidate.endsAt}
+              {removeCandidate.room ? ` · ${removeCandidate.room}` : ""}. This removes the weekly
+              planned meeting.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!!removingId}
+            ref={cancelRemoveRef}
+            onClick={() => {
+              setRemoveCandidate(null);
+              removeTriggerRef.current?.focus();
+            }}
+          >
+            Cancel removal
+          </button>
+          <button
+            type="button"
+            disabled={!!removingId}
+            onClick={() => handleRemove(removeCandidate)}
+          >
+            {removingId ? "Removing…" : "Confirm remove"}
+          </button>
+        </section>
+      )}
 
       {loading ? (
         <Skeleton label="Loading this class's schedule…" lines={4} />
@@ -192,14 +241,20 @@ export function ScheduleMeetingsScreen({
                     </td>
                     <td>{meeting.room ?? "—"}</td>
                     <td>
-                      <button
-                        type="button"
-                        aria-disabled={removingId === meeting.id}
-                        onClick={() => handleRemove(meeting)}
-                        aria-label={`Remove the ${WEEKDAY_LABELS[meeting.weekday]} ${meeting.startsAt} meeting`}
-                      >
-                        {removingId === meeting.id ? "Removing…" : "Remove"}
-                      </button>
+                      {canManage && (
+                        <button
+                          type="button"
+                          aria-disabled={removingId === meeting.id}
+                          disabled={!!removingId}
+                          onClick={(event) => {
+                            removeTriggerRef.current = event.currentTarget;
+                            setRemoveCandidate(meeting);
+                          }}
+                          aria-label={`Remove the ${WEEKDAY_LABELS[meeting.weekday]} ${meeting.startsAt} meeting`}
+                        >
+                          {removingId === meeting.id ? "Removing…" : "Remove"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -207,57 +262,64 @@ export function ScheduleMeetingsScreen({
             </table>
           )}
 
-          <form onSubmit={handleCreate} aria-label="Schedule a meeting">
-            <h3>Schedule a meeting</h3>
-            <div className="form-row">
-              <div className="field">
-                <label htmlFor="meeting-weekday">Day</label>
-                <select
-                  id="meeting-weekday"
-                  value={weekday}
-                  onChange={(event) => setWeekday(event.target.value)}
-                >
-                  {WEEKDAY_LABELS.map((label, index) => (
-                    <option key={label} value={index}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+          {!canManage && (
+            <p className="field-hint">
+              Your school head manages these assignments and schedule changes.
+            </p>
+          )}
+          {canManage && (
+            <form onSubmit={handleCreate} aria-label="Schedule a meeting">
+              <h3>Schedule a meeting</h3>
+              <div className="form-row">
+                <div className="field">
+                  <label htmlFor="meeting-weekday">Day</label>
+                  <select
+                    id="meeting-weekday"
+                    value={weekday}
+                    onChange={(event) => setWeekday(event.target.value)}
+                  >
+                    {WEEKDAY_LABELS.map((label, index) => (
+                      <option key={label} value={index}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="meeting-starts-at">Start time</label>
+                  <input
+                    id="meeting-starts-at"
+                    type="time"
+                    value={startsAt}
+                    onChange={(event) => setStartsAt(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="meeting-ends-at">End time</label>
+                  <input
+                    id="meeting-ends-at"
+                    type="time"
+                    value={endsAt}
+                    onChange={(event) => setEndsAt(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="meeting-room">Room (optional)</label>
+                  <input
+                    id="meeting-room"
+                    type="text"
+                    value={room}
+                    onChange={(event) => setRoom(event.target.value)}
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="meeting-starts-at">Start time</label>
-                <input
-                  id="meeting-starts-at"
-                  type="time"
-                  value={startsAt}
-                  onChange={(event) => setStartsAt(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="meeting-ends-at">End time</label>
-                <input
-                  id="meeting-ends-at"
-                  type="time"
-                  value={endsAt}
-                  onChange={(event) => setEndsAt(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="meeting-room">Room (optional)</label>
-                <input
-                  id="meeting-room"
-                  type="text"
-                  value={room}
-                  onChange={(event) => setRoom(event.target.value)}
-                />
-              </div>
-            </div>
-            <button type="submit" className="button-primary" aria-disabled={creating}>
-              {creating ? "Scheduling…" : "Schedule meeting"}
-            </button>
-          </form>
+              <button type="submit" className="button-primary" aria-disabled={creating}>
+                {creating ? "Scheduling…" : "Schedule meeting"}
+              </button>
+            </form>
+          )}
         </>
       )}
     </Page>

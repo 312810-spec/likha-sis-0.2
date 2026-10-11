@@ -45,12 +45,13 @@ describe("Sidebar", () => {
     expect(img).toHaveAttribute("src", "blob:mock-logo");
   });
 
-  it("shows school branding and only the six primary destinations", () => {
+  it("shows school branding and Today and six primary destinations", () => {
     renderSidebar();
     expect(screen.getByText("LIKHA-SIS")).toBeInTheDocument();
     expect(screen.getByText("Rizal Elementary")).toBeInTheDocument();
-    expect(screen.getAllByRole("button")).toHaveLength(6);
+    expect(screen.getAllByRole("button")).toHaveLength(7);
     for (const name of [
+      "Today",
       "Dashboard",
       "My Advisory",
       "Class Record",

@@ -47,9 +47,9 @@ describe("DevPreviewApp — new fixture destinations render", () => {
     expect(await screen.findByRole("heading", { name: "My Teaching Load" })).toBeInTheDocument();
   });
 
-  it("renders Teaching Assignments and Class Schedule via Sections", async () => {
+  it("renders authorized Teaching Assignments and Class Schedule via Sections", async () => {
     const user = userEvent.setup();
-    render(<DevPreviewApp />);
+    render(<DevPreviewApp roles={["school_head", "teacher"]} />);
     await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("button", { name: "Sections" }));
     await user.click(

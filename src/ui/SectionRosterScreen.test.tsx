@@ -1283,6 +1283,7 @@ describe("SectionRosterScreen", () => {
       await screen.findByText("C:\\Documents\\LIKHA-SIS\\SF1_Mabini.xlsx"),
     ).toBeInTheDocument();
     expect(screen.getByText(/\(2 learners\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Template: SF1 · synthetic-v1/)).toBeInTheDocument();
     expect(formRepo.sf1Calls).toEqual([{ sectionId: "sec-1", asOfDate: "2026-08-27" }]);
   });
 
@@ -1324,6 +1325,7 @@ describe("SectionRosterScreen", () => {
 
     expect(await screen.findByText(/Report card for Bautista, Ana saved to/)).toBeInTheDocument();
     expect(screen.getByText(/3 subjects/)).toBeInTheDocument();
+    expect(screen.getByText(/Template: SF9 · synthetic-v1/)).toBeInTheDocument();
     expect(formRepo.sf9Calls).toEqual([
       { sectionId: "sec-1", learnerId: "l-bautista", asOfDate: "2026-08-27" },
     ]);

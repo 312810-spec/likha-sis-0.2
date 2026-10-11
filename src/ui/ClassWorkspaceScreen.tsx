@@ -6,6 +6,9 @@ interface ClassWorkspaceScreenProps {
   context: TeacherClassWorkContext;
   onCheckAttendance: (teachingAssignmentId: string) => void;
   onOpenClassRecord: (teachingAssignmentId: string) => void;
+  /** Opens Classroom Mode -- CTOS.md §6.3's teaching cockpit -- for this
+   * class, today. Same narrow callback shape as the two above. */
+  onStartClassroom: (teachingAssignmentId: string) => void;
   onBackToToday: () => void;
 }
 
@@ -21,6 +24,7 @@ export function ClassWorkspaceScreen({
   context,
   onCheckAttendance,
   onOpenClassRecord,
+  onStartClassroom,
   onBackToToday,
 }: ClassWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
@@ -52,9 +56,28 @@ export function ClassWorkspaceScreen({
         </p>
       ) : null}
 
+      {context.scheduleDate && (
+        <p className="field-hint">
+          Schedule preview: {context.scheduleDate}. Classroom sessions use today’s date, shown
+          before recording.
+        </p>
+      )}
       <section aria-labelledby="class-workspace-work">
         <h3 id="class-workspace-work">Class work</h3>
         <div className="class-work-actions">
+          <div className="class-work-row">
+            <div>
+              <h4>Classroom</h4>
+              <p>Start the session, capture evidence, then finish the class.</p>
+            </div>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => onStartClassroom(context.teachingAssignmentId)}
+            >
+              Start class
+            </button>
+          </div>
           <div className="class-work-row">
             <div>
               <h4>Attendance</h4>

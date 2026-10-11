@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GradingApplicationService } from "../application/grading-service";
@@ -91,6 +91,49 @@ beforeEach(() => {
 });
 
 describe("GradingPeriodsScreen", () => {
+  it("keeps drafts scoped to the selected year and restores them only for that year", async () => {
+    renderScreen();
+    await screen.findByText("1st Term");
+    const year = screen.getByLabelText("School year");
+    const originalYear = (year as HTMLInputElement).value;
+    fireEvent.change(screen.getByLabelText("1st Term start date"), {
+      target: { value: "2026-06-08" },
+    });
+    fireEvent.change(year, { target: { value: "2027-2028" } });
+    await waitFor(() => expect(screen.getByLabelText("1st Term start date")).toHaveValue(""));
+    fireEvent.change(year, { target: { value: originalYear } });
+    await waitFor(() =>
+      expect(screen.getByLabelText("1st Term start date")).toHaveValue("2026-06-08"),
+    );
+    fireEvent.change(year, { target: { value: "" } });
+    expect(screen.getByText(/Enter a school year/)).toBeInTheDocument();
+    expect(screen.queryByText("Loading grading periods…")).not.toBeInTheDocument();
+  });
+
+  it("hides previously loaded dates when the new year cannot be read", async () => {
+    const repo = new FakeGradingRepository([POLICY], PERIODS, [
+      {
+        id: "gp1",
+        schoolId: "s1",
+        schoolYear: "2026-2027",
+        policyPeriodId: "pp1",
+        label: "1st Term",
+        startsOn: "2026-06-08",
+        endsOn: "2026-09-15",
+        createdAt: "now",
+      },
+    ]);
+    renderScreen(repo);
+    await screen.findByText("2026-06-08");
+    repo.listPeriodsBySchoolYear = async () => {
+      throw new Error("offline");
+    };
+    fireEvent.change(screen.getByLabelText("School year"), { target: { value: "2027-2028" } });
+    await screen.findByText(/Could not load grading periods/);
+    expect(screen.queryByText("2026-06-08")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
+
   it("shows the default policy's periods with the source citation", async () => {
     renderScreen();
 

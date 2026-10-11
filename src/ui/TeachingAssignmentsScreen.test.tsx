@@ -124,6 +124,8 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
 
 function renderScreen(
   options: {
+    roles?: string[];
+    onAssignmentRemoved?: (id: string) => void;
     assignments?: TeachingAssignmentDetail[];
     members?: SchoolMember[];
     onBack?: () => void;
@@ -142,6 +144,8 @@ function renderScreen(
   const result = render(
     <ModeProvider>
       <TeachingAssignmentsScreen
+        roles={options.roles ?? ["school_head"]}
+        onAssignmentRemoved={options.onAssignmentRemoved}
         teachingAssignmentService={teachingAssignmentService}
         subjectService={subjectService}
         schoolMemberService={schoolMemberService}
@@ -218,6 +222,7 @@ describe("TeachingAssignmentsScreen", () => {
 
     const removeButton = screen.getByRole("button", { name: "Remove Ana Cruz from Mathematics" });
     await user.click(removeButton);
+    await user.click(screen.getByRole("button", { name: "Confirm remove" }));
     await waitFor(() => expect(teachingAssignmentRepo.removeCalls).toBe(1));
 
     expect(removeButton).toHaveAttribute("aria-disabled", "true");
@@ -243,6 +248,7 @@ describe("TeachingAssignmentsScreen", () => {
     await screen.findByRole("rowheader", { name: "Mathematics" });
 
     await user.click(screen.getByRole("button", { name: "Remove Ana Cruz from Mathematics" }));
+    await user.click(screen.getByRole("button", { name: "Confirm remove" }));
 
     await waitFor(() =>
       expect(
@@ -275,4 +281,34 @@ describe("TeachingAssignmentsScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("requires deliberate confirmation and allows cancelling without a write", async () => {
+  const user = userEvent.setup();
+  const { teachingAssignmentRepo } = renderScreen({ assignments: [ASSIGNMENT] });
+  await screen.findByRole("rowheader", { name: "Mathematics" });
+  await user.click(screen.getByRole("button", { name: "Remove Ana Cruz from Mathematics" }));
+  expect(teachingAssignmentRepo.removeCalls).toBe(0);
+  await user.click(screen.getByRole("button", { name: "Cancel removal" }));
+  expect(teachingAssignmentRepo.removeCalls).toBe(0);
+  expect(screen.queryByRole("button", { name: "Confirm remove" })).not.toBeInTheDocument();
+});
+it("does not offer management mutations to teachers", async () => {
+  renderScreen({ assignments: [ASSIGNMENT], roles: ["teacher"] });
+  await screen.findByRole("rowheader", { name: "Mathematics" });
+  expect(screen.queryByRole("form", { name: "Assign a teacher" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Remove Ana Cruz from Mathematics" }),
+  ).not.toBeInTheDocument();
+});
+
+it("invalidates assignment context only after confirmed successful removal", async () => {
+  const user = userEvent.setup();
+  const removed = vi.fn();
+  renderScreen({ assignments: [ASSIGNMENT], onAssignmentRemoved: removed });
+  await screen.findByRole("rowheader", { name: "Mathematics" });
+  await user.click(screen.getByRole("button", { name: "Remove Ana Cruz from Mathematics" }));
+  expect(removed).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Confirm remove" }));
+  await waitFor(() => expect(removed).toHaveBeenCalledWith(ASSIGNMENT.id));
 });

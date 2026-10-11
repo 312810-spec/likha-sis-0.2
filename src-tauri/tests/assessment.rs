@@ -71,6 +71,7 @@ fn record_score_as_current_session(
         status,
         score,
         &user_id,
+        None,
     )
 }
 

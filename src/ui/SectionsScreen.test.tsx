@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExportApplicationService } from "../application/export-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import { SectionApplicationService } from "../application/section-service";
@@ -18,6 +18,8 @@ import type { SectionRepository } from "../domain/ports/section-repository";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
+import { SessionDraftContext } from "./session-draft-context";
+import { clearSessionDrafts } from "./session-draft-store";
 import { SectionsScreen } from "./SectionsScreen";
 
 const LEARNER: Learner = {
@@ -189,10 +191,14 @@ class FakeExportRepository implements ExportRepository {
 function renderScreen(
   sections: Section[] = [],
   exportOverrides: Partial<FakeExportRepository> = {},
+  options: { roles?: string[]; sectionFail?: boolean; learnerFail?: boolean; owner?: string } = {},
 ) {
   const sectionRepo = new FakeSectionRepository(sections);
   const sectionService = new SectionApplicationService(sectionRepo);
-  const learnerService = new LearnerApplicationService(new FakeLearnerRepository());
+  const learnerRepo = new FakeLearnerRepository();
+  if (options.sectionFail) vi.spyOn(sectionRepo, "list").mockRejectedValue(new Error("Offline"));
+  if (options.learnerFail) vi.spyOn(learnerRepo, "list").mockRejectedValue(new Error("Offline"));
+  const learnerService = new LearnerApplicationService(learnerRepo);
   const exportRepo = new FakeExportRepository();
   Object.assign(exportRepo, exportOverrides);
   const exportService = new ExportApplicationService(exportRepo);
@@ -200,20 +206,23 @@ function renderScreen(
   const manageAssignmentsCalls: Array<[string, string]> = [];
   const manageAdviserCalls: Array<[string, string]> = [];
   const result = render(
-    <ModeProvider>
-      <SectionsScreen
-        sectionService={sectionService}
-        learnerService={learnerService}
-        exportService={exportService}
-        onOpenRoster={(sectionId) => openRosterCalls.push(sectionId)}
-        onManageAssignments={(sectionId, sectionName) =>
-          manageAssignmentsCalls.push([sectionId, sectionName])
-        }
-        onManageAdviser={(sectionId, sectionName) =>
-          manageAdviserCalls.push([sectionId, sectionName])
-        }
-      />
-    </ModeProvider>,
+    <SessionDraftContext.Provider value={options.owner ?? null}>
+      <ModeProvider>
+        <SectionsScreen
+          roles={options.roles ?? ["school_head"]}
+          sectionService={sectionService}
+          learnerService={learnerService}
+          exportService={exportService}
+          onOpenRoster={(sectionId) => openRosterCalls.push(sectionId)}
+          onManageAssignments={(sectionId, sectionName) =>
+            manageAssignmentsCalls.push([sectionId, sectionName])
+          }
+          onManageAdviser={(sectionId, sectionName) =>
+            manageAdviserCalls.push([sectionId, sectionName])
+          }
+        />
+      </ModeProvider>
+    </SessionDraftContext.Provider>,
   );
   return {
     ...result,
@@ -227,6 +236,7 @@ function renderScreen(
 
 beforeEach(() => {
   window.localStorage.clear();
+  clearSessionDrafts();
 });
 
 describe("SectionsScreen", () => {
@@ -506,7 +516,7 @@ describe("SectionsScreen", () => {
     await user.click(createButton);
     await waitFor(() => expect(sectionRepo.createCalls.length).toBe(1));
 
-    expect(createButton).toHaveAttribute("aria-disabled", "true");
+    expect(createButton).toBeDisabled();
     await user.click(createButton);
 
     expect(sectionRepo.createCalls.length).toBe(1);
@@ -532,7 +542,7 @@ describe("SectionsScreen", () => {
     await user.click(enrollButton);
     await waitFor(() => expect(sectionRepo.enrollCalls.length).toBe(1));
 
-    expect(enrollButton).toHaveAttribute("aria-disabled", "true");
+    expect(enrollButton).toBeDisabled();
     await user.click(enrollButton);
 
     expect(sectionRepo.enrollCalls.length).toBe(1);
@@ -562,5 +572,41 @@ describe("SectionsScreen", () => {
     await user.click(exportBtn);
 
     expect(exportRepo.sf6Calls.length).toBe(1);
+  });
+});
+
+describe("Sections recovery and role-aware setup", () => {
+  it("shows read failure without claiming empty setup and retries", async () => {
+    const user = userEvent.setup();
+    const { sectionRepo } = renderScreen([], {}, { sectionFail: true });
+    await screen.findByRole("button", { name: "Retry sections" });
+    expect(screen.queryByText("No sections created yet.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create section" })).toBeDisabled();
+    vi.mocked(sectionRepo.list).mockResolvedValue([]);
+    await user.click(screen.getByRole("button", { name: "Retry sections" }));
+    expect(await screen.findByText("No sections created yet.")).toBeInTheDocument();
+  });
+  it("keeps section work available when learners fail and blocks enrollment", async () => {
+    renderScreen([], {}, { learnerFail: true });
+    await screen.findByRole("button", { name: "Retry learners" });
+    expect(screen.getByRole("button", { name: "Create section" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
+  });
+  it("retains setup draft on navigation within the same session but not another actor", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderScreen([], {}, { owner: "school:user" });
+    await user.type(screen.getByLabelText("Section name"), "Kindness");
+    unmount();
+    const second = renderScreen([], {}, { owner: "school:user" });
+    expect(screen.getByLabelText("Section name")).toHaveValue("Kindness");
+    second.unmount();
+    renderScreen([], {}, { owner: "school:other" });
+    expect(screen.getByLabelText("Section name")).toHaveValue("");
+  });
+  it("offers teachers read-only sections without setup or enrollment actions", async () => {
+    renderScreen([], {}, { roles: ["teacher"] });
+    await screen.findByText("No sections created yet.");
+    expect(screen.queryByRole("button", { name: "Create section" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enroll learner" })).not.toBeInTheDocument();
   });
 });

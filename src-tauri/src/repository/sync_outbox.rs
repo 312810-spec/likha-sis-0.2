@@ -334,6 +334,41 @@ mod tests {
     }
 
     #[test]
+    fn a_departed_members_queued_work_still_propagates_because_the_queue_is_the_schools_data() {
+        // M02 "sync queue scope" -- a deliberate decision, recorded here so it
+        // is not mistaken for an oversight. The queue is keyed on school, not
+        // on the actor who enqueued. When a member is removed from a school,
+        // their *already-recorded* attendance and scores are legitimate
+        // records of that school's learners, so their queued rows must still
+        // reach the hub; dropping them would destroy real teacher work. What
+        // removal blocks is *new* writes, and that guard is one layer up, in
+        // session revocation (`auth::remove_school_member` ->
+        // `session_repo::revoke_all_for_user`, fail-closed on every protected
+        // command). `actor_user_id` is therefore provenance, never a read
+        // filter.
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let mut departed = change();
+        let mut incoming = change();
+        let departed_actor = Uuid::now_v7();
+        let incoming_actor = Uuid::now_v7();
+        departed.actor_user_id = departed_actor;
+        incoming.actor_user_id = incoming_actor;
+        enqueue(&conn, &school.id, &departed).unwrap();
+        enqueue(&conn, &school.id, &incoming).unwrap();
+
+        // Both actors' rows are returned for the one school, in order.
+        let entries = pending_for_school(&conn, &school.id, 100).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].change.actor_user_id, departed_actor);
+        assert_eq!(entries[1].change.actor_user_id, incoming_actor);
+
+        // And both count as pending for the school -- the departed actor's row
+        // is not quarantined or hidden from the push loop.
+        assert_eq!(count_pending_for_school(&conn, &school.id).unwrap(), 2);
+    }
+
+    #[test]
     fn count_pending_for_school_counts_only_that_schools_queued_changes() {
         let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
         let first = school::create(&conn, "First School").unwrap();

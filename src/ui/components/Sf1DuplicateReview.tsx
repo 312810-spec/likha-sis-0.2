@@ -15,18 +15,20 @@ interface Sf1DuplicateReviewProps {
   hasNext: boolean;
 }
 
-type FieldComparison = "same" | "different" | "missingFromSf1" | "missingFromLikha" | "notStored";
+type FieldComparison =
+  "missingFromBoth" | "same" | "different" | "missingFromSf1" | "missingFromLikha" | "notStored";
 
 function compareText(sf1Value: string | null, likhaValue: string | null): FieldComparison {
   const a = sf1Value?.trim().toLowerCase() ?? "";
   const b = likhaValue?.trim().toLowerCase() ?? "";
-  if (a.length === 0 && b.length === 0) return "same";
+  if (a.length === 0 && b.length === 0) return "missingFromBoth";
   if (a.length === 0) return "missingFromSf1";
   if (b.length === 0) return "missingFromLikha";
   return a === b ? "same" : "different";
 }
 
 const COMPARISON_LABEL: Record<FieldComparison, string> = {
+  missingFromBoth: "Missing from both",
   same: "Same",
   different: "Different",
   missingFromSf1: "Missing from SF1",
@@ -35,6 +37,7 @@ const COMPARISON_LABEL: Record<FieldComparison, string> = {
 };
 
 const COMPARISON_TONE: Record<FieldComparison, "success" | "warning" | "neutral"> = {
+  missingFromBoth: "neutral",
   same: "success",
   different: "warning",
   missingFromSf1: "neutral",
@@ -146,9 +149,9 @@ export function Sf1DuplicateReview({
       {mode === "guided" && (
         <p className="field-hint">
           Compare the two records below field by field, then tell LIKHA whether this is the same
-          learner or a different one. If you're not sure, it's always safe to choose "These are
-          different learners" — LIKHA will simply add a new record, which you (or a Registrar) can
-          review later.
+          learner or a different one. If you are unsure, leave this unresolved and check the school
+          record. Choosing different learners creates a separate learner record; confirm their
+          identities first.
         </p>
       )}
 
@@ -193,9 +196,9 @@ export function Sf1DuplicateReview({
           {fields.map((field) => (
             <tr key={field.label}>
               <th scope="row">{field.label}</th>
-              <td>{field.sf1Value}</td>
-              <td>{field.likhaValue}</td>
-              <td>
+              <td data-label="From your SF1">{field.sf1Value}</td>
+              <td data-label="Already in LIKHA">{field.likhaValue}</td>
+              <td data-label="Comparison">
                 <StatusChip tone={COMPARISON_TONE[field.comparison]}>
                   {COMPARISON_LABEL[field.comparison]}
                 </StatusChip>

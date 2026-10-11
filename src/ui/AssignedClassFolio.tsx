@@ -185,6 +185,12 @@ export function AssignedClassFolio({
             <p>
               {selected.subjectName} · {selected.schoolYear}
             </p>
+            {context.scheduleDate && (
+              <p className="field-hint">
+                Schedule preview for {context.scheduleDate}. This class workspace contains records
+                across dates; attendance requires its own date selection.
+              </p>
+            )}
           </header>
           <div className="concept-folio-tabs" role="tablist" aria-label="Class worksheet">
             {TABS.map((item, index) => (

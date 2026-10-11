@@ -17,15 +17,21 @@ use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 /// the current session, never accepted from the caller. See ADR-0004:
 /// this is a strictly stronger guarantee than re-validating a
 /// caller-supplied school_id, because there is no parameter to forget to
-/// check on a future change.
+/// check on a future change. Teachers see only learners in their current
+/// teaching/advisory scope; Registrar and School Head retain school-wide
+/// management access. The directory name is retained for IPC compatibility.
 #[tauri::command]
 pub fn list_learners_by_school(
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<Learner>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
-    learner::list_by_school(&conn, &school_id)
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    learner::list_by_school(&conn, &school_id)?.into_iter().filter_map(|learner| {
+        match auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner.id) {
+            Ok(true) => Some(Ok(learner)), Ok(false) => None, Err(error) => Some(Err(error)),
+        }
+    }).collect()
 }
 
 /// WAVE 1A RBAC Foundation's representative authorization proof: only a
@@ -199,7 +205,8 @@ pub fn get_learner(
     learner_id: String,
 ) -> AppResult<Option<Learner>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    if !auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner_id)? { return Ok(None); }
     learner::find_by_id_in_school(&conn, &school_id, &learner_id)
 }
 

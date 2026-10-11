@@ -45,10 +45,16 @@ class FakeSchoolLogoRepository implements SchoolLogoRepository {
   }
 }
 
-function renderScreen(repo: FakeSchoolLogoRepository = new FakeSchoolLogoRepository()) {
+function renderScreen(
+  repo: FakeSchoolLogoRepository = new FakeSchoolLogoRepository(),
+  roles = ["school_head"],
+) {
   return render(
     <ModeProvider>
-      <SchoolBrandingScreen schoolLogoService={new SchoolLogoApplicationService(repo)} />
+      <SchoolBrandingScreen
+        roles={roles}
+        schoolLogoService={new SchoolLogoApplicationService(repo)}
+      />
     </ModeProvider>,
   );
 }
@@ -131,4 +137,11 @@ describe("SchoolBrandingScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("allows teachers to view school branding without change controls", async () => {
+  renderScreen(new FakeSchoolLogoRepository(), ["teacher"]);
+  await screen.findByText("No logo");
+  expect(screen.queryByLabelText("Upload a new logo (PNG, JPEG, or WebP)")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Remove logo" })).not.toBeInTheDocument();
 });

@@ -3,6 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import {
+  clearSessionDrafts,
+  readSessionDraft,
+  retainSessionDraft,
+  sessionDraftEpoch,
+} from "./ui/session-draft-store";
 import type { CurrentSession } from "./domain/session";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -28,9 +34,116 @@ const session: CurrentSession = {
 
 beforeEach(() => {
   mockInvoke.mockReset();
+  clearSessionDrafts();
 });
 
 describe("App", () => {
+  it("does not infer sign-in or first-run setup from a failed startup read and can retry", async () => {
+    let failed = true;
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status")
+        return failed
+          ? Promise.reject(new Error("private database path"))
+          : Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(null);
+      if (command === "list_schools") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+    render(<App />);
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private database path");
+    expect(screen.queryByRole("form", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Set up your school" })).not.toBeInTheDocument();
+    failed = false;
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry startup" }));
+    expect(await screen.findByRole("form", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("opens the real Today aggregate as the signed-in landing destination", async () => {
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "get_my_day_summary")
+        return Promise.resolve({
+          schedule: [],
+          next: null,
+          pendingAttendance: [],
+          pendingAssignments: [],
+          pendingConflicts: [],
+          pendingScoring: [],
+          pendingFollowups: [],
+          hasAnyAssignments: false,
+        });
+      return Promise.resolve(null);
+    });
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("get_my_day_summary", expect.anything()),
+    );
+    expect(document.title).toBe("Today · LIKHA-SIS");
+    expect(
+      within(screen.getByRole("navigation", { name: "Primary" })).getByRole("button", {
+        name: "Today",
+      }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it.each([
+    ["same account and school", session, true],
+    ["different account", { ...session, userId: "other" }, false],
+    ["different school", { ...session, schoolId: "other-school" }, false],
+  ] as const)(
+    "isolates retained drafts after reauthentication: %s",
+    async (_label, next, retained) => {
+      let current = session;
+      mockInvoke.mockImplementation((command) => {
+        if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+        if (command === "current_session") return Promise.resolve(current);
+        if (command === "get_my_day_summary")
+          return Promise.resolve({
+            schedule: [],
+            next: null,
+            pendingAttendance: [],
+            pendingAssignments: [],
+            pendingConflicts: [],
+            pendingScoring: [],
+            pendingFollowups: [],
+            hasAnyAssignments: false,
+          });
+        if (command === "list_audit_log") return Promise.reject("unauthorized");
+        if (command === "list_schools")
+          return Promise.resolve([
+            { id: next.schoolId, name: next.schoolName, createdAt: "synthetic" },
+          ]);
+        if (command === "login") {
+          current = next;
+          return Promise.resolve(next);
+        }
+        return Promise.resolve(null);
+      });
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole("heading", { name: "Today" });
+      const scope = JSON.stringify([
+        JSON.stringify([session.userId, session.schoolId]),
+        "sentinel",
+        sessionDraftEpoch(),
+      ]);
+      retainSessionDraft(scope, "unfinished teacher work");
+      await user.click(screen.getByRole("button", { name: "More" }));
+      await user.click(screen.getByRole("button", { name: "Sign-in Activity" }));
+      await screen.findByRole("form", { name: "Sign in" });
+      expect(readSessionDraft(scope, () => "empty")).toBe("unfinished teacher work");
+      await user.type(screen.getByLabelText("Username"), next.username);
+      await user.type(screen.getByLabelText("Password"), "synthetic-password");
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
+      await screen.findByRole("heading", { name: "Today" });
+      expect(readSessionDraft(scope, () => "empty")).toBe(
+        retained ? "unfinished teacher work" : "empty",
+      );
+    },
+  );
+
   it("shows the first-run setup screen when the backend reports the install needs setup", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: true });
@@ -58,7 +171,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "LIKHA-SIS" })).toBeInTheDocument();
   });
 
-  it("shows authorized assigned classes by default when there is an active session", async () => {
+  it("keeps authorized assigned classes available from Dashboard", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
@@ -71,6 +184,7 @@ describe("App", () => {
 
     render(<App />);
 
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     expect(await screen.findByRole("heading", { name: "My classes" })).toBeInTheDocument();
     expect(await screen.findByText("No teaching assignments yet.")).toBeInTheDocument();
     expect(mockInvoke).toHaveBeenCalledWith("list_teacher_assignments", expect.anything());
@@ -96,12 +210,13 @@ describe("App", () => {
 
     render(<App />);
 
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     const group = await screen.findByRole("group", { name: "Home view" });
     expect(within(group).getByRole("button", { name: "School overview" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "School overview" })).toBeInTheDocument();
   });
 
-  it("keeps six primary destinations and preserves specialist tools in More", async () => {
+  it("keeps Today and six primary destinations and preserves specialist tools in More", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
@@ -109,11 +224,13 @@ describe("App", () => {
       return Promise.reject(new Error(`unexpected command: ${String(command)}`));
     });
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(nav.querySelectorAll(".app-nav-item")).toHaveLength(6);
+    expect(nav.querySelectorAll(".app-nav-item")).toHaveLength(7);
     expect(within(nav).getByRole("button", { name: "Collapse navigation" })).toBeInTheDocument();
     for (const destination of [
+      "Today",
       "Dashboard",
       "My Advisory",
       "Class Record",
@@ -134,30 +251,37 @@ describe("App", () => {
       "My Advisory",
       "My Teaching Load",
       "Monthly Summary",
-      "Learners",
       "Sections",
-      "Import Learners (SF1)",
       "Grading Periods",
       "Record management",
       "Lesson Plans",
       "Sync Status",
       "Review Sync Conflicts",
       "Sign-in Activity",
-      "Reset a Password",
-      "School Members",
       "Devices",
-      "School Logo",
     ]) {
       expect(
         within(directory).getAllByRole("button", { name: destination }).length,
       ).toBeGreaterThan(0);
+    }
+    for (const destination of [
+      "Learners",
+      "Import Learners (SF1)",
+      "Reset a Password",
+      "School Members",
+      "School Logo",
+    ]) {
+      expect(
+        within(directory).queryByRole("button", { name: destination }),
+      ).not.toBeInTheDocument();
     }
   });
 
   it("sets the browser tab title to the active destination", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
-      if (command === "current_session") return Promise.resolve(session);
+      if (command === "current_session")
+        return Promise.resolve({ ...session, roles: ["registrar", "teacher"] });
       if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
@@ -167,6 +291,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     await waitFor(() => expect(document.title).toBe("Dashboard · LIKHA-SIS"));
 
@@ -181,7 +306,8 @@ describe("App", () => {
   it("shows the learner screen after switching to the Learners tab", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
-      if (command === "current_session") return Promise.resolve(session);
+      if (command === "current_session")
+        return Promise.resolve({ ...session, roles: ["registrar", "teacher"] });
       if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
@@ -191,6 +317,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
     await user.click(within(nav).getByRole("button", { name: "More" }));
@@ -198,6 +325,100 @@ describe("App", () => {
     await user.click(within(directory).getByRole("button", { name: "Learners" }));
 
     expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
+  });
+
+  it("remembers the grading period and weighting chosen for a class across destinations", async () => {
+    // M05's acceptance clause: the teacher should not repeatedly reselect
+    // grade/section/subject/term when the active class already determines
+    // them. The Class Folio remounts when the teacher moves between
+    // Dashboard, My Classes and Class Record; without App-held state each
+    // remount would blank the grading period and weighting the teacher
+    // already chose for that class.
+    const assignment = {
+      id: "ta-1",
+      sectionId: "sec-1",
+      sectionName: "Grade 8 – Joy",
+      schoolYear: "2026-2027",
+      subjectId: "subj-1",
+      subjectName: "Filipino",
+    };
+    const savedRecord = {
+      id: "cr-1",
+      schoolId: "s1",
+      sectionId: "sec-1",
+      sectionName: "Grade 8 – Joy",
+      subjectId: "subj-1",
+      subjectName: "Filipino",
+      gradingPeriodId: "gp-1",
+      gradingPeriodLabel: "Term 1",
+      schoolYear: "2026-2027",
+      weightPolicyId: "wp-1",
+      weightPolicyName: "Core Weighting",
+      createdAt: "now",
+      itemCount: 0,
+      recordedCount: 0,
+      totalEligible: 0,
+    };
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_teacher_assignments") return Promise.resolve([assignment]);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      if (command === "subject_attendance_monitor") return Promise.resolve({ rows: [] });
+      if (command === "list_grading_periods_by_school_year")
+        return Promise.resolve([
+          {
+            id: "gp-1",
+            schoolId: "s1",
+            schoolYear: "2026-2027",
+            policyPeriodId: "pp-1",
+            label: "Term 1",
+            startsOn: "2026-06-01",
+            endsOn: "2026-09-30",
+            createdAt: "now",
+          },
+        ]);
+      if (command === "list_grading_weight_policies")
+        return Promise.resolve([
+          {
+            id: "wp-1",
+            name: "Core Weighting",
+            sourceCitation: "Synthetic fixture",
+            isDefault: true,
+          },
+        ]);
+      if (command === "list_class_records_by_school") return Promise.resolve([savedRecord]);
+      if (command === "list_assessment_items_by_class_record") return Promise.resolve([]);
+      if (command === "list_assessment_category_sets") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Dashboard" }));
+    await screen.findByRole("button", { name: "Filipino · Grade 8 – Joy" });
+
+    // Open the Scores worksheet for the one authorized class and choose the
+    // term and weighting explicitly — the academic choice this test is about.
+    await user.click(screen.getByRole("button", { name: "View scores" }));
+    await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
+    await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+
+    // Leaving and returning to the Class Record destination remounts the
+    // folio. The teacher should not be asked for the term again.
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(nav).getByRole("button", { name: "Dashboard" }));
+    await user.click(within(nav).getByRole("button", { name: "Class Record" }));
+
+    expect(await screen.findByLabelText("Grading period")).toHaveValue("gp-1");
+    expect(screen.getByLabelText("DepEd grading weighting")).toHaveValue("wp-1");
+    expect(screen.getByRole("button", { name: "Open class record" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("returns to sign-in with a clear notice when a command fails because the session expired", async () => {
@@ -221,4 +442,93 @@ describe("App", () => {
     expect(await screen.findByRole("form", { name: "Sign in" })).toBeInTheDocument();
     expect(await screen.findByRole("status")).toHaveTextContent(/session has expired/i);
   });
+});
+
+it("preserves the signed-in session and drafts after failed logout, then allows retry", async () => {
+  let failLogout = true;
+  mockInvoke.mockImplementation((command) => {
+    if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+    if (command === "current_session") return Promise.resolve(session);
+    if (command === "get_my_day_summary")
+      return Promise.resolve({
+        schedule: [],
+        next: null,
+        pendingAttendance: [],
+        pendingAssignments: [],
+        pendingConflicts: [],
+        pendingScoring: [],
+        pendingFollowups: [],
+        hasAnyAssignments: false,
+      });
+    if (command === "logout")
+      return failLogout ? Promise.reject(new Error("offline")) : Promise.resolve(null);
+    if (command === "list_schools") return Promise.resolve([]);
+    return Promise.resolve(null);
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByRole("heading", { name: "Today" });
+  retainSessionDraft("logout-proof", "retained");
+  await user.click(
+    screen.getByRole("button", { name: `Account preferences for ${session.displayName}` }),
+  );
+  await user.click(screen.getByRole("button", { name: "Log out" }));
+  await screen.findByText(/Could not sign out/);
+  expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
+  expect(readSessionDraft("logout-proof", () => undefined)).toBe("retained");
+  failLogout = false;
+  await user.click(screen.getByRole("button", { name: "Log out" }));
+  await screen.findByRole("form", { name: "Sign in" });
+  expect(readSessionDraft("logout-proof", () => undefined)).toBeUndefined();
+});
+
+it("returns from Today class attendance to the original Today workspace", async () => {
+  const item = {
+    teachingAssignmentId: "ta-return",
+    subjectName: "Math",
+    sectionName: "Kindness",
+    startsAt: "08:00",
+    endsAt: "09:00",
+    room: null,
+  };
+  mockInvoke.mockImplementation((command) => {
+    if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+    if (command === "current_session") return Promise.resolve(session);
+    if (command === "get_my_day_summary")
+      return Promise.resolve({
+        schedule: [item],
+        next: item,
+        pendingAttendance: [],
+        pendingAssignments: [],
+        pendingConflicts: [],
+        pendingScoring: [],
+        pendingFollowups: [],
+        hasAnyAssignments: true,
+      });
+    if (command === "list_teacher_assignments")
+      return Promise.resolve([
+        {
+          id: "ta-return",
+          sectionId: "sec",
+          sectionName: "Kindness",
+          subjectId: "sub",
+          subjectName: "Math",
+          schoolYear: "2026-2027",
+        },
+      ]);
+    if (command === "list_subject_attendance_sessions") return Promise.resolve([]);
+    return Promise.resolve(null);
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(await screen.findByRole("button", { name: /Math — Kindness.*Open class/ }));
+  await user.click(screen.getByRole("button", { name: "Check attendance" }));
+  await user.click(await screen.findByRole("button", { name: "Back to Math — Kindness" }));
+  await screen.findByRole("heading", { name: "Today" });
+  expect(screen.getByRole("heading", { name: "Math — Kindness" })).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("navigation", { name: "Primary" })).getByRole("button", {
+      name: "Today",
+    }),
+  ).toHaveAttribute("aria-current", "page");
 });

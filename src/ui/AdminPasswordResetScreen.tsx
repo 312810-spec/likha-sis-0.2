@@ -9,6 +9,7 @@ import { PageHeader } from "./components/PageHeader";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AdminPasswordResetScreenProps {
+  roles?: readonly string[];
   schoolMemberService: SchoolMemberApplicationService;
 }
 
@@ -26,13 +27,14 @@ const GENERIC_FAILURE_MESSAGE =
  * Wave 3I (ADR-0061): a School Head sets a new password directly for a
  * colleague in their own school, effective immediately -- the
  * recommended mechanism from this wave's 10-scenario decision process.
- * Any authenticated school member sees the same form (matching
- * `SectionAdviserScreen`'s established convention); the backend alone
- * enforces that only a School Head holding `ManageSchoolMembership` may
- * actually perform a reset -- security must not rely on UI hiding.
+ * Role-aware presentation avoids inviting denied actions; native authorization remains authoritative.
  */
-export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordResetScreenProps) {
+export function AdminPasswordResetScreen({
+  schoolMemberService,
+  roles = [],
+}: AdminPasswordResetScreenProps) {
   const { mode } = useTeacherMode();
+  const canManage = roles.includes("school_head");
 
   const [members, setMembers] = useState<SchoolMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +70,16 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    if (canManage) load();
+    else {
+      setNewPassword("");
+      setTargetUserId("");
+    }
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolMemberService]);
+  }, [schoolMemberService, canManage]);
 
   function memberName(memberId: string): string {
     return members.find((member) => member.id === memberId)?.displayName ?? memberId;
@@ -78,7 +87,7 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (resetting) return;
+    if (!canManage || resetting) return;
     setError(null);
     setConfirmation(null);
     setResetting(true);
@@ -98,6 +107,16 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
     }
   }
 
+  if (!canManage)
+    return (
+      <section aria-label="Reset a Password">
+        <PageHeader title="Reset a Password" />
+        <p className="field-hint">
+          Ask your school head to reset a colleague’s password. This action is available to School
+          Heads.
+        </p>
+      </section>
+    );
   return (
     <section aria-label="Reset a Password">
       <PageHeader

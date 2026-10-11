@@ -11,6 +11,7 @@ import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionAdviserScreenProps {
+  roles?: readonly string[];
   sectionAdvisoryService: SectionAdvisoryApplicationService;
   schoolMemberService: SchoolMemberApplicationService;
   /** The section to manage the adviser for. Supplied by the Sections
@@ -40,11 +41,9 @@ function todayAsIsoDate(): string {
  * `docs/adr/0056-section-advisory-foundation.md`). Any authenticated
  * school member may view this screen (matching
  * `current_section_adviser`'s reference-data convention); the backend
- * alone enforces that only a School Head may assign or end an
- * advisory -- security must not rely on UI hiding, so this screen shows
- * the same form to everyone and surfaces a generic error if the backend
- * declines. */
+ * enforces authorization independently of role-aware read-only presentation. */
 export function SectionAdviserScreen({
+  roles = [],
   sectionAdvisoryService,
   schoolMemberService,
   sectionId,
@@ -52,6 +51,7 @@ export function SectionAdviserScreen({
   onBack,
 }: SectionAdviserScreenProps) {
   const { mode } = useTeacherMode();
+  const canManage = roles.includes("school_head");
 
   const [adviser, setAdviser] = useState<SectionAdvisory | null>(null);
   const [members, setMembers] = useState<SchoolMember[]>([]);
@@ -94,6 +94,9 @@ export function SectionAdviserScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionAdvisoryService, schoolMemberService, sectionId]);
 
@@ -105,7 +108,7 @@ export function SectionAdviserScreen({
 
   async function handleAssign(event: FormEvent) {
     event.preventDefault();
-    if (assigning || teachers.length === 0) return;
+    if (!canManage || assigning || teachers.length === 0) return;
     setError(null);
     setConfirmation(null);
     setAssigning(true);
@@ -136,7 +139,7 @@ export function SectionAdviserScreen({
 
   async function handleEnd(event: FormEvent) {
     event.preventDefault();
-    if (!adviser || ending) return;
+    if (!canManage || !adviser || ending) return;
     setError(null);
     setConfirmation(null);
     setEnding(true);
@@ -159,7 +162,7 @@ export function SectionAdviserScreen({
     <Page
       title={`${sectionName} — adviser`}
       hint={
-        mode === "guided" ? (
+        mode === "guided" && canManage ? (
           <p className="field-hint">
             Assign one teacher as this section's adviser. To change advisers, end the current
             advisory first, then assign the new teacher — this keeps a full history of who advised
@@ -183,9 +186,18 @@ export function SectionAdviserScreen({
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
+      {!canManage && (
+        <p className="field-hint">
+          Your school head manages adviser assignments. This view is read-only.
+        </p>
+      )}
       {loading ? (
         <Loading label="Loading this section's adviser…" />
-      ) : loadError ? null : adviser ? (
+      ) : loadError ? null : adviser && !canManage ? (
+        <p>
+          Current adviser: {teacherName(adviser.teacherUserId)} — adviser since {adviser.startsOn}
+        </p>
+      ) : adviser ? (
         <form onSubmit={handleEnd} aria-label="End the current advisory">
           <h3>Current adviser</h3>
           <p>
@@ -208,50 +220,52 @@ export function SectionAdviserScreen({
       ) : (
         <>
           <EmptyState>No adviser is currently assigned to this section.</EmptyState>
-          <form onSubmit={handleAssign} aria-label="Assign an adviser">
-            <h3>Assign an adviser</h3>
-            {teachers.length === 0 ? (
-              <p className="field-hint">No teachers are members of this school yet.</p>
-            ) : (
-              <div className="form-row">
-                <div className="field">
-                  <label htmlFor="advisory-teacher">Teacher</label>
-                  <select
-                    id="advisory-teacher"
-                    value={assignTeacherId}
-                    onChange={(event) => setAssignTeacherId(event.target.value)}
-                    required
-                  >
-                    <option value="" disabled>
-                      Select a teacher
-                    </option>
-                    {teachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.displayName}
+          {canManage && (
+            <form onSubmit={handleAssign} aria-label="Assign an adviser">
+              <h3>Assign an adviser</h3>
+              {teachers.length === 0 ? (
+                <p className="field-hint">No teachers are members of this school yet.</p>
+              ) : (
+                <div className="form-row">
+                  <div className="field">
+                    <label htmlFor="advisory-teacher">Teacher</label>
+                    <select
+                      id="advisory-teacher"
+                      value={assignTeacherId}
+                      onChange={(event) => setAssignTeacherId(event.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select a teacher
                       </option>
-                    ))}
-                  </select>
+                      {teachers.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="advisory-starts-on">Start date</label>
+                    <input
+                      id="advisory-starts-on"
+                      type="date"
+                      value={assignStartsOn}
+                      onChange={(event) => setAssignStartsOn(event.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="field">
-                  <label htmlFor="advisory-starts-on">Start date</label>
-                  <input
-                    id="advisory-starts-on"
-                    type="date"
-                    value={assignStartsOn}
-                    onChange={(event) => setAssignStartsOn(event.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            )}
-            <button
-              type="submit"
-              className="button-primary"
-              aria-disabled={assigning || teachers.length === 0}
-            >
-              {assigning ? "Assigning…" : "Assign adviser"}
-            </button>
-          </form>
+              )}
+              <button
+                type="submit"
+                className="button-primary"
+                aria-disabled={assigning || teachers.length === 0}
+              >
+                {assigning ? "Assigning…" : "Assign adviser"}
+              </button>
+            </form>
+          )}
         </>
       )}
     </Page>

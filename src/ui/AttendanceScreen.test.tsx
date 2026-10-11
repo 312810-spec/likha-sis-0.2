@@ -35,6 +35,10 @@ class FakeAttendanceRepository implements AttendanceRepository {
     status: AttendanceStatus;
   }> = [];
   bulkMarkPresentCalls: Array<{ sectionId: string; attendanceDate: string }> = [];
+  /** CTOS M07: injected failure, so the auto-advance invariant — focus moves
+   * only on a successful save — can be exercised against a real rejection
+   * rather than assumed. */
+  recordAttendanceRejects = false;
 
   constructor(private roster: AttendanceRosterEntry[] = []) {}
 
@@ -53,6 +57,7 @@ class FakeAttendanceRepository implements AttendanceRepository {
     status: AttendanceStatus,
   ): Promise<AttendanceRecord | null> {
     this.recordCalls.push({ sectionId, learnerId, attendanceDate, status });
+    if (this.recordAttendanceRejects) throw new Error("the hub is unreachable");
     this.roster = this.roster.map((entry) =>
       entry.learnerId === learnerId ? { ...entry, status, recordedAt: "now" } : entry,
     );
@@ -626,6 +631,48 @@ describe("AttendanceScreen", () => {
     expect(repo.recordCalls).toEqual([
       { sectionId: "sec-1", learnerId: "l1", attendanceDate: "2026-08-24", status: "present" },
     ]);
+  });
+
+  it("moves focus to the next learner after a keyboard mark, so a full roster is one keystroke per learner", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+      { learnerId: "l2", givenName: "Ben", familyName: "Reyes", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+    const anaGroup = screen.getByRole("group", { name: /attendance status for ana santos/i });
+    const benGroup = screen.getByRole("group", { name: /attendance status for ben reyes/i });
+
+    within(anaGroup).getByRole("button", { name: "Absent" }).focus();
+    await user.keyboard("a");
+
+    await waitFor(() =>
+      expect(within(anaGroup).getByRole("button", { name: "Absent" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    expect(within(benGroup).getByRole("button", { name: "Absent" })).toHaveFocus();
+  });
+
+  it("keeps focus on the learner whose mark failed instead of advancing past it", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+      { learnerId: "l2", givenName: "Ben", familyName: "Reyes", status: null, recordedAt: null },
+    ]);
+    repo.recordAttendanceRejects = true;
+    await screen.findByText("Ana Santos");
+    const anaGroup = screen.getByRole("group", { name: /attendance status for ana santos/i });
+    const benGroup = screen.getByRole("group", { name: /attendance status for ben reyes/i });
+    const anaTardy = within(anaGroup).getByRole("button", { name: "Tardy" });
+
+    anaTardy.focus();
+    await user.keyboard("t");
+
+    await waitFor(() => expect(screen.getByText(/could not save this mark/i)).toBeInTheDocument());
+    expect(anaTardy).toHaveFocus();
+    expect(within(benGroup).getByRole("button", { name: "Tardy" })).not.toHaveFocus();
   });
 
   it("moves focus to the same status button on the next/previous learner with ArrowDown/ArrowUp", async () => {

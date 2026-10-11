@@ -160,6 +160,10 @@ struct PushResponseBody {
 #[derive(Debug, Deserialize)]
 struct PullResponseBody {
     changes: Vec<sync_hub::AcceptedChange>,
+    #[serde(default)]
+    scanned_through: Option<SyncCursor>,
+    #[serde(default)]
+    scope_token: Option<String>,
 }
 
 /// Mirrors `hub_server`'s own (private) `PayloadKeyWrapResponseBody` --
@@ -405,6 +409,7 @@ pub fn pull_once(
     config: &SyncClientConfig,
 ) -> AppResult<PullRunSummary> {
     let after = sync_pull_cursor::get_cursor(conn, &config.school_id)?;
+    let scope_token = sync_pull_cursor::get_scope_token(conn, &config.school_id)?.unwrap_or_default();
     let response = client
         .get(format!("{}/sync/pull", config.base_url))
         .header(CREDENTIAL_ID_HEADER, &config.credential_id)
@@ -412,6 +417,7 @@ pub fn pull_once(
         .query(&[
             ("after", after.0.to_string()),
             ("limit", PULL_BATCH_LIMIT.to_string()),
+            ("scope_token", scope_token),
         ])
         .send();
 
@@ -440,6 +446,9 @@ pub fn pull_once(
         }
     };
 
+    if let Some(token) = &body.scope_token {
+        sync_pull_cursor::accept_scope_token(conn, &config.school_id, token)?;
+    }
     let mut summary = PullRunSummary {
         received: body.changes.len(),
         ..Default::default()
@@ -534,6 +543,11 @@ pub fn pull_once(
                 summary.failed = true;
                 break;
             }
+        }
+    }
+    if !summary.failed {
+        if let Some(scanned_through) = body.scanned_through {
+            sync_pull_cursor::advance_cursor(conn, &config.school_id, scanned_through)?;
         }
     }
     Ok(summary)
@@ -877,6 +891,8 @@ mod tests {
             crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
         let school = school::create(&hub_conn, "Rizal Elementary").unwrap();
         let user = user::create_user(&hub_conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&hub_conn, &user.id, &school.id).unwrap();
+        crate::repository::role::grant(&hub_conn, &user.id, &school.id, crate::repository::role::SCHOOL_HEAD).unwrap();
         let device_id = Uuid::now_v7();
         let credential = device_credential::enroll(
             &hub_conn,
@@ -3667,6 +3683,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();

@@ -38,3 +38,6 @@ Thumbs.db
 # only, but keeping it out of git is still the right default for local
 # working state).
 .claude/memory/
+
+# Reproducible browser downloads and transient captures
+.cache/

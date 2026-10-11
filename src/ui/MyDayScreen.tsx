@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MyDayApplicationService } from "../application/my-day-service";
-import type { MyDaySummary } from "../domain/my-day";
+import type { MyDayPendingFollowup, MyDaySummary } from "../domain/my-day";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -21,19 +21,35 @@ interface MyDayScreenProps {
   /** Opens the class record for this teaching assignment -- same narrow
    * callback shape as `onCheckAttendance`, passed through unchanged to
    * `ClassWorkspaceScreen`. */
-  onOpenClassRecord: (teachingAssignmentId: string) => void;
+  onOpenClassRecord: (
+    teachingAssignmentId: string,
+    classRecordId?: string,
+    context?: TeacherClassWorkContext,
+  ) => void;
+  /** Opens Classroom Mode for this teaching assignment -- CTOS.md §6.3's
+   * teaching cockpit. Passed through unchanged to `ClassWorkspaceScreen`. */
+  onStartClassroom: (teachingAssignmentId: string) => void;
   /** Opens the sync conflict review queue -- see `ConflictReviewScreen`. */
   onReviewConflicts: () => void;
+  /** Opens the learning-support plan for one standing follow-up marker --
+   * CTOS.md §M08's loop, the action CTOS.md §6.1's "learner follow-up due
+   * where appropriate" has been pointing at. Same narrow callback shape as
+   * `onCheckAttendance`: the marker's own row is the only thing passed,
+   * and the screen it opens re-derives everything authoritative. */
+  onPlanSupport: (followup: MyDayPendingFollowup) => void;
 }
 
 /** `0 = Sunday … 6 = Saturday`, matching `domain/schedule-meeting.ts`'s
- * established convention and JavaScript's own `Date.prototype.getDay()`. */
-function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
+ * established convention and JavaScript's own `Date.prototype.getDay()`.
+ * `nowTime` is local "HH:MM", the same wall-clock text shape
+ * `ScheduleMeeting.startsAt` uses, so the two compare directly. */
+function todayWeekdayAndIsoDate(): { weekday: number; date: string; nowTime: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
-  return { weekday: now.getDay(), date: `${year}-${month}-${day}` };
+  const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return { weekday: now.getDay(), date: `${year}-${month}-${day}`, nowTime };
 }
 
 /**
@@ -54,29 +70,33 @@ export function MyDayScreen({
   onBackToToday,
   onCheckAttendance,
   onOpenClassRecord,
+  onStartClassroom,
   onReviewConflicts,
+  onPlanSupport,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
   const [summary, setSummary] = useState<MyDaySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
 
   function load() {
     const requestId = ++requestRef.current;
     setLoading(true);
     setError(null);
-    const { weekday, date } = todayWeekdayAndIsoDate();
+    const { weekday, date, nowTime } = todayWeekdayAndIsoDate();
 
     myDayService
-      .getSummary(weekday, date)
+      .getSummary(weekday, date, nowTime)
       .then((result) => {
         if (requestRef.current !== requestId) return;
         setSummary(result);
+        setLastChecked(new Date().toLocaleString());
       })
       .catch(() => {
         if (requestRef.current !== requestId) return;
-        setError("Could not load My Day.");
+        setError("Could not refresh Today. Previously loaded information may be out of date.");
       })
       .finally(() => {
         if (requestRef.current !== requestId) return;
@@ -87,6 +107,20 @@ export function MyDayScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") load();
+    };
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      // Request sequence is owned by this component, not a DOM ref.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      ++requestRef.current;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDayService]);
 
@@ -97,13 +131,26 @@ export function MyDayScreen({
       context={selectedClassContext}
       onCheckAttendance={onCheckAttendance}
       onOpenClassRecord={onOpenClassRecord}
-      onBackToToday={onBackToToday}
+      onStartClassroom={onStartClassroom}
+      onBackToToday={handleBackToToday}
     />
   ) : null;
 
+  /** Returning from a class workspace re-fetches the summary so the "Needs
+   * your attention" rail reflects any attendance recorded while that
+   * workspace was open. Without this, a teacher who checks attendance then
+   * goes back sees the same pending item they just cleared -- the class
+   * workspace renders inside this screen rather than on its own tab, so
+   * nothing unmounts and the mount-time fetch alone would stay stale. This
+   * mirrors `ClassRecordsScreen.handleBackToList`'s own reasoning. */
+  function handleBackToToday() {
+    onBackToToday();
+    load();
+  }
+
   return (
     <Page
-      title="My Day"
+      title="Today"
       hint={
         mode === "guided" ? (
           <p className="field-hint">
@@ -113,6 +160,12 @@ export function MyDayScreen({
         ) : undefined
       }
     >
+      <div className="form-row">
+        <button type="button" disabled={loading} onClick={load}>
+          {loading ? "Refreshing…" : "Refresh Today"}
+        </button>
+        {lastChecked && <span className="field-hint">Last checked: {lastChecked}</span>}
+      </div>
       {error && (
         <Alert tone="error">
           <p>{error}</p>
@@ -122,12 +175,12 @@ export function MyDayScreen({
         </Alert>
       )}
 
-      {loading ? (
+      {loading && !summary ? (
         <>
-          <Loading label="Loading My Day…" />
+          <Loading label="Loading Today…" />
           {classWorkspace}
         </>
-      ) : error || !summary ? (
+      ) : !summary ? (
         classWorkspace
       ) : (
         <>
@@ -153,7 +206,11 @@ export function MyDayScreen({
                     }
                     onChange={(event) => {
                       const item = summary.schedule[Number(event.target.value)];
-                      if (item) onOpenClassContext(item);
+                      if (item)
+                        onOpenClassContext({
+                          ...item,
+                          scheduleDate: todayWeekdayAndIsoDate().date,
+                        });
                     }}
                   >
                     <option value="" disabled>
@@ -168,44 +225,56 @@ export function MyDayScreen({
                 </label>
               )}
               {summary.schedule.length === 0 ? (
-                <EmptyState>No classes scheduled for you today.</EmptyState>
+                <EmptyState>
+                  {summary.hasAnyAssignments
+                    ? "No classes scheduled for you today."
+                    : "You are not assigned to any classes yet."}
+                </EmptyState>
               ) : (
                 <ul className="folio-section-list">
-                  {summary.schedule.map((item, index) => (
-                    <li
-                      key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
-                      className="folio-schedule-item"
-                    >
-                      <button
-                        type="button"
-                        className="folio-section-choice"
-                        aria-pressed={
-                          selectedClassContext?.teachingAssignmentId ===
-                            item.teachingAssignmentId &&
-                          selectedClassContext?.startsAt === item.startsAt
-                        }
-                        onClick={() =>
-                          onOpenClassContext({
-                            teachingAssignmentId: item.teachingAssignmentId,
-                            subjectName: item.subjectName,
-                            sectionName: item.sectionName,
-                            startsAt: item.startsAt,
-                            endsAt: item.endsAt,
-                            room: item.room,
-                          })
-                        }
+                  {summary.schedule.map((item, index) => {
+                    const isNext =
+                      summary.next !== null &&
+                      item.teachingAssignmentId === summary.next.teachingAssignmentId &&
+                      item.startsAt === summary.next.startsAt;
+                    return (
+                      <li
+                        key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
+                        className={isNext ? "folio-schedule-item is-next" : "folio-schedule-item"}
                       >
-                        <span className="folio-section-name">
-                          {item.subjectName} — {item.sectionName}
-                        </span>
-                        <span className="folio-section-state">
-                          {item.startsAt}–{item.endsAt}
-                          {item.room ? ` · ${item.room}` : ""}
-                        </span>
-                        <span className="field-hint">Open class</span>
-                      </button>
-                    </li>
-                  ))}
+                        <button
+                          type="button"
+                          className="folio-section-choice"
+                          aria-pressed={
+                            selectedClassContext?.teachingAssignmentId ===
+                              item.teachingAssignmentId &&
+                            selectedClassContext?.startsAt === item.startsAt
+                          }
+                          onClick={() =>
+                            onOpenClassContext({
+                              scheduleDate: todayWeekdayAndIsoDate().date,
+                              teachingAssignmentId: item.teachingAssignmentId,
+                              subjectName: item.subjectName,
+                              sectionName: item.sectionName,
+                              startsAt: item.startsAt,
+                              endsAt: item.endsAt,
+                              room: item.room,
+                            })
+                          }
+                        >
+                          {isNext && <span className="folio-next-badge">Next up</span>}
+                          <span className="folio-section-name">
+                            {item.subjectName} — {item.sectionName}
+                          </span>
+                          <span className="folio-section-state">
+                            {item.startsAt}–{item.endsAt}
+                            {item.room ? ` · ${item.room}` : ""}
+                          </span>
+                          <span className="field-hint">Open class</span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </aside>
@@ -227,10 +296,27 @@ export function MyDayScreen({
           </div>
           <details className="folio-pending" open={!selectedClassContext}>
             <summary>Needs your attention today</summary>
-            {summary.pendingAttendance.length === 0 && summary.pendingConflicts.length === 0 ? (
+            {summary.pendingAttendance.length === 0 &&
+            summary.pendingAssignments.length === 0 &&
+            summary.pendingConflicts.length === 0 &&
+            summary.pendingScoring.length === 0 &&
+            summary.pendingFollowups.length === 0 ? (
               <EmptyState>Nothing pending — you&rsquo;re all caught up for today.</EmptyState>
             ) : (
               <ul className="workspace-priority-rail">
+                {summary.pendingAssignments.map((task) => (
+                  <li
+                    key={task.teachingAssignmentId}
+                    className="workspace-priority-item is-not-started"
+                  >
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.subjectName} — {task.sectionName}
+                      </span>
+                      <span className="field-hint">no schedule given to this class yet</span>
+                    </div>
+                  </li>
+                ))}
                 {summary.pendingAttendance.map((task) => (
                   <li
                     key={task.teachingAssignmentId}
@@ -265,6 +351,51 @@ export function MyDayScreen({
                     </button>
                   </li>
                 )}
+                {summary.pendingScoring.map((task) => (
+                  <li key={task.classRecordId} className="workspace-priority-item is-partial">
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.subjectName} — {task.sectionName}
+                      </span>
+                      <span className="field-hint">
+                        {task.recordedCount} of {task.totalCount} scores recorded in{" "}
+                        {task.gradingPeriodLabel}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={() =>
+                        onOpenClassRecord(task.teachingAssignmentId, task.classRecordId, {
+                          teachingAssignmentId: task.teachingAssignmentId,
+                          subjectName: task.subjectName,
+                          sectionName: task.sectionName,
+                        })
+                      }
+                    >
+                      Open class record
+                    </button>
+                  </li>
+                ))}
+                {summary.pendingFollowups.map((task) => (
+                  <li key={task.markerId} className="workspace-priority-item is-partial">
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.learnerGivenName} {task.learnerFamilyName}
+                      </span>
+                      <span className="field-hint">
+                        follow-up in {task.subjectName} — {task.sectionName} · {task.reason}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={() => onPlanSupport(task)}
+                    >
+                      Plan support
+                    </button>
+                  </li>
+                ))}
               </ul>
             )}
           </details>

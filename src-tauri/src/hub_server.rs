@@ -33,7 +33,7 @@ use axum::Router;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
+use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::{AppError, AppResult};
 use crate::repository::{device_credential, school, sync_hub, sync_payload_key};
 use crate::sync::{PendingChange, SyncCursor};
@@ -382,6 +382,23 @@ async fn push_handler(
         return Err(ApiError::BadRequest("push batch too large"));
     }
 
+    for change in &body.changes {
+        if change.operation == crate::sync::ChangeOperation::Delete
+            && change.entity_kind != crate::sync::EntityKind::TeachingAssignment {
+            return Err(ApiError::BadRequest("unsupported sync deletion"));
+        }
+        if crate::auth::data_scope::can_resolve_entity(&conn, &verified.user_id, &verified.school_id, change.entity_kind, &change.entity_id.to_string())?
+            && crate::repository::role::has_any_role(&conn, &verified.user_id, &verified.school_id, &[crate::repository::role::SCHOOL_HEAD, crate::repository::role::REGISTRAR])? {
+            continue;
+        }
+        let plaintext = payload_key::decrypt_payload(&sspk, &change.encrypted_payload)
+            .map_err(|_| AppError::Unauthorized)?;
+        let payload: serde_json::Value = serde_json::from_slice(&plaintext)
+            .map_err(|_| AppError::Unauthorized)?;
+        if !crate::auth::data_scope::can_write_sync_payload(&conn, &verified.user_id, &verified.school_id, change.entity_kind, &change.entity_id.to_string(), &payload)? {
+            return Err(AppError::Unauthorized.into());
+        }
+    }
     let outcomes = sync_hub::push_batch(&conn, &verified, &body.changes)?;
     Ok(Json(PushResponseBody { outcomes }))
 }
@@ -390,6 +407,8 @@ async fn push_handler(
 struct PullQuery {
     after: u64,
     limit: u16,
+    #[serde(default)]
+    scope_token: Option<String>,
 }
 
 /// `Deserialize` is for this module's own tests (round-tripping the
@@ -397,6 +416,10 @@ struct PullQuery {
 #[derive(Debug, Serialize, Deserialize)]
 struct PullResponseBody {
     changes: Vec<sync_hub::AcceptedChange>,
+    #[serde(default)]
+    scanned_through: Option<SyncCursor>,
+    #[serde(default)]
+    scope_token: Option<String>,
 }
 
 async fn pull_handler(
@@ -411,13 +434,28 @@ async fn pull_handler(
     let sspk = current_sspk(&state)?;
     let verified = authenticate(&conn, &headers, &sspk)?;
 
+    let scope_token = crate::auth::data_scope::sync_scope_token(&conn, &verified.user_id, &verified.school_id)?;
+    let after = if query.scope_token.as_deref() == Some(scope_token.as_str()) { query.after } else { 0 };
     let changes = sync_hub::pull_since(
         &conn,
         &verified.school_id,
-        SyncCursor(query.after),
+        SyncCursor(after),
         query.limit,
     )?;
-    Ok(Json(PullResponseBody { changes }))
+    let scanned_through = changes.last().map(|change| change.cursor);
+    let mut allowed = Vec::new();
+    let administrator = crate::repository::role::has_any_role(&conn, &verified.user_id, &verified.school_id, &[crate::repository::role::SCHOOL_HEAD, crate::repository::role::REGISTRAR])?;
+    for change in changes {
+        if administrator { allowed.push(change); continue; }
+        let plaintext = payload_key::decrypt_payload(&sspk, &change.encrypted_payload)
+            .map_err(|_| AppError::Unauthorized)?;
+        let payload: serde_json::Value = serde_json::from_slice(&plaintext)
+            .map_err(|_| AppError::Unauthorized)?;
+        if crate::auth::data_scope::can_read_sync_payload(&conn, &verified.user_id, &verified.school_id, change.entity_kind, &change.entity_id.to_string(), &payload)? {
+            allowed.push(change);
+        }
+    }
+    Ok(Json(PullResponseBody { changes: allowed, scanned_through, scope_token: Some(scope_token) }))
 }
 
 /// `Deserialize` is for `sync_client`'s own decoding of this response, and
@@ -494,6 +532,8 @@ mod tests {
         .unwrap();
         let school = school::create(&conn, "Rizal Elementary").unwrap();
         let user = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &user.id, &school.id).unwrap();
+        crate::repository::role::grant(&conn, &user.id, &school.id, crate::repository::role::SCHOOL_HEAD).unwrap();
         let device_id = Uuid::now_v7();
         let credential =
             device_credential::enroll(&conn, &school.id, &user.id, &device_id.to_string(), None)
@@ -742,6 +782,58 @@ mod tests {
         assert_eq!(parsed.changes.len(), 1);
         assert_eq!(parsed.changes[0].entity_id, entity_id);
         assert_eq!(parsed.changes[0].version, 1);
+    }
+
+    #[tokio::test]
+    async fn revoked_admin_replay_is_denied_and_filtered_pull_advances_without_disclosure() {
+        let fixture = test_fixture();
+        let (school_id, sspk) = {
+            let conn = fixture.state.db.lock().unwrap();
+            let school_id: String = conn.query_row("SELECT school_id FROM user_school_memberships WHERE user_id=?1", [&fixture.user_id], |row| row.get(0)).unwrap();
+            (school_id, current_sspk(&fixture.state).unwrap())
+        };
+        let entity_id = Uuid::now_v7();
+        let payload = serde_json::json!({"id": entity_id.to_string(), "schoolId": school_id, "givenName": "Synthetic", "familyName": "Learner", "lrn": null, "sex": null, "createdAt": "2026-09-09T00:00:00Z"});
+        let change = PendingChange {
+            change_id: Uuid::now_v7(), device_id: fixture.device_id,
+            actor_user_id: Uuid::parse_str(&fixture.user_id).unwrap(),
+            entity_kind: EntityKind::Learner, entity_id, base_version: 0,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: payload_key::encrypt_payload(&sspk, &serde_json::to_vec(&payload).unwrap()).unwrap(),
+        };
+        let body = serde_json::json!({"changes": [change]}).to_string();
+        let app = router(fixture.state.clone());
+        let accepted = app.clone().oneshot(push_request(&fixture.credential.id, &fixture.credential.secret_hex, &body)).await.unwrap();
+        assert_eq!(accepted.status(), StatusCode::OK);
+        {
+            let conn = fixture.state.db.lock().unwrap();
+            crate::repository::role::revoke(&conn, &fixture.user_id, &school_id, crate::repository::role::SCHOOL_HEAD).unwrap();
+        }
+        let denied = app.clone().oneshot(push_request(&fixture.credential.id, &fixture.credential.secret_hex, &body)).await.unwrap();
+        assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+        let response = app.clone().oneshot(Request::builder().method("GET").uri("/sync/pull?after=0&limit=10")
+            .header(CREDENTIAL_ID_HEADER, &fixture.credential.id).header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+            .body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let page: PullResponseBody = serde_json::from_slice(&bytes).unwrap();
+        assert!(page.changes.is_empty());
+        assert_eq!(page.scanned_through, Some(SyncCursor(1)));
+        {
+            let conn = fixture.state.db.lock().unwrap();
+            crate::repository::role::grant(&conn, &fixture.user_id, &school_id, crate::repository::role::SCHOOL_HEAD).unwrap();
+        }
+        let token = page.scope_token.unwrap();
+        let recovered = app.oneshot(Request::builder().method("GET")
+            .uri(format!("/sync/pull?after=1&limit=10&scope_token={token}"))
+            .header(CREDENTIAL_ID_HEADER, &fixture.credential.id).header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+            .body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(recovered.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(recovered.into_body(), usize::MAX).await.unwrap();
+        let backfill: PullResponseBody = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(backfill.changes.len(), 1);
+        assert_eq!(backfill.changes[0].entity_id, entity_id);
+        assert_ne!(backfill.scope_token.as_deref(), Some(token.as_str()));
     }
 
     #[tokio::test]

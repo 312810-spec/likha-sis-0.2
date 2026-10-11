@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import { CalendarScreen } from "./WorkspaceHubs";
+import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "./WorkspaceHubs";
 const assignment = {
   id: "a1",
   sectionId: "s1",
@@ -35,7 +35,7 @@ it("opens the selected date's authorized scheduled class with its context", asyn
     />,
   );
   fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-10-05" } });
-  await user.click(await screen.findByRole("button", { name: "Open class" }));
+  await user.click(await screen.findByRole("button", { name: "Open class workspace" }));
   expect(list).toHaveBeenCalledWith("teacher");
   expect(open).toHaveBeenCalledWith({
     teachingAssignmentId: "a1",
@@ -44,6 +44,7 @@ it("opens the selected date's authorized scheduled class with its context", asyn
     startsAt: "08:00",
     endsAt: "09:00",
     room: "Room 3",
+    scheduleDate: "2026-10-05",
   });
   await user.click(screen.getByRole("button", { name: "Next day" }));
   expect(await screen.findByText(/No scheduled classes for this day/)).toBeInTheDocument();
@@ -73,4 +74,22 @@ describe("Calendar recovery", () => {
     expect(await screen.findByText(/No scheduled classes for this day/)).toBeInTheDocument();
     expect(list).toHaveBeenLastCalledWith("second");
   });
+});
+
+it("keeps ordinary teacher tasks and own device access while hiding admin setup", () => {
+  render(<MoreScreen roles={["teacher"]} onNavigate={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "Learners" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Import Learners (SF1)" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reset a Password" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Devices" })).toBeInTheDocument();
+});
+it("gives registrars learner import but no school-head administration", () => {
+  render(<MoreScreen roles={["registrar"]} onNavigate={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Learners" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reset a Password" })).not.toBeInTheDocument();
+});
+it("does not offer schoolwide import as a teacher's forms action", () => {
+  render(<SchoolFormsScreen roles={["teacher"]} onNavigate={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "Import learners" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Open Class Record" })).toBeInTheDocument();
 });
