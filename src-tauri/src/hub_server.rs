@@ -244,6 +244,7 @@ pub fn maybe_spawn_listener(app: &tauri::AppHandle, sspk_cell: SharedSspk) -> Ap
 /// boundary (the same discipline `AppError::Import`/`FormGeneration`
 /// already apply to the Tauri IPC boundary: "the message is a fixed,
 /// generic category string ... never the underlying error text").
+#[derive(Debug)]
 enum ApiError {
     Unauthorized,
     BadRequest(&'static str),
