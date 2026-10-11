@@ -48,6 +48,13 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
   const [checkError, setCheckError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const onExpiredRef = useRef(onExpired);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     onExpiredRef.current = onExpired;
   }, [onExpired]);
@@ -90,6 +97,7 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
     setExtending(true);
     try {
       const session = await authService.extendSession();
+      if (!mounted.current) return;
       const remaining = session.idleExpiresAtUnixMs - Date.now();
       if (remaining <= 0) {
         onExpiredRef.current();
@@ -103,7 +111,7 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
       );
       setAttempt((value) => value + 1);
     } finally {
-      setExtending(false);
+      if (mounted.current) setExtending(false);
     }
   }
 

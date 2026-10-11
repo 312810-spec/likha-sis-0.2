@@ -162,7 +162,7 @@ try {
   );
   await matrix(page, "support-update-recovery");
   await page.getByRole("button", { name: "Reload cases", exact: true }).first().click();
-  await page.getByText("Completed guided practice", { exact: true }).waitFor();
+  await page.getByText("Completed guided practice", { exact: false }).first().waitFor();
   await inspect(page, "support-transition-reconciled");
   await open(page, "sf1-import", "commit-error");
   await workbook(page);

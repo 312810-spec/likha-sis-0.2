@@ -9,6 +9,7 @@ interface SidebarProps {
   logoUrl?: string | null;
 }
 const ICONS: Record<string, IconName> = {
+  today: "calendar",
   workspace: "home",
   "adviser-view": "learners",
   "class-records": "document",

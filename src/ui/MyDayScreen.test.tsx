@@ -200,7 +200,7 @@ describe("MyDayScreen", () => {
     renderScreen();
     await user.click(await screen.findByRole("button", { name: /Open class$/ }));
     await user.click(screen.getByRole("button", { name: "Back to Today" }));
-    expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open class$/ })).toBeInTheDocument();
   });
 
@@ -305,7 +305,7 @@ describe("MyDayScreen", () => {
   it("retains previously selected class work when the schedule refresh fails", async () => {
     const user = userEvent.setup();
     const { onOpenClassRecord } = renderScreen("reject", SUMMARY.schedule[0]);
-    await screen.findByText("Could not load My Day.");
+    await screen.findByText("Could not load Today.");
     expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open class record" }));
     expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
@@ -314,7 +314,7 @@ describe("MyDayScreen", () => {
   it("shows a retryable error when loading fails", async () => {
     const user = userEvent.setup();
     const { repo } = renderScreen("reject");
-    expect(await screen.findByText("Could not load My Day.")).toBeInTheDocument();
+    expect(await screen.findByText("Could not load Today.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(repo.calls.length).toBeGreaterThanOrEqual(2);
   });

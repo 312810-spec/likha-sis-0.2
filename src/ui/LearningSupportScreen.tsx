@@ -125,7 +125,7 @@ export function LearningSupportScreen({
       }
       actions={
         <button type="button" onClick={onBack}>
-          Back to My Day
+          Back to Today
         </button>
       }
     >

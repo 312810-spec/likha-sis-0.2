@@ -3,7 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { clearSessionDrafts } from "./ui/session-draft-store";
+import {
+  clearSessionDrafts,
+  readSessionDraft,
+  retainSessionDraft,
+  sessionDraftEpoch,
+} from "./ui/session-draft-store";
 import type { CurrentSession } from "./domain/session";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -82,6 +87,62 @@ describe("App", () => {
       }),
     ).toHaveAttribute("aria-current", "page");
   });
+
+  it.each([
+    ["same account and school", session, true],
+    ["different account", { ...session, userId: "other" }, false],
+    ["different school", { ...session, schoolId: "other-school" }, false],
+  ] as const)(
+    "isolates retained drafts after reauthentication: %s",
+    async (_label, next, retained) => {
+      let current = session;
+      mockInvoke.mockImplementation((command) => {
+        if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+        if (command === "current_session") return Promise.resolve(current);
+        if (command === "get_my_day_summary")
+          return Promise.resolve({
+            schedule: [],
+            next: null,
+            pendingAttendance: [],
+            pendingAssignments: [],
+            pendingConflicts: [],
+            pendingScoring: [],
+            pendingFollowups: [],
+            hasAnyAssignments: false,
+          });
+        if (command === "list_audit_log") return Promise.reject("unauthorized");
+        if (command === "list_schools")
+          return Promise.resolve([
+            { id: next.schoolId, name: next.schoolName, createdAt: "synthetic" },
+          ]);
+        if (command === "login") {
+          current = next;
+          return Promise.resolve(next);
+        }
+        return Promise.resolve(null);
+      });
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole("heading", { name: "Today" });
+      const scope = JSON.stringify([
+        JSON.stringify([session.userId, session.schoolId]),
+        "sentinel",
+        sessionDraftEpoch(),
+      ]);
+      retainSessionDraft(scope, "unfinished teacher work");
+      await user.click(screen.getByRole("button", { name: "More" }));
+      await user.click(screen.getByRole("button", { name: "Sign-in Activity" }));
+      await screen.findByRole("form", { name: "Sign in" });
+      expect(readSessionDraft(scope, () => "empty")).toBe("unfinished teacher work");
+      await user.type(screen.getByLabelText("Username"), next.username);
+      await user.type(screen.getByLabelText("Password"), "synthetic-password");
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
+      await screen.findByRole("heading", { name: "Today" });
+      expect(readSessionDraft(scope, () => "empty")).toBe(
+        retained ? "unfinished teacher work" : "empty",
+      );
+    },
+  );
 
   it("shows the first-run setup screen when the backend reports the install needs setup", async () => {
     mockInvoke.mockImplementation((command) => {
@@ -327,6 +388,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("button", { name: "Filipino · Grade 8 – Joy" });
 
     // Open the Scores worksheet for the one authorized class and choose the

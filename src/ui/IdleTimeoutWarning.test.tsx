@@ -190,6 +190,30 @@ describe("IdleTimeoutWarning", () => {
     expect(onExpired).not.toHaveBeenCalled();
   });
 
+  it("does not expire a later screen from an extension response after unmount", async () => {
+    const repo = new FakeAuthRepository();
+    repo.sessionToReturn = aSession(Date.now() + 60_000);
+    let resolve!: (session: CurrentSession) => void;
+    vi.spyOn(repo, "extendSession").mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const onExpired = vi.fn();
+    const { unmount } = render(
+      <IdleTimeoutWarning authService={new AuthApplicationService(repo)} onExpired={onExpired} />,
+    );
+    const user = (await import("@testing-library/user-event")).default.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+    await user.click(await screen.findByRole("button", { name: "Stay signed in" }));
+    unmount();
+    resolve(aSession(Date.now() - 1));
+    await Promise.resolve();
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
   it("has no accessibility violations while the warning is shown", async () => {
     const repo = new FakeAuthRepository();
     repo.sessionToReturn = aSession(Date.now() + 60_000);

@@ -33,7 +33,7 @@ describe("workbench-nav-data", () => {
   });
 
   it("exposes the four concept phone destinations", () => {
-    expect(BOTTOM_NAV.map((d) => d.id)).toEqual(["workspace", "my-day", "school-forms", "account"]);
+    expect(BOTTOM_NAV.map((d) => d.id)).toEqual(["today", "my-day", "school-forms", "account"]);
   });
 
   it("normalizes contextual tabs to their parent list tab", () => {
