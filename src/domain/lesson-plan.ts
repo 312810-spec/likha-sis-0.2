@@ -5,6 +5,8 @@ export interface LessonSourceReference {
   citation: string;
   curriculumName: string;
   term: string;
+  /** Explicit teacher declaration; absent means subject/year applicability is unknown. */
+  scope?: { schoolYear: string; subjectId: string };
 }
 
 /** Class context captured at creation; absent for plans saved before context capture. */

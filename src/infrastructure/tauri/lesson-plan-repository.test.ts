@@ -38,6 +38,7 @@ describe("TauriLessonPlanRepository", () => {
       citation: "fixture:bow",
       curriculumName: "Synthetic curriculum",
       term: "Term A",
+      scope: { schoolYear: "2026-2027", subjectId: "sub-1" },
     };
     mockInvoke.mockResolvedValueOnce({ ...PLAN, sourceReference: source });
     await new TauriLessonPlanRepository().create("ta-1", "2026-09-07", FIELDS, source);

@@ -10,16 +10,20 @@ at verified passing heads; retarget the child after PR111 merges.
 
 ## Current continuation — 13 October 2026
 
-PR109 merged at `fb928015fcbc2b8a427bb6fc4a218346eca97fdf` from verified head
-`acf1c5bce6c12634f20bde49688c2ff83fe71617`; PR110 retargeted to main and merged
-at `f0884e08a66ab8fb6529cbf52107acf23276cf6b` from verified head
-`47b56475848a98f2fb2446ecc16f5e73fb10bdb0`. Quality and Security passed for
-both heads. The dedicated two-PR CI watch is paused because its scope is complete.
+PR111 merged as `6725ed6998299e05a3fe5ad78934c74c8d61cc95` from
+`aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998` after Quality/Security PASS.
+PR112 is on main; native formatting repaired at `4bbbb9348e02511d6bffa8eb0becfc84e4a534af`,
+checkpoint head `f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7`.
+Security PASS; Quality running at last inspection. Inspect live heads before merge.
 
-Continue the M10 lesson-context capture slice, then explicit curriculum/BOW
-source versions and subject/term applicability. See
-`docs/ctos/checkpoints/m10-lesson-context-2026-10-13.md`.
-Device/professional acceptance and broader batches B–G remain incomplete.
+Next isolated candidate: teacher-declared source subject/year scope with canonical
+native mismatch rejection, retained drafts, immutable saved scope and truthful
+unknown/declared labels. See `docs/ctos/checkpoints/m10-source-scope-2026-10-13.md`.
+Publish/reconcile its exact-source CI before merging; if stacked, retarget after PR112.
+Then continue canonical term/cohort applicability, explicit provenance amendments,
+verified source ingestion and teacher-confirmed AI drafts. Existing classroom target
+seeding already exists; inspect it before adding linkage. Device/professional
+acceptance and broader batches B–G remain incomplete; no deployment.
 
 ## Latest continuation — FORGE audit implementation completed, 12 October 2026
 
