@@ -1,3 +1,13 @@
+/** Class context captured at creation; absent for plans saved before context capture. */
+interface LessonTeachingContext {
+  schoolYear: string;
+  gradeLevel: string;
+  sectionId: string;
+  sectionName: string;
+  subjectId: string;
+  subjectName: string;
+}
+
 /**
  * A structured lesson plan authored under the "ILAW" format --
  * Intentions, Learning Experiences, Assessment, Ways Forward -- per
@@ -14,6 +24,7 @@ export interface LessonPlan {
   schoolId: string;
   teachingAssignmentId: string;
   planDate: string;
+  teachingContext?: LessonTeachingContext | null;
   /** Intentions: the DepEd learning competency text (from the MATATAG
    * Curriculum Guide). */
   learningCompetency: string;

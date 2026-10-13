@@ -6,15 +6,15 @@
 
 ## Current execution state
 
-- Execution branch: forge/remaining-batches-20261013 (created from main c89474c)
-- Active execution: batches A–G; A reconciled locally, B boundary repairs implemented/native verification pending. See docs/ctos/checkpoints/remaining-batches-2026-10-13.md.
-- Current runtime: Linux shell/frontend checks available; Rust installed, host libraries missing; Windows/Android devices unavailable.
-- Publication: automatic approval review rejected push; commits remain local.
+- Execution branch: ctos/m10-lesson-context-20261013; baseline main f0884e0
+- Active execution: A reconciled; B lesson/planner boundary repairs merged with native CI PASS in PR109. M10 academic-year lock merged in PR110. Lesson context capture is the next isolated slice; broader B acceptance and C–G remain incomplete.
+- Current runtime: Linux shell/frontend checks available; native Rust tools and Windows/Android devices unavailable. Browser launch crashed (SIGSEGV); use native/UI CI for this candidate.
+- Publication: PR109 merged as fb928015fcbc2b8a427bb6fc4a218346eca97fdf; PR110 merged as f0884e08a66ab8fb6529cbf52107acf23276cf6b. Both verified heads passed Quality/Security before expected-head merges.
 - Source branch: main
 - Current milestone: M10 — Curriculum, BOW, Teaching Flow, ILAW (pending); M09 remains complete with deferred applicability.
 - Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
 - Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
-- Next action: execute M10 — Curriculum, BOW, Teaching Flow, ILAW (CTOS.md §M10)
+- Next action: verify lesson teaching-context snapshot, then add explicit versioned curriculum/BOW provenance and subject/term applicability (CTOS.md §M10).
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a

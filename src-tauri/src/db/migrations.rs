@@ -2434,6 +2434,20 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: capture only context known when a new lesson is saved.
+        -- Legacy plans remain NULL: current assignments cannot prove their past context.
+        ALTER TABLE lesson_plans ADD COLUMN teaching_context_json TEXT
+            CHECK (teaching_context_json IS NULL OR json_valid(teaching_context_json));
+        CREATE TRIGGER lesson_plan_context_immutable
+        BEFORE UPDATE OF teaching_context_json ON lesson_plans
+        WHEN NEW.teaching_context_json IS NOT OLD.teaching_context_json
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson teaching context is immutable');
+        END;
+        "#,
+        ),
     ])
 }
 
@@ -2448,6 +2462,35 @@ mod tests {
     /// rows are left unsectioned (section_id NULL) rather than backfilled
     /// into a fabricated section, and the new CHECK constraint actually
     /// rejects the retired 'excused' value going forward.
+    #[test]
+    fn migration_48_preserves_legacy_plans_without_inventing_context() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrations().to_version(&mut conn, 47).unwrap();
+        conn.execute("INSERT INTO lesson_plans (id, school_id, teaching_assignment_id, plan_date,
+            learning_competency, learning_objectives, learning_experiences, assessment, created_by_user_id)
+            VALUES ('legacy', 'school', 'assignment', '2026-09-07', 'Synthetic target', 'Objective', 'Activity', 'Assessment', 'teacher')", []).unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let (target, context): (String, Option<String>) = conn.query_row(
+            "SELECT learning_competency, teaching_context_json FROM lesson_plans WHERE id = 'legacy'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+        assert_eq!(target, "Synthetic target");
+        assert_eq!(context, None);
+        assert!(conn
+            .execute(
+                "UPDATE lesson_plans SET teaching_context_json = '{}' WHERE id = 'legacy'",
+                []
+            )
+            .is_err());
+        conn.execute(
+            "UPDATE lesson_plans SET assessment = 'Revised' WHERE id = 'legacy'",
+            [],
+        )
+        .unwrap();
+    }
+
     #[test]
     fn schema_41_preserves_existing_review_payload_and_adds_pending_entity_index() {
         let mut conn = Connection::open_in_memory().unwrap();

@@ -549,6 +549,11 @@ function LessonPlanWorkspace({
                 <li key={plan.id}>
                   <span>
                     {plan.planDate} — {plan.learningCompetency}
+                    <small className="muted">
+                      {plan.teachingContext
+                        ? `Saved context: ${plan.teachingContext.schoolYear} · Grade ${plan.teachingContext.gradeLevel} · ${plan.teachingContext.sectionName} · ${plan.teachingContext.subjectName}`
+                        : "Saved class context unavailable for this earlier plan."}
+                    </small>
                   </span>
                   <button type="button" disabled={saving} onClick={() => startEditingPlan(plan)}>
                     Edit
