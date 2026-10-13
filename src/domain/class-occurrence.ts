@@ -1,3 +1,5 @@
+import type { LessonSourceReference } from "./lesson-plan";
+
 /**
  * One actual class occurrence — the third term of CTOS.md §5's scheduling
  * invariant, "assignment ≠ planned meeting ≠ actual class occurrence". The
@@ -28,6 +30,20 @@ export interface ClassOccurrence {
   actualEndsAt: string | null;
   actualRoom: string | null;
   learningTarget: string;
+  /** Captured at start; absent on earlier occurrences, never inferred later. */
+  lessonOrigin?: {
+    lessonPlanId: string;
+    planUpdatedAt: string;
+    teachingContext?: {
+      schoolYear: string;
+      gradeLevel: string;
+      sectionId: string;
+      sectionName: string;
+      subjectId: string;
+      subjectName: string;
+    } | null;
+    sourceReference?: LessonSourceReference | null;
+  } | null;
   quickEvidence: string;
   notes: string;
   summary: string;

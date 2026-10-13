@@ -116,6 +116,7 @@ pub struct ClassOccurrence {
     pub actual_ends_at: Option<String>,
     pub actual_room: Option<String>,
     pub learning_target: String,
+    pub lesson_origin: Option<LessonOrigin>,
     pub quick_evidence: String,
     pub notes: String,
     pub summary: String,
@@ -127,6 +128,17 @@ pub struct ClassOccurrence {
     pub created_by_user_id: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Captured when this occurrence starts, never re-derived from a mutable lesson.
+/// Source declarations and file identity are not official approval assertions.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonOrigin {
+    pub lesson_plan_id: String,
+    pub plan_updated_at: String,
+    pub teaching_context: Option<lesson_plan::LessonTeachingContext>,
+    pub source_reference: Option<lesson_plan::LessonSourceReference>,
 }
 
 /// One persisted follow-up marker on one enrollment for one occurrence.
@@ -169,6 +181,18 @@ fn is_iso_date(value: &str) -> bool {
 /// and every row is re-read after it is written, so the value returned to a
 /// caller is always the database's, never a Rust-side reconstruction of it.
 fn row_to_occurrence(row: &rusqlite::Row) -> rusqlite::Result<ClassOccurrence> {
+    let origin_json: Option<String> = row.get(23)?;
+    let lesson_origin = origin_json
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    23,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
     Ok(ClassOccurrence {
         id: row.get(0)?,
         school_id: row.get(1)?,
@@ -182,6 +206,7 @@ fn row_to_occurrence(row: &rusqlite::Row) -> rusqlite::Result<ClassOccurrence> {
         actual_ends_at: row.get(9)?,
         actual_room: row.get(10)?,
         learning_target: row.get(11)?,
+        lesson_origin,
         quick_evidence: row.get(12)?,
         notes: row.get(13)?,
         summary: row.get(14)?,
@@ -200,7 +225,7 @@ const OCCURRENCE_SELECT: &str = "SELECT id, school_id, teaching_assignment_id, \
      occurrence_date, status, planned_starts_at, planned_ends_at, planned_room, \
      actual_starts_at, actual_ends_at, actual_room, learning_target, quick_evidence, \
      notes, summary, cancelled_reason, started_at, finished_at, cancelled_at, \
-     revision, created_by_user_id, created_at, updated_at \
+     revision, created_by_user_id, created_at, updated_at, lesson_origin_json \
      FROM class_occurrences";
 
 fn row_to_marker(row: &rusqlite::Row) -> rusqlite::Result<LearnerFollowupMarker> {
@@ -353,32 +378,44 @@ pub fn start(
     // Seed the learning target from today's lesson plan for this class, if
     // one has been authored -- a snapshot, not a join: the plan can be edited
     // later, and this occurrence records what was targeted in *this* class.
-    let learning_target = lesson_plan::find_by_assignment_and_date(
+    let lesson = lesson_plan::find_by_assignment_and_date(
         conn,
         school_id,
         teaching_assignment_id,
         occurrence_date,
-    )?
-    .map(|plan| {
-        if plan.learning_competency_code.trim().is_empty() {
-            plan.learning_competency
-        } else {
-            format!(
-                "{} ({})",
-                plan.learning_competency, plan.learning_competency_code
-            )
-        }
-    })
-    .unwrap_or_default();
+    )?;
+    let lesson_origin = lesson.as_ref().map(|plan| LessonOrigin {
+        lesson_plan_id: plan.id.clone(),
+        plan_updated_at: plan.updated_at.clone(),
+        teaching_context: plan.teaching_context.clone(),
+        source_reference: plan.source_reference.clone(),
+    });
+    let origin_json = lesson_origin
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|_| AppError::Validation("Lesson origin could not be captured".into()))?;
+    let learning_target = lesson
+        .map(|plan| {
+            if plan.learning_competency_code.trim().is_empty() {
+                plan.learning_competency
+            } else {
+                format!(
+                    "{} ({})",
+                    plan.learning_competency, plan.learning_competency_code
+                )
+            }
+        })
+        .unwrap_or_default();
 
     conn.execute(
         "INSERT INTO class_occurrences \
              (id, school_id, teaching_assignment_id, occurrence_date, status, \
               planned_starts_at, planned_ends_at, planned_room, \
-              learning_target, started_at, created_by_user_id, updated_at) \
+              learning_target, started_at, created_by_user_id, updated_at, lesson_origin_json) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, \
                  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?10, \
-                 strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+                 strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?11)",
         params![
             Uuid::now_v7().to_string(),
             school_id,
@@ -390,6 +427,7 @@ pub fn start(
             planned_room,
             &learning_target,
             actor_user_id,
+            origin_json,
         ],
     )?;
 
@@ -1061,7 +1099,7 @@ mod tests {
         let conn = open_test_db();
         let f = seed(&conn);
         use crate::repository::lesson_plan::{self, LessonPlanFields};
-        lesson_plan::create(
+        let plan = lesson_plan::create(
             &conn,
             &f.school_id,
             &f.assignment_id,
@@ -1077,11 +1115,75 @@ mod tests {
                 ways_forward: "",
             },
         )
+        .unwrap()
         .unwrap();
 
+        let source = lesson_plan::LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: None,
+            artifact_id: None,
+        };
+        lesson_plan::amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &source,
+            "Added synthetic source",
+        )
+        .unwrap();
         let occurrence = started_occurrence(&conn, &f, "2026-09-09");
 
         assert_eq!(occurrence.learning_target, "Adds polynomials (M7AL-Ig-1)");
+        let origin = occurrence.lesson_origin.as_ref().unwrap();
+        assert_eq!(origin.lesson_plan_id, plan.id);
+        assert_eq!(origin.teaching_context, plan.teaching_context);
+        assert_eq!(origin.plan_updated_at, plan.updated_at);
+        assert_eq!(origin.source_reference.as_ref(), Some(&source));
+        let corrected_source = lesson_plan::LessonSourceReference {
+            version: "v2".into(),
+            ..source
+        };
+        lesson_plan::amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &corrected_source,
+            "Later synthetic correction",
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE lesson_plans SET learning_competency = 'Changed later' WHERE id = ?1",
+            [&plan.id],
+        )
+        .unwrap();
+        let resumed = match start(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            &f.teacher_id,
+        )
+        .unwrap()
+        {
+            OccurrenceOutcome::AlreadyOpen(existing) => existing,
+            other => panic!("expected AlreadyOpen, got {other:?}"),
+        };
+        assert_eq!(resumed.lesson_origin, occurrence.lesson_origin);
+        assert_eq!(resumed.learning_target, occurrence.learning_target);
+        assert!(conn
+            .execute(
+                "UPDATE class_occurrences SET lesson_origin_json = NULL WHERE id = ?1",
+                [&occurrence.id]
+            )
+            .is_err());
     }
 
     #[test]

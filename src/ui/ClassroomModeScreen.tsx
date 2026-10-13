@@ -912,6 +912,11 @@ export function ClassroomModeScreen({
             <>
               <section aria-labelledby="classroom-capture">
                 <h3 id="classroom-capture">What is happening in this class</h3>
+                <p className="muted">
+                  {occurrence?.lessonOrigin
+                    ? `Lesson link captured at start: ${occurrence.lessonOrigin.lessonPlanId}. ${occurrence.lessonOrigin.sourceReference ? `Declared source: ${occurrence.lessonOrigin.sourceReference.title} · ${occurrence.lessonOrigin.sourceReference.version}.` : "No source reference was declared."} Later lesson edits do not rewrite this link. Official source approval is not verified.`
+                    : "No lesson link was captured for this occurrence. A learning target alone does not establish lesson provenance."}
+                </p>
                 <div className="classroom-capture-grid">
                   <label className="field">
                     <span>Actual start</span>
