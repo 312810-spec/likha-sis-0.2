@@ -1,14 +1,17 @@
 # CTOS State
 
-**Updated:** 2026-10-08
+**Updated:** 2026-10-13
 **Program:** CTOS v3 / FORGE-UHF  
 **Repository:** 312810-spec/likha-sis-0.2
 
 ## Current execution state
 
-- Execution branch: ctos/integration (created from main 659fb0d)
+- Execution branch: forge/remaining-batches-20261013 (created from main c89474c)
+- Active execution: batches A–G; A reconciled locally, B boundary repairs implemented/native verification pending. See docs/ctos/checkpoints/remaining-batches-2026-10-13.md.
+- Current runtime: Linux shell/frontend checks available; Rust installed, host libraries missing; Windows/Android devices unavailable.
+- Publication: automatic approval review rejected push; commits remain local.
 - Source branch: main
-- Current milestone: M09 — Teacher Load Maker + Smart Scheduling (COMPLETE, PASS)
+- Current milestone: M10 — Curriculum, BOW, Teaching Flow, ILAW (pending); M09 remains complete with deferred applicability.
 - Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
 - Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
 - Next action: execute M10 — Curriculum, BOW, Teaching Flow, ILAW (CTOS.md §M10)
@@ -35,7 +38,7 @@
   the trusted Rust checker documented in `docs/ctos/evals/schedule-cases.md`.
   The full gate matrix was re-run on the reconciled tree before this checkpoint
   was pushed
-- Dirty/unpushed warning: none after the M09 commit and tag are pushed
+- Dirty/unpushed warning: inspect Git status at resume; do not infer a clean tree from this file.
 - M09 research checkpoint: DepEd Mandaue site/archive, official Division seal, DO 005 s.2024, DM 053 s.2024, and eSF7 national/current operational evidence recorded in `docs/research/deped-mandaue-teacher-load-2026.md` (commit `0fef68e`); no local Mandaue memo number or deadline was invented
 
 ## M09 result (checkpoint m09.md)

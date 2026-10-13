@@ -73,10 +73,12 @@ pub fn update_lesson_plan(
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     lesson_plan::authorize_own_assignment(&conn, &user_id, &school_id, &teaching_assignment_id)?;
-    lesson_plan::update(
+    lesson_plan::update_authorized(
         &conn,
+        &user_id,
         &school_id,
         &id,
+        &teaching_assignment_id,
         &LessonPlanFields {
             learning_competency: &learning_competency,
             learning_competency_code: &learning_competency_code,
@@ -206,10 +208,12 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, created.id);
 
-        let updated = lesson_plan::update(
+        let updated = lesson_plan::update_authorized(
             &conn,
+            &f.teacher_id,
             &f.school_id,
             &created.id,
+            &f.assignment_id,
             &LessonPlanFields {
                 learning_competency: "Revised",
                 learning_competency_code: "M7NS-Ig-2",
@@ -237,5 +241,64 @@ mod tests {
         let result = lesson_plan::authorize_view(&conn, &head.id, &f.school_id, &f.assignment_id);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn update_cannot_use_an_owned_assignment_to_edit_another_teachers_plan() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();
+        let sec = section::create(&conn, &f.school_id, "2026-2027", "8", "Other").unwrap();
+        let sub = subject::create(&conn, &f.school_id, "TLE").unwrap();
+        let assignment =
+            teaching_assignment::create(&conn, &f.school_id, &other.id, &sec.id, &sub.id)
+                .unwrap()
+                .unwrap();
+        let fields = LessonPlanFields {
+            learning_competency: "Synthetic competency",
+            learning_competency_code: "",
+            learning_objectives: "Synthetic objective",
+            connection_to_previous_learning: "",
+            learning_experiences: "Synthetic activity",
+            assessment: "Synthetic assessment",
+            ways_forward: "",
+        };
+        let plan = lesson_plan::create(
+            &conn,
+            &f.school_id,
+            &assignment.id,
+            "2026-10-13",
+            &other.id,
+            &fields,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(matches!(
+            lesson_plan::update_authorized(
+                &conn,
+                &f.teacher_id,
+                &f.school_id,
+                &plan.id,
+                &f.assignment_id,
+                &fields,
+            ),
+            Err(crate::error::AppError::Unauthorized)
+        ));
+        assert!(matches!(
+            lesson_plan::update_authorized(
+                &conn,
+                &f.teacher_id,
+                &f.school_id,
+                &plan.id,
+                &assignment.id,
+                &fields,
+            ),
+            Err(crate::error::AppError::Unauthorized)
+        ));
+        assert_eq!(
+            lesson_plan::find_by_id_in_school(&conn, &f.school_id, &plan.id).unwrap(),
+            Some(plan)
+        );
     }
 }
