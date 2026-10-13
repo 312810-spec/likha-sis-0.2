@@ -78,8 +78,7 @@ fn validate_as_current_session(
     sessions: &SessionManager,
     plan_id: &str,
 ) -> AppResult<Vec<Violation>> {
-    let school_id =
-        sessions.require_active_school_scope(conn)?;
+    let school_id = sessions.require_active_school_scope(conn)?;
     check::check(conn, &school_id, plan_id)
 }
 
@@ -99,8 +98,7 @@ fn settings_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
 ) -> AppResult<ScheduleSettings> {
-    let school_id =
-        sessions.require_active_school_scope(conn)?;
+    let school_id = sessions.require_active_school_scope(conn)?;
     scheduling_inputs::ensure(conn, &school_id)
 }
 
