@@ -48,3 +48,19 @@ or deployment. M10 and batches C–G remain incomplete.
 Next: source-aware subject/term/year applicability, provenance amendments and
 verified source ingestion, then teacher-confirmed AI drafts and classroom linkage.
 Missing approved BOW/templates remain unknown; no official source is fabricated.
+
+## Follow-up CI repair — 13 October 2026
+
+PR111 passed Quality `38405394618` and Security `38405394729` at
+`aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998` and merged as
+`6725ed6998299e05a3fe5ad78934c74c8d61cc95`. PR112 is retargeted to main;
+its resulting diff contains only the declared-source slice.
+
+At source head `ba01849ccb54f488862aa9112585aa24c0df9d41`, Security
+`38406129378` and Windows Quality passed; Ubuntu frontend/UI/recovery passed.
+Ubuntu Quality `38406129189` stopped at rustfmt on one chained assertion,
+before its native tests/Clippy. The isolated formatting repair is
+`4bbbb9348e02511d6bffa8eb0becfc84e4a534af`, tree
+`5d6718582b1ce84b140ff36645187846c1612889`; 30 focused frontend tests passed
+locally on that unchanged-behavior repair. Native CI at the repaired PR head
+must pass before merge. No gate is bypassed and no installed acceptance is claimed.
