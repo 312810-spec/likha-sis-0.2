@@ -56,17 +56,15 @@ pub fn ingest_lesson_source_file(
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     lesson_plan::authorize_own_assignment(&conn, &user_id, &school_id, &teaching_assignment_id)?;
     let path = Path::new(&file_path);
-    let metadata = fs::metadata(path).map_err(|_| {
-        AppError::Validation("The selected source file could not be opened".into())
-    })?;
+    let metadata = fs::metadata(path)
+        .map_err(|_| AppError::Validation("The selected source file could not be opened".into()))?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_SOURCE_FILE_BYTES {
         return Err(AppError::Validation(
             "Source file must contain data and be no larger than 8 MiB".into(),
         ));
     }
-    let content = fs::read(path).map_err(|_| {
-        AppError::Validation("The selected source file could not be read".into())
-    })?;
+    let content = fs::read(path)
+        .map_err(|_| AppError::Validation("The selected source file could not be read".into()))?;
     let (file_name, media_type) = source_file_identity(path, &content)?;
     lesson_plan::ingest_source_artifact_authorized(
         &conn,
@@ -247,7 +245,9 @@ mod tests {
     #[test]
     fn source_file_identity_checks_extension_and_container_signature() {
         assert_eq!(
-            source_file_identity(Path::new("source.PDF"), b"%PDF-1.7\nfixture").unwrap().1,
+            source_file_identity(Path::new("source.PDF"), b"%PDF-1.7\nfixture")
+                .unwrap()
+                .1,
             "application/pdf"
         );
         assert!(source_file_identity(Path::new("source.pdf"), b"PK\x03\x04fixture").is_err());

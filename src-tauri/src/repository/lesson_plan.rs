@@ -220,9 +220,8 @@ pub fn ingest_source_artifact_authorized(
             user_id
         ],
     )?;
-    find_source_artifact(conn, school_id, &id)?.ok_or_else(|| {
-        AppError::Validation("Stored source artifact could not be read back".into())
-    })
+    find_source_artifact(conn, school_id, &id)?
+        .ok_or_else(|| AppError::Validation("Stored source artifact could not be read back".into()))
 }
 
 pub fn find_source_artifact(
@@ -933,7 +932,10 @@ mod tests {
             )
             .is_err());
         assert!(conn
-            .execute("DELETE FROM lesson_source_artifacts WHERE id = ?1", [&stored.id])
+            .execute(
+                "DELETE FROM lesson_source_artifacts WHERE id = ?1",
+                [&stored.id]
+            )
             .is_err());
         let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();
