@@ -2466,6 +2466,18 @@ mod tests {
     fn migration_48_preserves_legacy_plans_without_inventing_context() {
         let mut conn = Connection::open_in_memory().unwrap();
         migrations().to_version(&mut conn, 47).unwrap();
+        conn.execute_batch(
+            "INSERT INTO schools (id, name) VALUES ('school', 'Synthetic School');
+             INSERT INTO users (id, username, password_hash, display_name)
+             VALUES ('teacher', 'synthetic.teacher', 'unused-fixture-hash', 'Synthetic Teacher');
+             INSERT INTO user_school_memberships (user_id, school_id) VALUES ('teacher', 'school');
+             INSERT INTO sections (id, school_id, school_year, grade_level, name)
+             VALUES ('section', 'school', '2026-2027', '7', 'Synthetic Section');
+             INSERT INTO subjects (id, school_id, name) VALUES ('subject', 'school', 'Synthetic Subject');
+             INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id)
+             VALUES ('assignment', 'school', 'teacher', 'section', 'subject');",
+        )
+        .unwrap();
         conn.execute("INSERT INTO lesson_plans (id, school_id, teaching_assignment_id, plan_date,
             learning_competency, learning_objectives, learning_experiences, assessment, created_by_user_id)
             VALUES ('legacy', 'school', 'assignment', '2026-09-07', 'Synthetic target', 'Objective', 'Activity', 'Assessment', 'teacher')", []).unwrap();
