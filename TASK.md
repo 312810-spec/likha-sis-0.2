@@ -1,5 +1,16 @@
 # Current task — CTOS v3
 
+## Latest active slice — classroom lesson origin
+
+PR115 passed Quality/Security at `ffd647800f57aaa09d39b86ee0ea372aa236f0e7`
+and merged as `30cfd9df08072d83c331b5ab000e0ba74a71f50b`. Classroom lesson
+origin is the next isolated slice on `ctos/m10-classroom-lesson-origin-20261014`.
+Read `docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md` next.
+Require exact-source Quality/Security before merge. Continue provider-independent
+teacher-confirmed AI draft ingestion next; live generation needs the deferred
+provider/privacy decision. Official-source and installed-device acceptance remain
+pending. No deployment.
+
 ## Active slice — exact lesson source ingestion
 
 PR114 passed exact-head Quality and Security and merged as

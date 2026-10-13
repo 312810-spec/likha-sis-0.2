@@ -6,6 +6,8 @@
 
 ## Current execution state
 
+- Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
+
 - Execution branch: ctos/m10-source-ingestion-20261014, based on PR114 merge e5f4c74c11dd6a81ce15278ae68b39f6e4614459.
 - Active execution: PR111–PR114 merged after verified gates. Exact local source ingestion, SHA-256 integrity evidence, school-scoped linking and append-only storage are implemented locally as the next isolated M10 slice; official source approval and broader B acceptance/C–G remain incomplete.
 - Current runtime: Linux frontend/build/browser checks available. Official Rust 1.99 formatter obtained and changed Rust checked; native execution, Windows/Android installed devices and professional acceptance unavailable locally.

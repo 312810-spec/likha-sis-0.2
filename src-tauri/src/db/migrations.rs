@@ -2533,6 +2533,20 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: capture the lesson identity and effective declared provenance at
+        -- occurrence start. Earlier occurrences remain unknown; never backfill.
+        ALTER TABLE class_occurrences ADD COLUMN lesson_origin_json TEXT
+            CHECK (lesson_origin_json IS NULL OR json_valid(lesson_origin_json));
+        CREATE TRIGGER class_occurrence_lesson_origin_immutable
+        BEFORE UPDATE OF lesson_origin_json ON class_occurrences
+        WHEN NEW.lesson_origin_json IS NOT OLD.lesson_origin_json
+        BEGIN
+            SELECT RAISE(ABORT, 'Classroom lesson origin is immutable');
+        END;
+        "#,
+        ),
     ])
 }
 
@@ -2540,6 +2554,56 @@ pub fn migrations() -> Migrations<'static> {
 mod tests {
     use super::*;
     use rusqlite::Connection;
+
+    #[test]
+    fn migration_52_preserves_earlier_occurrences_without_backfilling_lesson_origin() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 51).unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO schools (id, name) VALUES ('school', 'Synthetic School');
+            INSERT INTO users (id, username, password_hash, display_name)
+            VALUES ('teacher', 'synthetic.teacher', 'unused', 'Synthetic Teacher');
+            INSERT INTO user_school_memberships (user_id, school_id)
+            VALUES ('teacher', 'school');
+            INSERT INTO sections (id, school_id, school_year, grade_level, name)
+            VALUES ('section', 'school', '2026-2027', '7', 'Synthetic Section');
+            INSERT INTO subjects (id, school_id, name)
+            VALUES ('subject', 'school', 'Synthetic Subject');
+            INSERT INTO teaching_assignments
+                (id, school_id, teacher_user_id, section_id, subject_id)
+            VALUES ('assignment', 'school', 'teacher', 'section', 'subject');
+            INSERT INTO class_occurrences
+                (id, school_id, teaching_assignment_id, occurrence_date, status,
+                 learning_target, created_by_user_id)
+            VALUES ('earlier', 'school', 'assignment', '2026-09-07', 'planned',
+                    'Synthetic target', 'teacher');
+            "#,
+        )
+        .unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let (target, origin): (String, Option<String>) = conn
+            .query_row(
+                "SELECT learning_target, lesson_origin_json FROM class_occurrences WHERE id = 'earlier'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(target, "Synthetic target");
+        assert_eq!(origin, None);
+        assert!(conn
+            .execute(
+                "UPDATE class_occurrences SET lesson_origin_json = '{}' WHERE id = 'earlier'",
+                []
+            )
+            .is_err());
+        conn.execute(
+            "UPDATE class_occurrences SET learning_target = 'Teacher correction' WHERE id = 'earlier'",
+            [],
+        )
+        .unwrap();
+    }
 
     /// Proves the migration-5 attendance_records rebuild is a safe, lossless
     /// conversion of pre-section legacy data: row count is preserved, the

@@ -422,6 +422,36 @@ async function learnerRow(name: RegExp): Promise<HTMLElement> {
 }
 
 describe("ClassroomModeScreen", () => {
+  it("shows captured lesson provenance without claiming official approval", async () => {
+    const { container } = renderScreen({
+      occurrence: makeOccurrence({
+        lessonOrigin: {
+          lessonPlanId: "lesson-synthetic-1",
+          planUpdatedAt: "2026-09-09T00:00:00.000Z",
+          sourceReference: {
+            title: "Synthetic BOW",
+            version: "v1",
+            citation: "fixture:bow",
+            curriculumName: "Synthetic",
+            term: "Term A",
+          },
+        },
+      }),
+    });
+    expect(await screen.findByText(/Lesson link captured at start/)).toHaveTextContent(
+      "lesson-synthetic-1",
+    );
+    expect(screen.getByText(/Declared source: Synthetic BOW/)).toHaveTextContent(
+      "Official source approval is not verified",
+    );
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("does not infer a lesson identity for an earlier occurrence", async () => {
+    renderScreen({ occurrence: makeOccurrence() });
+    expect(await screen.findByText(/No lesson link was captured/)).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     clearSessionDrafts();
     vi.useFakeTimers({ shouldAdvanceTime: true });
