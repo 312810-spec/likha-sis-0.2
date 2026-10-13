@@ -2495,6 +2495,44 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: exact source bytes retained locally with an integrity fingerprint.
+        -- This proves which file was attached; it does not certify curriculum
+        -- authority, official approval, applicability or competency accuracy.
+        CREATE TABLE lesson_source_artifacts (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            file_name TEXT NOT NULL CHECK (length(trim(file_name)) BETWEEN 1 AND 255),
+            media_type TEXT NOT NULL CHECK (media_type IN (
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )),
+            byte_length INTEGER NOT NULL CHECK (byte_length BETWEEN 1 AND 8388608),
+            sha256 TEXT NOT NULL CHECK (
+                length(sha256) = 64 AND sha256 = lower(sha256) AND
+                sha256 NOT GLOB '*[^0-9a-f]*'
+            ),
+            content BLOB NOT NULL CHECK (length(content) = byte_length),
+            ingested_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (school_id, sha256)
+        );
+        CREATE INDEX idx_lesson_source_artifacts_school_created
+            ON lesson_source_artifacts(school_id, created_at DESC, id DESC);
+        CREATE TRIGGER lesson_source_artifact_no_update
+        BEFORE UPDATE ON lesson_source_artifacts
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson source artifacts are immutable');
+        END;
+        CREATE TRIGGER lesson_source_artifact_no_delete
+        BEFORE DELETE ON lesson_source_artifacts
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson source artifacts are retained evidence');
+        END;
+        "#,
+        ),
     ])
 }
 

@@ -3,6 +3,7 @@ import { ValidationError } from "../domain/errors";
 import type {
   LessonPlan,
   LessonPlanFields,
+  LessonSourceArtifact,
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../domain/lesson-plan";
@@ -31,6 +32,26 @@ const PLAN: LessonPlan = {
 };
 
 class FakeLessonPlanRepository implements LessonPlanRepository {
+  artifact: LessonSourceArtifact = {
+    id: "artifact-1",
+    fileName: "source.pdf",
+    mediaType: "application/pdf",
+    byteLength: 20,
+    sha256: "a".repeat(64),
+    ingestedByUserId: "u1",
+    ingestedByName: "Teacher A",
+    createdAt: "now",
+    alreadyImported: false,
+  };
+
+  async ingestSourceFile(): Promise<LessonSourceArtifact> {
+    return this.artifact;
+  }
+
+  async getSourceArtifact(): Promise<LessonSourceArtifact | null> {
+    return this.artifact;
+  }
+
   createCalls: Array<{
     teachingAssignmentId: string;
     planDate: string;
@@ -97,6 +118,23 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("ingests a teacher-selected source and preserves cancellation", async () => {
+    const repo = new FakeLessonPlanRepository();
+    let selected: string | null = "/tmp/source.pdf";
+    const service = new LessonPlanApplicationService(repo, {
+      async pickSf1Workbook() {
+        return null;
+      },
+      async pickLessonSourceFile() {
+        return selected;
+      },
+    });
+    await expect(service.pickAndIngestSource(" ta-1 ")).resolves.toEqual(repo.artifact);
+    selected = null;
+    await expect(service.pickAndIngestSource("ta-1")).resolves.toBeNull();
+    await expect(service.getSourceArtifact(" artifact-1 ")).resolves.toEqual(repo.artifact);
+  });
+
   it("validates and trims source corrections before forwarding them", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);

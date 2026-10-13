@@ -9,6 +9,21 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 const mockOpen = vi.mocked(open);
 
 describe("TauriFilePicker", () => {
+  it("filters curriculum source selection to supported exact-file formats", async () => {
+    mockOpen.mockResolvedValueOnce("C:\\Users\\teacher\\source.pdf");
+
+    const result = await new TauriFilePicker().pickLessonSourceFile();
+
+    expect(mockOpen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        multiple: false,
+        directory: false,
+        filters: [{ name: expect.any(String), extensions: ["pdf", "docx", "xlsx"] }],
+      }),
+    );
+    expect(result).toBe("C:\\Users\\teacher\\source.pdf");
+  });
+
   it("filters to .xls/.xlsx and returns the chosen path", async () => {
     mockOpen.mockResolvedValueOnce("C:\\Users\\teacher\\sf1.xlsx");
 

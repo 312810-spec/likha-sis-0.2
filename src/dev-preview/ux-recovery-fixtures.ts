@@ -25,6 +25,12 @@ export function recoveryServices(state: string) {
   let plans: LessonPlan[] = [];
   let sourceAmendments: LessonSourceAmendment[] = [];
   const lessonPlanService = new LessonPlanApplicationService({
+    async ingestSourceFile() {
+      throw new Error("Synthetic source ingestion is not configured");
+    },
+    async getSourceArtifact() {
+      return null;
+    },
     async listByAssignment(id) {
       if (lessonReadFails) {
         lessonReadFails = false;
@@ -357,6 +363,9 @@ export function recoveryServices(state: string) {
     {
       async pickSf1Workbook() {
         return "/synthetic/synthetic-sf1.xlsx";
+      },
+      async pickLessonSourceFile() {
+        return null;
       },
     },
   );

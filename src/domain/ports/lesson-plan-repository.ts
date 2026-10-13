@@ -1,6 +1,7 @@
 import type {
   LessonPlan,
   LessonPlanFields,
+  LessonSourceArtifact,
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../lesson-plan";
@@ -13,6 +14,8 @@ import type {
  * server-side; this port only carries the ids needed to route the call.
  */
 export interface LessonPlanRepository {
+  ingestSourceFile(teachingAssignmentId: string, filePath: string): Promise<LessonSourceArtifact>;
+  getSourceArtifact(artifactId: string): Promise<LessonSourceArtifact | null>;
   create(
     teachingAssignmentId: string,
     planDate: string,

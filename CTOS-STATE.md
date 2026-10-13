@@ -1,20 +1,20 @@
 # CTOS State
 
-**Updated:** 2026-10-13
+**Updated:** 2026-10-14
 **Program:** CTOS v3 / FORGE-UHF  
 **Repository:** 312810-spec/likha-sis-0.2
 
 ## Current execution state
 
-- Execution branch: ctos/m10-source-amendments-20261013, reconciled to main merge 4c365f117846ad1bd724d5189816f97676a9d794 at 58d554997fe228b5dcc5386023b9090b096e2184.
-- Active execution: PR111 historical lesson context, PR112 declared source references and PR113 teacher-declared subject/year scope merged after verified gates. Append-only source amendments are implemented locally through 7f9909788e3cff97c8021c67750c940087bf8893 and reconciled to main as the next isolated M10 slice; broader B acceptance and C–G remain incomplete.
+- Execution branch: ctos/m10-source-ingestion-20261014, based on PR114 merge e5f4c74c11dd6a81ce15278ae68b39f6e4614459.
+- Active execution: PR111–PR114 merged after verified gates. Exact local source ingestion, SHA-256 integrity evidence, school-scoped linking and append-only storage are implemented locally as the next isolated M10 slice; official source approval and broader B acceptance/C–G remain incomplete.
 - Current runtime: Linux frontend/build/browser checks available. Official Rust 1.99 formatter obtained and changed Rust checked; native execution, Windows/Android installed devices and professional acceptance unavailable locally.
-- Publication: PR109/110/111 merged at verified heads. PR112 merged as c18383d442af3bd3cdbbe80b15605eab68ff19a9 from verified head f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7. PR113 passed Quality/Security at reconciled head 240c97ad125c0e396a20e318e246c99b0b8bcfb1 and merged as 4c365f117846ad1bd724d5189816f97676a9d794.
+- Publication: PR109–PR114 merged at verified heads; PR114 merged as e5f4c74c11dd6a81ce15278ae68b39f6e4614459 from verified head 7b8b28ddfa9aec5524567ffc3fc696034802c91d.
 - Source branch: main
 - Current milestone: M10 — Curriculum, BOW, Teaching Flow, ILAW (pending); M09 remains complete with deferred applicability.
 - Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
 - Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
-- Next action: publish the reconciled append-only source-amendment slice and require exact-source Quality/Security before merge; then continue verified ingestion and teacher-confirmed AI drafts (CTOS.md §M10).
+- Next action: publish exact source ingestion and require exact-source Quality/Security before merge; then continue teacher-confirmed AI drafts and classroom linkage (CTOS.md §M10).
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a

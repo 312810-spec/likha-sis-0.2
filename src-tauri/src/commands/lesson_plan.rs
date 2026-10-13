@@ -1,3 +1,5 @@
+use std::fs;
+use std::path::Path;
 use std::sync::Mutex;
 
 use rusqlite::Connection;
@@ -5,10 +7,86 @@ use tauri::State;
 
 use crate::auth::SessionManager;
 use crate::commands::lock_db;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::lesson_plan::{
-    self, LessonPlan, LessonPlanFields, LessonSourceAmendment, LessonSourceReference,
+    self, LessonPlan, LessonPlanFields, LessonSourceAmendment, LessonSourceArtifact,
+    LessonSourceReference,
 };
+
+const MAX_SOURCE_FILE_BYTES: u64 = 8 * 1024 * 1024;
+
+fn source_file_identity(path: &Path, content: &[u8]) -> AppResult<(String, &'static str)> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| AppError::Validation("Source file name is required".into()))?;
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let media_type = match extension.as_str() {
+        "pdf" if content.starts_with(b"%PDF-") => "application/pdf",
+        "docx" if content.starts_with(b"PK\x03\x04") => {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+        "xlsx" if content.starts_with(b"PK\x03\x04") => {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        "pdf" | "docx" | "xlsx" => {
+            return Err(AppError::Validation(
+                "Source file contents do not match the selected file type".into(),
+            ));
+        }
+        _ => return Err(AppError::Validation("Unsupported source file type".into())),
+    };
+    Ok((file_name.to_string(), media_type))
+}
+
+#[tauri::command]
+pub fn ingest_lesson_source_file(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    teaching_assignment_id: String,
+    file_path: String,
+) -> AppResult<LessonSourceArtifact> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    lesson_plan::authorize_own_assignment(&conn, &user_id, &school_id, &teaching_assignment_id)?;
+    let path = Path::new(&file_path);
+    let metadata = fs::metadata(path)
+        .map_err(|_| AppError::Validation("The selected source file could not be opened".into()))?;
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_SOURCE_FILE_BYTES {
+        return Err(AppError::Validation(
+            "Source file must contain data and be no larger than 8 MiB".into(),
+        ));
+    }
+    let content = fs::read(path)
+        .map_err(|_| AppError::Validation("The selected source file could not be read".into()))?;
+    let (file_name, media_type) = source_file_identity(path, &content)?;
+    lesson_plan::ingest_source_artifact_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        &teaching_assignment_id,
+        &file_name,
+        media_type,
+        &content,
+    )
+}
+
+#[tauri::command]
+pub fn get_lesson_source_artifact(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    artifact_id: String,
+) -> AppResult<Option<LessonSourceArtifact>> {
+    let conn = lock_db(&db);
+    let (_, school_id) = sessions.require_active_session(&conn)?;
+    lesson_plan::find_source_artifact(&conn, &school_id, artifact_id.trim())
+}
 
 /// Every command in this file gates on `lesson_plan::authorize_own_assignment`
 /// (create/update) or `lesson_plan::authorize_view` (read) -- the caller
@@ -159,10 +237,22 @@ mod tests {
     use super::*;
     use crate::db;
     use crate::repository::{role, school, section, subject, teaching_assignment, user};
-    use std::path::Path;
 
     fn open_test_db() -> Connection {
         db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
+    }
+
+    #[test]
+    fn source_file_identity_checks_extension_and_container_signature() {
+        assert_eq!(
+            source_file_identity(Path::new("source.PDF"), b"%PDF-1.7\nfixture")
+                .unwrap()
+                .1,
+            "application/pdf"
+        );
+        assert!(source_file_identity(Path::new("source.pdf"), b"PK\x03\x04fixture").is_err());
+        assert!(source_file_identity(Path::new("source.doc"), b"PK\x03\x04fixture").is_err());
+        assert!(source_file_identity(Path::new("source.xlsx"), b"PK\x03\x04fixture").is_ok());
     }
 
     struct Fixture {

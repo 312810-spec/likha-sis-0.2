@@ -194,6 +194,8 @@ pub fn run() {
             commands::learner_support::resolve_learner_support_case,
             commands::learner_support::list_learner_support_cases,
             commands::lesson_plan::create_lesson_plan,
+            commands::lesson_plan::ingest_lesson_source_file,
+            commands::lesson_plan::get_lesson_source_artifact,
             commands::lesson_plan::update_lesson_plan,
             commands::lesson_plan::list_lesson_plans_by_assignment,
             commands::lesson_plan::amend_lesson_source,

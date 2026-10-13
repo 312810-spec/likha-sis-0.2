@@ -31,6 +31,20 @@ const PLAN: LessonPlan = {
 };
 
 describe("TauriLessonPlanRepository", () => {
+  it("routes exact source ingestion and school-scoped artifact reads", async () => {
+    mockInvoke.mockResolvedValueOnce({ id: "artifact-1" });
+    await new TauriLessonPlanRepository().ingestSourceFile("ta-1", "/tmp/source.pdf");
+    expect(mockInvoke).toHaveBeenLastCalledWith("ingest_lesson_source_file", {
+      teachingAssignmentId: "ta-1",
+      filePath: "/tmp/source.pdf",
+    });
+    mockInvoke.mockResolvedValueOnce({ id: "artifact-1" });
+    await new TauriLessonPlanRepository().getSourceArtifact("artifact-1");
+    expect(mockInvoke).toHaveBeenLastCalledWith("get_lesson_source_artifact", {
+      artifactId: "artifact-1",
+    });
+  });
+
   it("routes source corrections and history through dedicated commands", async () => {
     const source = {
       title: "Synthetic BOW",

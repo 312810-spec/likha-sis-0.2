@@ -7,6 +7,21 @@ export interface LessonSourceReference {
   term: string;
   /** Explicit teacher declaration; absent means subject/year applicability is unknown. */
   scope?: { schoolYear: string; subjectId: string };
+  /** Exact local source-file identity; never an official-approval assertion. */
+  artifactId?: string;
+}
+
+/** Exact locally stored source bytes and their integrity fingerprint. */
+export interface LessonSourceArtifact {
+  id: string;
+  fileName: string;
+  mediaType: string;
+  byteLength: number;
+  sha256: string;
+  ingestedByUserId: string;
+  ingestedByName?: string | null;
+  createdAt: string;
+  alreadyImported: boolean;
 }
 
 /** Append-only lineage for a teacher-authored source correction. */
