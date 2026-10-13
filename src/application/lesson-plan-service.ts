@@ -131,7 +131,8 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
     curriculumName: source.curriculumName.trim(),
     term: source.term.trim(),
   };
-  if (Object.values(trimmed).every((value) => value.length === 0)) return undefined;
+  if (!source.scope && Object.values(trimmed).every((value) => value.length === 0))
+    return undefined;
   for (const [label, value] of Object.entries(trimmed)) {
     if (!value || value.length > MAX_LONG_FIELD_LENGTH) {
       throw new ValidationError(
@@ -139,5 +140,15 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
       );
     }
   }
-  return trimmed;
+  if (!source.scope) return trimmed;
+  const scope = {
+    schoolYear: source.scope.schoolYear.trim(),
+    subjectId: source.scope.subjectId.trim(),
+  };
+  if (Object.values(scope).some((value) => !value || value.length > MAX_LONG_FIELD_LENGTH)) {
+    throw new ValidationError(
+      "Source subject and school year are required when scope is declared.",
+    );
+  }
+  return { ...trimmed, scope };
 }

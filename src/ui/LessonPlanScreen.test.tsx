@@ -170,14 +170,70 @@ describe("LessonPlanScreen", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByText("Curriculum / BOW source reference"));
     await user.type(screen.getByLabelText("Source title"), "Draft reference");
+    await user.click(
+      screen.getByLabelText(
+        "I confirm this reference applies to the selected subject and school year",
+      ),
+    );
     first.unmount();
     renderScreen(repo);
     await user.click(await screen.findByText("Curriculum / BOW source reference"));
     expect(screen.getByLabelText("Source title")).toHaveValue("Draft reference");
+    expect(
+      screen.getByLabelText(
+        "I confirm this reference applies to the selected subject and school year",
+      ),
+    ).toBeChecked();
     await user.click(await screen.findByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("Source title")).toHaveValue("Synthetic BOW");
     expect(screen.getByLabelText("Source title")).toBeDisabled();
     expect(screen.getByLabelText("Applicable term")).toHaveValue("Term A");
+    expect(
+      screen.getByLabelText(
+        "I confirm this reference applies to the selected subject and school year",
+      ),
+    ).not.toBeChecked();
+    expect(
+      screen.getByLabelText(
+        "I confirm this reference applies to the selected subject and school year",
+      ),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Declared source: Synthetic BOW.*Subject\/year scope unknown/),
+    ).toBeInTheDocument();
+  });
+  it("submits the selected subject/year only after an explicit scope declaration", async () => {
+    const repo = new FakeLessonPlanRepository();
+    renderScreen(repo);
+    const user = userEvent.setup();
+    await screen.findByLabelText("Learning competency");
+    for (const label of [
+      "Learning competency",
+      "Learning objectives (2–3, one per line)",
+      "Planned activities",
+      "How learning will be checked",
+    ])
+      await user.type(screen.getByLabelText(label), "Synthetic lesson content");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    for (const [label, value] of [
+      ["Source title", "Synthetic BOW"],
+      ["Source version / revision", "v1"],
+      ["Source citation / location", "fixture:bow"],
+      ["Curriculum name", "Synthetic curriculum"],
+      ["Applicable term", "Term A"],
+    ] as const)
+      await user.type(screen.getByLabelText(label), value);
+    await user.click(
+      screen.getByLabelText(
+        "I confirm this reference applies to the selected subject and school year",
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Save lesson plan" }));
+    await screen.findByText(/Lesson plan saved on this device/);
+    expect(repo.createCalls[0]?.sourceReference?.scope).toEqual({
+      schoolYear: ASSIGNMENT.schoolYear,
+      subjectId: ASSIGNMENT.subjectId,
+    });
   });
   it("shows captured class context rather than the assignment's current values", async () => {
     renderScreen(

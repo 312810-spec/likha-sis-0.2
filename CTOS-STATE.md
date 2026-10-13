@@ -6,15 +6,15 @@
 
 ## Current execution state
 
-- Execution branch: ctos/m10-source-reference-20261013; baseline main f0884e0
-- Active execution: A reconciled; B lesson/planner boundary repairs merged with native CI PASS in PR109. M10 academic-year lock merged in PR110. Lesson context capture is the next isolated slice; broader B acceptance and C–G remain incomplete.
-- Current runtime: Linux shell/frontend checks available; native Rust tools and Windows/Android devices unavailable. Browser launch crashed (SIGSEGV); use native/UI CI for this candidate.
-- Publication: PR109 merged as fb928015fcbc2b8a427bb6fc4a218346eca97fdf; PR110 merged as f0884e08a66ab8fb6529cbf52107acf23276cf6b. Both verified heads passed Quality/Security before expected-head merges.
+- Execution branch: ctos/m10-source-scope-20261013; source-reference slice remains PR112 pending CI.
+- Active execution: PR111 historical lesson context merged after verified gates as 6725ed6998299e05a3fe5ad78934c74c8d61cc95. Declared source-reference repair and teacher-declared subject/year scope are isolated M10 slices; broader B acceptance and C–G remain incomplete.
+- Current runtime: Linux frontend/build/browser checks available. Official Rust 1.99 formatter obtained and changed Rust checked; native execution, Windows/Android installed devices and professional acceptance unavailable locally.
+- Publication: PR109/110/111 merged at verified heads; PR112 retargeted to main, repaired source head f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7 has Security PASS and Quality running at last inspection. Source-scope candidate is stacked on that head until gates pass.
 - Source branch: main
 - Current milestone: M10 — Curriculum, BOW, Teaching Flow, ILAW (pending); M09 remains complete with deferred applicability.
 - Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
 - Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
-- Next action: verify PR111 fixture repair and declared-source slice; then source-aware subject/term/year applicability and provenance amendments (CTOS.md §M10).
+- Next action: verify PR112/source-scope live heads and gates; then canonical term/cohort applicability and explicit provenance amendments (CTOS.md §M10).
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a

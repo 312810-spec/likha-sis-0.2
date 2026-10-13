@@ -71,6 +71,43 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("preserves a declared scope and rejects incomplete scope without writing", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const source = {
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+      scope: { schoolYear: " 2026-2027 ", subjectId: " sub-1 " },
+    };
+    await service.create("ta-1", "2026-09-07", VALID_FIELDS, source);
+    expect(repo.createCalls[0]?.sourceReference?.scope).toEqual({
+      schoolYear: "2026-2027",
+      subjectId: "sub-1",
+    });
+    for (const scope of [
+      { schoolYear: " ", subjectId: "sub-1" },
+      { schoolYear: "2026-2027", subjectId: " " },
+      { schoolYear: "x".repeat(4001), subjectId: "sub-1" },
+    ]) {
+      await expect(
+        service.create("ta-1", "2026-09-08", VALID_FIELDS, { ...source, scope }),
+      ).rejects.toThrow(ValidationError);
+    }
+    await expect(
+      service.create("ta-1", "2026-09-08", VALID_FIELDS, {
+        title: "",
+        version: "",
+        citation: "",
+        curriculumName: "",
+        term: "",
+        scope: source.scope,
+      }),
+    ).rejects.toThrow(ValidationError);
+    expect(repo.createCalls).toHaveLength(1);
+  });
   it("stores a trimmed declared source version only when every source field is supplied", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);

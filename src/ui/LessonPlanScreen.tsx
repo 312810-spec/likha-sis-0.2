@@ -98,6 +98,7 @@ function LessonPlanWorkspace({
     setError(null);
   }
   const [assignments, setAssignments] = useState<TeachingAssignmentSummary[]>([]);
+  const selectedAssignment = assignments.find((assignment) => assignment.id === assignmentId);
   const [assignmentsLoading, setAssignmentsLoading] = useState(true);
   const [assignmentsError, setAssignmentsError] = useState(false);
   const [assignmentsAttempt, setAssignmentsAttempt] = useState(0);
@@ -460,6 +461,47 @@ function LessonPlanWorkspace({
                 />
               </div>
             ))}
+            <div className="field">
+              <label htmlFor="lesson-source-scope">
+                <input
+                  id="lesson-source-scope"
+                  type="checkbox"
+                  checked={!!sourceReference?.scope}
+                  disabled={saving || editingPlanId !== null || !selectedAssignment}
+                  onChange={(event) => {
+                    const scope =
+                      event.target.checked && selectedAssignment
+                        ? {
+                            schoolYear: selectedAssignment.schoolYear,
+                            subjectId: selectedAssignment.subjectId,
+                          }
+                        : undefined;
+                    changeWorkspace((current) => ({
+                      ...current,
+                      active: {
+                        ...current.active,
+                        sourceReference: {
+                          title: "",
+                          version: "",
+                          citation: "",
+                          curriculumName: "",
+                          term: "",
+                          ...current.active.sourceReference,
+                          scope,
+                        },
+                      },
+                    }));
+                  }}
+                />
+                I confirm this reference applies to the selected subject and school year
+              </label>
+              <p className="muted">
+                {sourceReference?.scope
+                  ? `Declared school year: ${sourceReference.scope.schoolYear}. Subject is checked when saving.`
+                  : "Subject and school-year applicability is unknown until declared."}{" "}
+                Term remains teacher-provided metadata; official applicability is not verified.
+              </p>
+            </div>
           </details>
 
           <h3>Intentions</h3>
@@ -613,6 +655,11 @@ function LessonPlanWorkspace({
                       {plan.teachingContext
                         ? `Saved context: ${plan.teachingContext.schoolYear} · Grade ${plan.teachingContext.gradeLevel} · ${plan.teachingContext.sectionName} · ${plan.teachingContext.subjectName}`
                         : "Saved class context unavailable for this earlier plan."}
+                    </small>
+                    <small className="muted">
+                      {plan.sourceReference
+                        ? `Declared source: ${plan.sourceReference.title} · ${plan.sourceReference.version} · ${plan.sourceReference.term}. ${plan.sourceReference.scope ? `Subject/year scope declared for ${plan.sourceReference.scope.schoolYear}.` : "Subject/year scope unknown."} Official applicability is not verified.`
+                        : "Curriculum / BOW source unknown."}
                     </small>
                   </span>
                   <button type="button" disabled={saving} onClick={() => startEditingPlan(plan)}>

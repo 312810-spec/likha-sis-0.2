@@ -57,6 +57,16 @@ pub struct LessonSourceReference {
     pub citation: String,
     pub curriculum_name: String,
     pub term: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<LessonSourceScope>,
+}
+
+/// Declared scope checked against canonical assignment context, not official approval.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonSourceScope {
+    pub school_year: String,
+    pub subject_id: String,
 }
 
 impl LessonSourceReference {
@@ -67,6 +77,10 @@ impl LessonSourceReference {
             citation: self.citation.trim().into(),
             curriculum_name: self.curriculum_name.trim().into(),
             term: self.term.trim().into(),
+            scope: self.scope.as_ref().map(|scope| LessonSourceScope {
+                school_year: scope.school_year.trim().into(),
+                subject_id: scope.subject_id.trim().into(),
+            }),
         };
         for value in [
             &source.title,
@@ -78,6 +92,16 @@ impl LessonSourceReference {
             if value.is_empty() || value.chars().count() > 4000 {
                 return Err(AppError::Validation(
                     "Source reference fields are required and limited to 4000 characters".into(),
+                ));
+            }
+        }
+        if let Some(scope) = &source.scope {
+            if [&scope.school_year, &scope.subject_id]
+                .iter()
+                .any(|value| value.is_empty() || value.chars().count() > 4000)
+            {
+                return Err(AppError::Validation(
+                    "Source subject and school year are required when scope is declared".into(),
                 ));
             }
         }
@@ -186,11 +210,8 @@ pub fn create_with_source(
     fields: &LessonPlanFields<'_>,
     source_reference: Option<&LessonSourceReference>,
 ) -> AppResult<Option<LessonPlan>> {
-    let source_json = source_reference
-        .map(|source| {
-            serde_json::to_string(&source.normalized()?)
-                .map_err(|_| AppError::Validation("Source reference could not be saved".into()))
-        })
+    let source = source_reference
+        .map(LessonSourceReference::normalized)
         .transpose()?;
     if teaching_assignment::find_by_id_in_school(conn, school_id, teaching_assignment_id)?.is_none()
     {
@@ -218,6 +239,23 @@ pub fn create_with_source(
             })
         },
     )?;
+    if let Some(scope) = source
+        .as_ref()
+        .and_then(|reference| reference.scope.as_ref())
+    {
+        if scope.school_year != context.school_year || scope.subject_id != context.subject_id {
+            return Err(AppError::Validation(
+                "Source scope does not match this class's subject and school year. Review the reference before saving".into(),
+            ));
+        }
+    }
+    let source_json = source
+        .as_ref()
+        .map(|reference| {
+            serde_json::to_string(reference)
+                .map_err(|_| AppError::Validation("Source reference could not be saved".into()))
+        })
+        .transpose()?;
     let context_json = serde_json::to_string(&context)
         .map_err(|_| AppError::Validation("Lesson teaching context could not be saved".into()))?;
 
@@ -466,6 +504,108 @@ mod tests {
     }
 
     #[test]
+    fn declared_source_scope_rejects_other_subjects_and_years_without_inserting() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap();
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: Some(LessonSourceScope {
+                school_year: " 2026-2027 ".into(),
+                subject_id: format!(" {} ", assignment.subject_id),
+            }),
+        };
+        for (year, subject_id) in [
+            ("2025-2026", assignment.subject_id.as_str()),
+            ("2026-2027", "other-subject"),
+            ("", assignment.subject_id.as_str()),
+        ] {
+            let invalid = LessonSourceReference {
+                scope: Some(LessonSourceScope {
+                    school_year: year.into(),
+                    subject_id: subject_id.into(),
+                }),
+                ..source.clone()
+            };
+            assert!(create_with_source(
+                &conn,
+                &f.school_id,
+                &f.assignment_id,
+                "2026-09-07",
+                &f.teacher_id,
+                &sample_fields(),
+                Some(&invalid)
+            )
+            .is_err());
+        }
+        assert!(list_by_assignment(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .is_empty());
+        let plan = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .unwrap();
+        let scope = plan
+            .source_reference
+            .as_ref()
+            .unwrap()
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.school_year, "2026-2027");
+        assert_eq!(scope.subject_id, assignment.subject_id);
+        conn.execute(
+            "UPDATE sections SET school_year = '2027-2028' WHERE id = ?1",
+            [&assignment.section_id],
+        )
+        .unwrap();
+        assert!(create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2027-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source)
+        )
+        .is_err());
+        let edited = update_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(edited.source_reference, plan.source_reference);
+        assert_eq!(edited.teaching_context, plan.teaching_context);
+    }
+
+    #[test]
+    fn earlier_source_json_deserializes_with_unknown_scope() {
+        let source: LessonSourceReference = serde_json::from_str(
+            r#"{"title":"Synthetic BOW","version":"v1","citation":"fixture:bow","curriculumName":"Synthetic","term":"Term A"}"#,
+        ).unwrap();
+        assert_eq!(source.scope, None);
+    }
+
+    #[test]
     fn source_reference_is_normalized_and_preserved_during_content_updates() {
         let conn = open_test_db();
         let f = seed(&conn);
@@ -475,6 +615,7 @@ mod tests {
             citation: " fixture:bow ".into(),
             curriculum_name: " Synthetic curriculum ".into(),
             term: " Term A ".into(),
+            scope: None,
         };
         let created = create_with_source(
             &conn,
