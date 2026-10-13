@@ -337,8 +337,9 @@ function LessonPlanWorkspace({
         mode === "guided" ? (
           <p className="field-hint">
             Build a lesson plan in the ILAW format (Intentions, Learning Experiences, Assessment,
-            Ways Forward) per DepEd Order No. 16, s. 2026. Pick a class and date, fill in each
-            section, then save. This is your own planning tool — it is not submitted to DepEd.
+            Ways Forward). Use your current approved BOW and lesson-plan template. Pick a class and
+            date, fill in each section, then save. This is your own planning tool — it is not
+            submitted to DepEd.
           </p>
         ) : undefined
       }

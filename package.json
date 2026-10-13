@@ -22,12 +22,14 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:dev-preview-isolation": "node scripts/check-dev-preview-isolation.mjs",
     "check:deadcode": "knip",
-    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test",
+    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test",
     "quality:security": "node scripts/check-security.mjs",
     "quality:ui": "node scripts/ui-smoke.mjs",
     "harness:verify": "node scripts/harness/verify.mjs",
     "quality:full": "npm run quality && cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings",
-    "quality:ui:recovery": "node scripts/ui-recovery.mjs"
+    "quality:ui:recovery": "node scripts/ui-recovery.mjs",
+    "quality:batches": "node scripts/ctos/verify-batches.mjs",
+    "test:batch-runner": "node --test scripts/ctos/verify-batches.node-test.mjs"
   },
   "dependencies": {
     "@fontsource/public-sans": "5.3.0",

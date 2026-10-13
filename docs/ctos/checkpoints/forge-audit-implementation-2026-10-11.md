@@ -8,7 +8,7 @@ Implemented all F01–F16 source changes: assigned entity reads/conflicts, termi
 
 Enhancements: secondary Review projection of existing pending data; encrypted device classroom recovery drafts with explicit review/restore/discard; returned template/source provenance; shared density tokens restored after main reconciliation. No invented approval queue, official template claim, or native readiness claim.
 
-Sync trust extension: fresh entity/parent checks before push/replay; filtered pull with scanned cursor; live scope-token fingerprint and backfill on scope change. Unknown trusted hub parents fail closed. Migration 46 stores private classroom drafts; migration 47 tracks the authenticated pull-scope epoch.
+Sync trust extension: fresh entity/parent checks before push/replay; filtered pull with scanned cursor; live scope-token fingerprint and backfill on scope change. Unknown trusted hub parents fail closed. Migration 47 stores private classroom drafts; migration 48 tracks the authenticated pull-scope epoch.
 
 Final local evidence: full frontend quality 149 files / 1,441 tests passed on the completed source; classroom 23 focused tests passed; final browser smoke and 49 recovery checks passed after token/transition fixes. Build and preview isolation passed (21 output files scanned). Independent SQLite migration and scope checks passed. Production JavaScript 623.38 kB / 162.04 kB gzip; CSS 70.32 kB / 11.68 kB gzip. The large-chunk advisory remains; no device startup-performance claim is made.
 
@@ -26,6 +26,6 @@ Merge: PR #107 merged to main as `a46eba68f3ca36843d9f8bc34ee844993f9348c8`. Fet
 
 Still unexecuted: installed Windows teacher journeys, actual import/export/printing/backup/upgrade acceptance, Android/Keystore/process death, real two-device reassignment/backfill, manual assistive-technology and teacher acceptance. CI compilation, synthetic HTTP transport and SQLCipher tests do not establish these device/user acceptance states.
 
-Next: execute those acceptance journeys with synthetic school data, then continue broader CTOS/M09 work separately. The audit implementation and automated merge gates are complete; do not restart or mass-merge historical branches.
+Next: execute those acceptance journeys with synthetic school data, then continue broader CTOS/M10 work separately. The audit implementation and automated merge gates are complete; do not restart or mass-merge historical branches.
 
 AI prepares. Teacher reviews and approves.

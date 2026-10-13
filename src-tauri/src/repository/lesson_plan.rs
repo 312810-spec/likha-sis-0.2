@@ -156,6 +156,22 @@ pub fn create(
 /// `assessment_item::update`, there is no "already has downstream
 /// data" guard here -- a lesson plan is planning content, never read by
 /// grade computation or export, so it is always safely re-editable.
+pub fn update_authorized(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+    id: &str,
+    expected_assignment_id: &str,
+    fields: &LessonPlanFields<'_>,
+) -> AppResult<Option<LessonPlan>> {
+    let plan = find_by_id_in_school(conn, school_id, id)?.ok_or(AppError::Unauthorized)?;
+    if plan.teaching_assignment_id != expected_assignment_id {
+        return Err(AppError::Unauthorized);
+    }
+    authorize_own_assignment(conn, user_id, school_id, &plan.teaching_assignment_id)?;
+    update(conn, school_id, id, fields)
+}
+
 pub fn update(
     conn: &Connection,
     school_id: &str,

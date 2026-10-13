@@ -10,7 +10,7 @@ Next acceptance work: installed Windows teacher journeys and upgrades/import/exp
 
 Updated: 2026-10-08.
 
-Use CTOS.md as the controlling plan. Current milestone: **M09 — Teacher Load Maker + Smart Scheduling**.
+Use CTOS.md as the controlling plan. Current development milestone: **M10 — Curriculum, BOW, Teaching Flow, ILAW**. M09 is complete with applicability deferred to M10.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
 
@@ -167,7 +167,7 @@ Deliberately out of scope: the class-record `markFinal` state machine, which
 `grading-cases.md` assigns to M11. "Fast" is claimed as interaction shape (one
 keystroke per learner, no per-row fetch), not as a measured latency.
 
-Next step: execute **M09 — Teacher Load Maker + Smart Scheduling** (CTOS.md §M09). The
+Historical next action (superseded by the M09 checkpoint): execute M09. Current next action: M10. The
 M04-recorded duplicated schedule read path remains deliberately untouched and is still
 open as a risk; M09 is the natural milestone to reconcile it, since it owns the
 scheduling surface.

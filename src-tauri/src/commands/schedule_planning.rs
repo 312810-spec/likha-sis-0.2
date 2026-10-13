@@ -27,6 +27,15 @@ use crate::scheduling::pipeline::{self, GenerationResponse};
 use rusqlite::Connection;
 use std::sync::Mutex;
 use tauri::State;
+/// Shared read boundary used by every planner read command. The session tuple
+/// returns actor first, school second; use the named scope API to avoid swapping them.
+fn require_planning_school_scope(
+    conn: &Connection,
+    sessions: &SessionManager,
+) -> AppResult<String> {
+    sessions.require_active_school_scope(conn)
+}
+
 /// The school's bell grid and workload limits — Prepare.
 #[tauri::command]
 pub fn get_schedule_settings(
@@ -34,7 +43,7 @@ pub fn get_schedule_settings(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<ScheduleSettings> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     scheduling_inputs::ensure(&conn, &school_id)
 }
 
@@ -72,7 +81,7 @@ pub fn list_teacher_unavailability(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<TeacherUnavailability>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     scheduling_inputs::list_unavailability_by_school(&conn, &school_id)
 }
 
@@ -125,7 +134,7 @@ pub fn list_schedule_rooms(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<ScheduleRoom>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     scheduling_inputs::list_rooms_by_school(&conn, &school_id)
 }
 
@@ -170,7 +179,7 @@ pub fn list_subject_schedule_requirements(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<SubjectScheduleRequirement>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     scheduling_inputs::list_requirements_by_school(&conn, &school_id)
 }
 
@@ -215,7 +224,7 @@ pub fn list_schedule_plan_placements(
     plan_id: String,
 ) -> AppResult<Vec<PlanPlacement>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     schedule_plan::list_placements(&conn, &school_id, &plan_id)
 }
 
@@ -278,7 +287,7 @@ pub fn validate_schedule_plan(
     plan_id: String,
 ) -> AppResult<Vec<Violation>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     crate::scheduling::check::check(&conn, &school_id, &plan_id)
 }
 
@@ -308,7 +317,7 @@ pub fn list_published_schedule_views(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Option<PublishedViews>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     schedule_plan::published_views(&conn, &school_id)
 }
 
@@ -320,7 +329,7 @@ pub fn list_schedule_plans(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<SchedulePlan>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     schedule_plan::list_plans(&conn, &school_id)
 }
 
@@ -331,6 +340,35 @@ pub fn current_schedule_plan(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Option<SchedulePlan>> {
     let conn = lock_db(&db);
-    let (school_id, _) = sessions.require_active_session(&conn)?;
+    let school_id = require_planning_school_scope(&conn, &sessions)?;
     schedule_plan::current_draft(&conn, &school_id)
+}
+
+#[cfg(test)]
+mod read_scope_tests {
+    use super::*;
+    use crate::repository::{role, school, user};
+    use std::path::Path;
+
+    #[test]
+    fn planning_read_scope_is_the_school_not_the_authenticated_actor() {
+        let conn = crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Synthetic school").unwrap();
+        let actor = user::create_user(&conn, "scope.head", "password", "Synthetic head").unwrap();
+        user::add_school_membership(&conn, &actor.id, &school.id).unwrap();
+        role::grant(&conn, &actor.id, &school.id, role::SCHOOL_HEAD).unwrap();
+        let sessions = SessionManager::new();
+        auth::login(&conn, &sessions, "scope.head", "password", &school.id).unwrap();
+        assert_ne!(actor.id, school.id);
+        let actual = require_planning_school_scope(&conn, &sessions).unwrap();
+        assert_eq!(actual, school.id);
+        assert_eq!(
+            scheduling_inputs::ensure(&conn, &actual).unwrap().school_id,
+            school.id
+        );
+        assert!(matches!(
+            require_planning_school_scope(&conn, &SessionManager::new()),
+            Err(crate::error::AppError::Unauthorized)
+        ));
+    }
 }

@@ -41,3 +41,5 @@ Thumbs.db
 
 # Reproducible browser downloads and transient captures
 .cache/
+
+.ctos-evidence/
