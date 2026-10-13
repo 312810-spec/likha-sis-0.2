@@ -31,6 +31,29 @@ const PLAN: LessonPlan = {
 };
 
 describe("TauriLessonPlanRepository", () => {
+  it("routes source corrections and history through dedicated commands", async () => {
+    const source = {
+      title: "Synthetic BOW",
+      version: "v2",
+      citation: "fixture:two",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+    };
+    mockInvoke.mockResolvedValueOnce({ ...PLAN, sourceReference: source });
+    await new TauriLessonPlanRepository().amendSource("lp-1", "ta-1", source, "Corrected citation");
+    expect(mockInvoke).toHaveBeenLastCalledWith("amend_lesson_source", {
+      lessonPlanId: "lp-1",
+      teachingAssignmentId: "ta-1",
+      sourceReference: source,
+      reason: "Corrected citation",
+    });
+    mockInvoke.mockResolvedValueOnce([]);
+    await new TauriLessonPlanRepository().listSourceAmendments("lp-1", "ta-1");
+    expect(mockInvoke).toHaveBeenLastCalledWith("list_lesson_source_amendments", {
+      lessonPlanId: "lp-1",
+      teachingAssignmentId: "ta-1",
+    });
+  });
   it("passes source metadata only on creation, without changing authorization parameters", async () => {
     const source = {
       title: "Synthetic BOW",

@@ -4,7 +4,11 @@ import { ClassOccurrenceApplicationService } from "../application/class-occurren
 import { SchedulePlanningApplicationService } from "../application/schedule-planning-service";
 import { Sf1ImportApplicationService } from "../application/sf1-import-service";
 import { MyDayApplicationService } from "../application/my-day-service";
-import type { LessonPlan } from "../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../domain/lesson-plan";
 import type { LearnerSupportCase } from "../domain/learner-support";
 import type { SchedulePlan, PlanPlacement } from "../domain/schedule-planning";
 import type { Sf1ImportPreview, Sf1ImportHistoryEntry } from "../domain/sf1-import";
@@ -19,6 +23,7 @@ const unavailable = async (): Promise<never> => {
 export function recoveryServices(state: string) {
   let lessonReadFails = state === "list-error";
   let plans: LessonPlan[] = [];
+  let sourceAmendments: LessonSourceAmendment[] = [];
   const lessonPlanService = new LessonPlanApplicationService({
     async listByAssignment(id) {
       if (lessonReadFails) {
@@ -27,7 +32,7 @@ export function recoveryServices(state: string) {
       }
       return plans.filter((plan) => plan.teachingAssignmentId === id);
     },
-    async create(teachingAssignmentId, planDate, fields) {
+    async create(teachingAssignmentId, planDate, fields, sourceReference) {
       const plan = {
         ...fields,
         id: `lesson-${plans.length + 1}`,
@@ -37,6 +42,7 @@ export function recoveryServices(state: string) {
         createdByUserId: "teacher-ana",
         createdAt: stamp,
         updatedAt: stamp,
+        ...(sourceReference ? { sourceReference } : {}),
       };
       plans.push(plan);
       lessonReadFails = state === "refresh-error";
@@ -51,6 +57,34 @@ export function recoveryServices(state: string) {
       plans = plans.map((plan) => (plan.id === id ? next : plan));
       lessonReadFails = state === "refresh-error";
       return next;
+    },
+    async amendSource(
+      lessonPlanId,
+      teachingAssignmentId,
+      sourceReference: LessonSourceReference,
+      reason,
+    ) {
+      const old = plans.find(
+        (plan) => plan.id === lessonPlanId && plan.teachingAssignmentId === teachingAssignmentId,
+      );
+      if (!old) return null;
+      const amendment: LessonSourceAmendment = {
+        id: `source-amendment-${sourceAmendments.length + 1}`,
+        lessonPlanId,
+        previousSourceReference: old.sourceReference ?? null,
+        newSourceReference: sourceReference,
+        reason,
+        amendedByUserId: "teacher-ana",
+        amendedByName: "Ana Teacher",
+        createdAt: stamp,
+      };
+      sourceAmendments = [amendment, ...sourceAmendments];
+      const next = { ...old, sourceReference };
+      plans = plans.map((plan) => (plan.id === lessonPlanId ? next : plan));
+      return next;
+    },
+    async listSourceAmendments(lessonPlanId) {
+      return sourceAmendments.filter((entry) => entry.lessonPlanId === lessonPlanId);
     },
   });
   const seedCase: LearnerSupportCase = {

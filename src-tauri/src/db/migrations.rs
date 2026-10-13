@@ -2461,6 +2461,40 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: corrections never rewrite the original source declaration.
+        -- Each amendment preserves the source it superseded, the replacement,
+        -- the teacher's reason and actor. Rows are append-only audit history.
+        CREATE UNIQUE INDEX idx_lesson_plans_id_school
+            ON lesson_plans(id, school_id);
+        CREATE TABLE lesson_source_amendments (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id),
+            lesson_plan_id TEXT NOT NULL,
+            previous_source_reference_json TEXT
+                CHECK (previous_source_reference_json IS NULL OR json_valid(previous_source_reference_json)),
+            new_source_reference_json TEXT NOT NULL
+                CHECK (json_valid(new_source_reference_json)),
+            reason TEXT NOT NULL CHECK (length(trim(reason)) BETWEEN 1 AND 1000),
+            amended_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            FOREIGN KEY (lesson_plan_id, school_id) REFERENCES lesson_plans(id, school_id)
+        );
+        CREATE INDEX idx_lesson_source_amendments_plan_created
+            ON lesson_source_amendments(school_id, lesson_plan_id, created_at DESC, id DESC);
+        CREATE TRIGGER lesson_source_amendment_no_update
+        BEFORE UPDATE ON lesson_source_amendments
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson source amendments are append-only');
+        END;
+        CREATE TRIGGER lesson_source_amendment_no_delete
+        BEFORE DELETE ON lesson_source_amendments
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson source amendments are append-only');
+        END;
+        "#,
+        ),
     ])
 }
 
@@ -2514,6 +2548,85 @@ mod tests {
             [],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn migration_50_adds_school_scoped_append_only_source_amendments() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 49).unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO schools (id, name) VALUES
+                ('school', 'Synthetic School'),
+                ('other-school', 'Other School');
+            INSERT INTO users (id, username, password_hash, display_name)
+            VALUES ('teacher', 'synthetic.teacher', 'unused-fixture-hash', 'Synthetic Teacher');
+            INSERT INTO user_school_memberships (user_id, school_id)
+            VALUES ('teacher', 'school');
+            INSERT INTO sections (id, school_id, school_year, grade_level, name)
+            VALUES ('section', 'school', '2026-2027', '7', 'Synthetic Section');
+            INSERT INTO subjects (id, school_id, name)
+            VALUES ('subject', 'school', 'Synthetic Subject');
+            INSERT INTO teaching_assignments
+                (id, school_id, teacher_user_id, section_id, subject_id)
+            VALUES ('assignment', 'school', 'teacher', 'section', 'subject');
+            INSERT INTO lesson_plans
+                (id, school_id, teaching_assignment_id, plan_date,
+                 learning_competency, learning_objectives, learning_experiences,
+                 assessment, created_by_user_id, source_reference_json)
+            VALUES
+                ('lesson', 'school', 'assignment', '2026-09-07',
+                 'Synthetic target', 'Objective', 'Activity', 'Assessment', 'teacher',
+                 '{"title":"Synthetic BOW","version":"v1","citation":"fixture:v1","curriculumName":"Synthetic","term":"Term A"}');
+            "#,
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            r#"INSERT INTO lesson_source_amendments
+                (id, school_id, lesson_plan_id, previous_source_reference_json,
+                 new_source_reference_json, reason, amended_by_user_id)
+               VALUES
+                ('amendment', 'school', 'lesson',
+                 '{"title":"Synthetic BOW","version":"v1","citation":"fixture:v1","curriculumName":"Synthetic","term":"Term A"}',
+                 '{"title":"Synthetic BOW","version":"v2","citation":"fixture:v2","curriculumName":"Synthetic","term":"Term A"}',
+                 'Corrected the synthetic fixture version', 'teacher')"#,
+            [],
+        )
+        .unwrap();
+        assert!(conn
+            .execute(
+                "UPDATE lesson_source_amendments SET reason = 'rewritten' WHERE id = 'amendment'",
+                []
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                "DELETE FROM lesson_source_amendments WHERE id = 'amendment'",
+                []
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                r#"INSERT INTO lesson_source_amendments
+                    (id, school_id, lesson_plan_id, new_source_reference_json,
+                     reason, amended_by_user_id)
+                   VALUES ('wrong-school', 'other-school', 'lesson',
+                    '{"title":"Synthetic BOW","version":"v3","citation":"fixture:v3","curriculumName":"Synthetic","term":"Term A"}',
+                    'Must fail school isolation', 'teacher')"#,
+                [],
+            )
+            .is_err());
+        let original: String = conn
+            .query_row(
+                "SELECT source_reference_json FROM lesson_plans WHERE id = 'lesson'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(original.contains("fixture:v1"));
     }
 
     #[test]

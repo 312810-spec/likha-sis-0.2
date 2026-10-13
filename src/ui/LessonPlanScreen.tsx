@@ -1,7 +1,12 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import type { LessonPlanApplicationService } from "../application/lesson-plan-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../domain/lesson-plan";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { ValidationError } from "../domain/errors";
 import { Alert } from "./components/Alert";
@@ -71,7 +76,15 @@ function LessonPlanWorkspace({
         drafts: {} as Record<string, LessonDraft>,
       },
   );
-  const { assignmentId, planDate, editingPlanId, fields, sourceReference } = workspace.active;
+  const {
+    assignmentId,
+    planDate,
+    editingPlanId,
+    fields,
+    sourceReference,
+    amendingSource = false,
+    sourceCorrectionReason = "",
+  } = workspace.active;
   const currentAssignment = useRef(assignmentId);
   useEffect(() => {
     currentAssignment.current = assignmentId;
@@ -114,6 +127,8 @@ function LessonPlanWorkspace({
   const [confirmation, setConfirmation] = useState<string | null>(workspace.confirmation ?? null);
   const [saving, setSaving] = useState(false);
   const [discardPending, setDiscardPending] = useState(false);
+  const [sourceHistory, setSourceHistory] = useState<LessonSourceAmendment[] | null>(null);
+  const [sourceHistoryError, setSourceHistoryError] = useState(false);
   useEffect(
     () =>
       subscribeLessonWorkspace(owner, () => {
@@ -199,11 +214,15 @@ function LessonPlanWorkspace({
       : [];
   const validAssignment = assignments.some((item) => item.id === assignmentId);
   function startEditingPlan(plan: LessonPlan) {
+    setSourceHistory(null);
+    setSourceHistoryError(false);
     switchDraft({
       assignmentId,
       planDate: plan.planDate,
       editingPlanId: plan.id,
       sourceReference: plan.sourceReference ?? undefined,
+      amendingSource: false,
+      sourceCorrectionReason: "",
       fields: {
         learningCompetency: plan.learningCompetency,
         learningCompetencyCode: plan.learningCompetencyCode,
@@ -214,6 +233,61 @@ function LessonPlanWorkspace({
         waysForward: plan.waysForward,
       },
     });
+  }
+
+  async function loadSourceHistory() {
+    if (!editingPlanId) return;
+    setSourceHistoryError(false);
+    try {
+      setSourceHistory(await lessonPlanService.listSourceAmendments(editingPlanId, assignmentId));
+    } catch {
+      setSourceHistoryError(true);
+    }
+  }
+
+  async function handleSourceCorrection() {
+    if (!editingPlanId || !sourceReference || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const amended = await lessonPlanService.amendSource(
+        editingPlanId,
+        assignmentId,
+        sourceReference,
+        sourceCorrectionReason,
+      );
+      if (!alive.current || lessonDraftEpoch() !== epoch) return;
+      if (!amended) {
+        setError("Could not save this source correction. Your correction draft is still here.");
+        return;
+      }
+      changeWorkspace((current) => ({
+        ...current,
+        active: {
+          ...current.active,
+          sourceReference: amended.sourceReference ?? undefined,
+          amendingSource: false,
+          sourceCorrectionReason: "",
+        },
+      }));
+      setConfirmation("Source correction saved with an append-only reason and history.");
+      setPlansAttempt((value) => value + 1);
+      try {
+        setSourceHistory(await lessonPlanService.listSourceAmendments(editingPlanId, assignmentId));
+        setSourceHistoryError(false);
+      } catch {
+        setSourceHistoryError(true);
+      }
+    } catch (err) {
+      if (!alive.current || lessonDraftEpoch() !== epoch) return;
+      setError(
+        err instanceof ValidationError
+          ? err.message
+          : "Could not confirm this source correction was saved. Your correction draft is still here.",
+      );
+    } finally {
+      if (alive.current) setSaving(false);
+    }
   }
   function updateField(key: keyof LessonPlanFields, value: string) {
     changeWorkspace((current) => ({
@@ -338,6 +412,7 @@ function LessonPlanWorkspace({
 
   const canSave =
     !saving &&
+    !amendingSource &&
     validAssignment &&
     !assignmentsLoading &&
     !assignmentsError &&
@@ -440,7 +515,7 @@ function LessonPlanWorkspace({
                   id={`lesson-source-${key}`}
                   value={sourceReference?.[key] ?? ""}
                   maxLength={4000}
-                  disabled={saving || editingPlanId !== null}
+                  disabled={saving || (editingPlanId !== null && !amendingSource)}
                   onChange={(event) =>
                     changeWorkspace((current) => ({
                       ...current,
@@ -467,7 +542,9 @@ function LessonPlanWorkspace({
                   id="lesson-source-scope"
                   type="checkbox"
                   checked={!!sourceReference?.scope}
-                  disabled={saving || editingPlanId !== null || !selectedAssignment}
+                  disabled={
+                    saving || (editingPlanId !== null && !amendingSource) || !selectedAssignment
+                  }
                   onChange={(event) => {
                     const scope =
                       event.target.checked && selectedAssignment
@@ -502,6 +579,107 @@ function LessonPlanWorkspace({
                 Term remains teacher-provided metadata; official applicability is not verified.
               </p>
             </div>
+            {editingPlanId && !amendingSource && (
+              <>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() =>
+                    changeWorkspace((current) => ({
+                      ...current,
+                      active: { ...current.active, amendingSource: true },
+                    }))
+                  }
+                >
+                  Correct source reference
+                </button>
+                <button type="button" disabled={saving} onClick={() => void loadSourceHistory()}>
+                  View source correction history
+                </button>
+              </>
+            )}
+            {editingPlanId && amendingSource && (
+              <Alert tone="warning">
+                <p>
+                  This creates a correction record. The original reference and every earlier
+                  correction remain in history. This does not verify the source as official.
+                </p>
+                <label htmlFor="lesson-source-correction-reason">Reason for correction</label>
+                <textarea
+                  id="lesson-source-correction-reason"
+                  value={sourceCorrectionReason}
+                  maxLength={1000}
+                  disabled={saving}
+                  onChange={(event) =>
+                    changeWorkspace((current) => ({
+                      ...current,
+                      active: {
+                        ...current.active,
+                        sourceCorrectionReason: event.target.value,
+                      },
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="button-primary"
+                  disabled={saving}
+                  onClick={() => void handleSourceCorrection()}
+                >
+                  {saving ? "Saving correction…" : "Save source correction"}
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() =>
+                    changeWorkspace((current) => ({
+                      ...current,
+                      active: {
+                        ...current.active,
+                        sourceReference:
+                          plans.find((plan) => plan.id === editingPlanId)?.sourceReference ??
+                          undefined,
+                        amendingSource: false,
+                        sourceCorrectionReason: "",
+                      },
+                    }))
+                  }
+                >
+                  Cancel source correction
+                </button>
+              </Alert>
+            )}
+            {sourceHistoryError && (
+              <Alert tone="error">
+                Could not load source correction history.{" "}
+                <button type="button" onClick={() => void loadSourceHistory()}>
+                  Retry source history
+                </button>
+              </Alert>
+            )}
+            {sourceHistory && (
+              <section aria-label="Source correction history">
+                <h3>Source correction history</h3>
+                {sourceHistory.length === 0 ? (
+                  <p className="muted">No source corrections recorded.</p>
+                ) : (
+                  <ol>
+                    {sourceHistory.map((entry) => (
+                      <li key={entry.id}>
+                        <strong>
+                          {entry.previousSourceReference?.version ?? "Unknown source"} →{" "}
+                          {entry.newSourceReference.version}
+                        </strong>
+                        <p>{entry.reason}</p>
+                        <small className="muted">
+                          {entry.amendedByName ?? "Recorded teacher"} · {entry.createdAt}
+                        </small>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            )}
           </details>
 
           <h3>Intentions</h3>

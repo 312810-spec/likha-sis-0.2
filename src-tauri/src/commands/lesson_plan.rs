@@ -6,7 +6,9 @@ use tauri::State;
 use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
-use crate::repository::lesson_plan::{self, LessonPlan, LessonPlanFields, LessonSourceReference};
+use crate::repository::lesson_plan::{
+    self, LessonPlan, LessonPlanFields, LessonSourceAmendment, LessonSourceReference,
+};
 
 /// Every command in this file gates on `lesson_plan::authorize_own_assignment`
 /// (create/update) or `lesson_plan::authorize_view` (read) -- the caller
@@ -110,6 +112,46 @@ pub fn list_lesson_plans_by_assignment(
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     lesson_plan::authorize_view(&conn, &user_id, &school_id, &teaching_assignment_id)?;
     lesson_plan::list_by_assignment(&conn, &school_id, &teaching_assignment_id)
+}
+
+#[tauri::command]
+pub fn amend_lesson_source(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    lesson_plan_id: String,
+    teaching_assignment_id: String,
+    source_reference: LessonSourceReference,
+    reason: String,
+) -> AppResult<Option<LessonPlan>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    lesson_plan::amend_source_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        &lesson_plan_id,
+        &teaching_assignment_id,
+        &source_reference,
+        &reason,
+    )
+}
+
+#[tauri::command]
+pub fn list_lesson_source_amendments(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    lesson_plan_id: String,
+    teaching_assignment_id: String,
+) -> AppResult<Vec<LessonSourceAmendment>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    let plan = lesson_plan::find_by_id_in_school(&conn, &school_id, &lesson_plan_id)?
+        .ok_or(crate::error::AppError::Unauthorized)?;
+    if plan.teaching_assignment_id != teaching_assignment_id {
+        return Err(crate::error::AppError::Unauthorized);
+    }
+    lesson_plan::authorize_view(&conn, &user_id, &school_id, &teaching_assignment_id)?;
+    lesson_plan::list_source_amendments(&conn, &school_id, &lesson_plan_id)
 }
 
 #[cfg(test)]

@@ -1,4 +1,9 @@
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../lesson-plan";
 
 /**
  * Port for the structured lesson-plan builder (Creation Studio sub-scope
@@ -20,4 +25,14 @@ export interface LessonPlanRepository {
     fields: LessonPlanFields,
   ): Promise<LessonPlan | null>;
   listByAssignment(teachingAssignmentId: string): Promise<LessonPlan[]>;
+  amendSource(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+    sourceReference: LessonSourceReference,
+    reason: string,
+  ): Promise<LessonPlan | null>;
+  listSourceAmendments(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+  ): Promise<LessonSourceAmendment[]>;
 }

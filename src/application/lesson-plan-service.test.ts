@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import { LessonPlanApplicationService } from "./lesson-plan-service";
 
@@ -40,6 +45,13 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
   createResult: LessonPlan | null = PLAN;
   updateResult: LessonPlan | null = PLAN;
   plansToReturn: LessonPlan[] = [];
+  amendCalls: Array<{
+    lessonPlanId: string;
+    teachingAssignmentId: string;
+    sourceReference: LessonSourceReference;
+    reason: string;
+  }> = [];
+  amendmentsToReturn: LessonSourceAmendment[] = [];
 
   async create(
     teachingAssignmentId: string,
@@ -68,9 +80,63 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
   async listByAssignment(): Promise<LessonPlan[]> {
     return this.plansToReturn;
   }
+
+  async amendSource(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+    sourceReference: LessonSourceReference,
+    reason: string,
+  ): Promise<LessonPlan | null> {
+    this.amendCalls.push({ lessonPlanId, teachingAssignmentId, sourceReference, reason });
+    return { ...PLAN, sourceReference };
+  }
+
+  async listSourceAmendments(): Promise<LessonSourceAmendment[]> {
+    return this.amendmentsToReturn;
+  }
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("validates and trims source corrections before forwarding them", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const source = {
+      title: " Synthetic BOW ",
+      version: " v2 ",
+      citation: " fixture:two ",
+      curriculumName: " Synthetic curriculum ",
+      term: " Term A ",
+    };
+    await service.amendSource(" lp-1 ", " ta-1 ", source, " Corrected citation ");
+    expect(repo.amendCalls).toEqual([
+      {
+        lessonPlanId: "lp-1",
+        teachingAssignmentId: "ta-1",
+        sourceReference: {
+          title: "Synthetic BOW",
+          version: "v2",
+          citation: "fixture:two",
+          curriculumName: "Synthetic curriculum",
+          term: "Term A",
+        },
+        reason: "Corrected citation",
+      },
+    ]);
+    for (const reason of [" ", "x".repeat(1001)]) {
+      await expect(service.amendSource("lp-1", "ta-1", source, reason)).rejects.toThrow(
+        ValidationError,
+      );
+    }
+    expect(repo.amendCalls).toHaveLength(1);
+  });
+
+  it("validates amendment-history identifiers", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    expect(() => service.listSourceAmendments(" ", "ta-1")).toThrow(ValidationError);
+    expect(() => service.listSourceAmendments("lp-1", " ")).toThrow(ValidationError);
+    await expect(service.listSourceAmendments(" lp-1 ", " ta-1 ")).resolves.toEqual([]);
+  });
   it("preserves a declared scope and rejects incomplete scope without writing", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);
