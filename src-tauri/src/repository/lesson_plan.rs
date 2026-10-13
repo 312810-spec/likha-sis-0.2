@@ -199,7 +199,10 @@ pub fn ingest_source_artifact_authorized(
     ) {
         return Err(AppError::Validation("Unsupported source file type".into()));
     }
-    let sha256 = format!("{:x}", Sha256::digest(content));
+    let sha256: String = Sha256::digest(content)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     if let Some(mut existing) = find_source_artifact_by_hash(conn, school_id, &sha256)? {
         existing.already_imported = true;
         return Ok(existing);
@@ -902,7 +905,10 @@ mod tests {
         .unwrap();
         assert!(!stored.already_imported);
         assert_eq!(stored.byte_length, content.len() as i64);
-        assert_eq!(stored.sha256.len(), 64);
+        assert_eq!(
+            stored.sha256,
+            "19e2e459ae79d77420876537b91d6a2cf5ab527d7a7e654087da96db64c04708"
+        );
         assert_eq!(stored.ingested_by_name.as_deref(), Some("Teacher A"));
 
         let duplicate = ingest_source_artifact_authorized(
