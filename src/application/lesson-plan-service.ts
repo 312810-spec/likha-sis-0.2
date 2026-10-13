@@ -8,6 +8,7 @@ import type {
 } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import type { FilePicker } from "../domain/ports/file-picker";
+import { parseLessonSuggestion, type LessonSuggestion } from "../domain/lesson-suggestion";
 
 const MAX_LONG_FIELD_LENGTH = 4000;
 
@@ -19,6 +20,10 @@ const MAX_LONG_FIELD_LENGTH = 4000;
  * own convention.
  */
 export class LessonPlanApplicationService {
+  stagePlanningSuggestion(raw: string): LessonSuggestion {
+    return parseLessonSuggestion(raw);
+  }
+
   constructor(
     private readonly lessonPlans: LessonPlanRepository,
     private readonly filePicker?: FilePicker,

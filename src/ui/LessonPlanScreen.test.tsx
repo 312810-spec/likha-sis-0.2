@@ -218,6 +218,36 @@ function renderScreen(
 
 describe("LessonPlanScreen", () => {
   beforeEach(() => clearLessonDrafts());
+  it("applies a reviewed suggestion only to unsaved planning fields and saves separately", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLessonPlanRepository();
+    renderScreen(repo);
+    await user.type(await screen.findByLabelText("Learning competency"), "Teacher-entered target");
+    await user.type(screen.getByLabelText("Planned activities"), "Original manual activity");
+    await user.click(screen.getByText("Review an external AI-assisted planning draft"));
+    await user.click(screen.getByLabelText("External planning draft JSON"));
+    await user.paste(
+      JSON.stringify({
+        learningObjectives: "Synthetic objective",
+        connectionToPreviousLearning: "",
+        learningExperiences: "Reviewed synthetic activity",
+        assessment: "Synthetic assessment",
+        waysForward: "",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Stage draft for review" }));
+    expect(screen.getByLabelText("Planned activities")).toHaveValue("Original manual activity");
+    expect(repo.createCalls).toHaveLength(0);
+    await user.click(screen.getByRole("checkbox", { name: /I reviewed this suggestion/ }));
+    await user.click(screen.getByRole("button", { name: "Apply reviewed draft" }));
+    expect(screen.getByLabelText("Learning competency")).toHaveValue("Teacher-entered target");
+    expect(screen.getByLabelText("Planned activities")).toHaveValue("Reviewed synthetic activity");
+    expect(repo.createCalls).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Save lesson plan" }));
+    await waitFor(() => expect(repo.createCalls).toHaveLength(1));
+    expect(repo.createCalls[0]?.fields.learningCompetency).toBe("Teacher-entered target");
+  });
+
   it("links a selected exact source file without claiming official verification", async () => {
     const user = userEvent.setup();
     const repo = new FakeLessonPlanRepository();
