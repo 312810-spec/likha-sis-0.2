@@ -55,6 +55,10 @@ class FakeFilePicker implements FilePicker {
   async pickSf1Workbook(): Promise<string | null> {
     return this.result;
   }
+
+  async pickLessonSourceFile(): Promise<string | null> {
+    return null;
+  }
 }
 
 function emptyPreview(): Sf1ImportPreview {

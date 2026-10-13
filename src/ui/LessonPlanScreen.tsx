@@ -245,6 +245,45 @@ function LessonPlanWorkspace({
     }
   }
 
+  async function attachSourceFile() {
+    if (saving || !assignmentId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const artifact = await lessonPlanService.pickAndIngestSource(assignmentId);
+      if (!artifact || !alive.current || lessonDraftEpoch() !== epoch) return;
+      changeWorkspace((current) => ({
+        ...current,
+        active: {
+          ...current.active,
+          sourceReference: {
+            title: "",
+            version: "",
+            citation: "",
+            curriculumName: "",
+            term: "",
+            ...current.active.sourceReference,
+            artifactId: artifact.id,
+          },
+        },
+      }));
+      setConfirmation(
+        artifact.alreadyImported
+          ? "This exact source file was already stored; the existing integrity record is linked to this draft."
+          : "Source file stored locally and linked to this draft with a SHA-256 integrity record.",
+      );
+    } catch (err) {
+      if (!alive.current || lessonDraftEpoch() !== epoch) return;
+      setError(
+        err instanceof ValidationError
+          ? err.message
+          : "Could not store the selected source file. Your lesson draft is unchanged.",
+      );
+    } finally {
+      if (alive.current) setSaving(false);
+    }
+  }
+
   async function handleSourceCorrection() {
     if (!editingPlanId || !sourceReference || saving) return;
     setSaving(true);
@@ -499,6 +538,18 @@ function LessonPlanWorkspace({
             <p className="muted">
               Optional teacher-provided reference, saved with this lesson's class context. It is not
               officially verified and stays fixed after creation.
+            </p>
+            <button
+              type="button"
+              disabled={saving || (editingPlanId !== null && !amendingSource)}
+              onClick={() => void attachSourceFile()}
+            >
+              Attach exact source file
+            </button>
+            <p className="muted">
+              {sourceReference?.artifactId
+                ? `A local integrity record is linked (${sourceReference.artifactId}). It identifies exact bytes only and does not prove official approval or applicability.`
+                : "PDF, DOCX, or XLSX up to 8 MiB. The stored fingerprint does not prove official approval or applicability."}
             </p>
             {(
               [

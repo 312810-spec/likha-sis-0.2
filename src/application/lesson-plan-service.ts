@@ -2,10 +2,12 @@ import { ValidationError } from "../domain/errors";
 import type {
   LessonPlan,
   LessonPlanFields,
+  LessonSourceArtifact,
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
+import type { FilePicker } from "../domain/ports/file-picker";
 
 const MAX_LONG_FIELD_LENGTH = 4000;
 
@@ -17,7 +19,25 @@ const MAX_LONG_FIELD_LENGTH = 4000;
  * own convention.
  */
 export class LessonPlanApplicationService {
-  constructor(private readonly lessonPlans: LessonPlanRepository) {}
+  constructor(
+    private readonly lessonPlans: LessonPlanRepository,
+    private readonly filePicker?: FilePicker,
+  ) {}
+
+  async pickAndIngestSource(teachingAssignmentId: string): Promise<LessonSourceArtifact | null> {
+    const trimmedAssignmentId = teachingAssignmentId.trim();
+    if (!trimmedAssignmentId) throw new ValidationError("Teaching assignment is required.");
+    if (!this.filePicker) throw new ValidationError("Source file picker is unavailable.");
+    const filePath = await this.filePicker.pickLessonSourceFile();
+    if (!filePath) return null;
+    return this.lessonPlans.ingestSourceFile(trimmedAssignmentId, filePath);
+  }
+
+  getSourceArtifact(artifactId: string): Promise<LessonSourceArtifact | null> {
+    const trimmedArtifactId = artifactId.trim();
+    if (!trimmedArtifactId) throw new ValidationError("Source artifact is required.");
+    return this.lessonPlans.getSourceArtifact(trimmedArtifactId);
+  }
 
   listByAssignment(teachingAssignmentId: string): Promise<LessonPlan[]> {
     const trimmedAssignmentId = teachingAssignmentId.trim();
@@ -177,7 +197,11 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
       );
     }
   }
-  if (!source.scope) return trimmed;
+  const artifactId = source.artifactId?.trim();
+  if (source.artifactId !== undefined && !artifactId) {
+    throw new ValidationError("Attached source artifact identifier is required.");
+  }
+  if (!source.scope) return { ...trimmed, ...(artifactId ? { artifactId } : {}) };
   const scope = {
     schoolYear: source.scope.schoolYear.trim(),
     subjectId: source.scope.subjectId.trim(),
@@ -187,5 +211,5 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
       "Source subject and school year are required when scope is declared.",
     );
   }
-  return { ...trimmed, scope };
+  return { ...trimmed, scope, ...(artifactId ? { artifactId } : {}) };
 }

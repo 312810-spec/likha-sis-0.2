@@ -91,6 +91,10 @@ class FakeFilePicker implements FilePicker {
     if (this.pending) return new Promise<string | null>(() => {});
     return this.nextPath;
   }
+
+  async pickLessonSourceFile(): Promise<string | null> {
+    return null;
+  }
 }
 
 class FakeSf1ImportRepository implements Sf1ImportRepository {

@@ -13,4 +13,7 @@ export interface FilePicker {
    * teacher cancelled the dialog.
    */
   pickSf1Workbook(): Promise<string | null>;
+
+  /** Selects an exact curriculum/BOW source file for local integrity storage. */
+  pickLessonSourceFile(): Promise<string | null>;
 }

@@ -103,7 +103,11 @@ export const classRecordService = new ClassRecordApplicationService(
   new TauriClassRecordRepository(),
 );
 export const assessmentService = new AssessmentApplicationService(new TauriAssessmentRepository());
-export const lessonPlanService = new LessonPlanApplicationService(new TauriLessonPlanRepository());
+const filePicker = new TauriFilePicker();
+export const lessonPlanService = new LessonPlanApplicationService(
+  new TauriLessonPlanRepository(),
+  filePicker,
+);
 export const learnerScoreService = new LearnerScoreApplicationService(
   new TauriLearnerScoreRepository(),
 );
@@ -112,7 +116,7 @@ export const learnerScoreSyncStatusService = new LearnerScoreSyncStatusApplicati
 );
 export const sf1ImportService = new Sf1ImportApplicationService(
   new TauriSf1ImportRepository(),
-  new TauriFilePicker(),
+  filePicker,
 );
 const teachingAssignmentRepository = new TauriTeachingAssignmentRepository();
 export const subjectAttendanceService = new SubjectAttendanceApplicationService(

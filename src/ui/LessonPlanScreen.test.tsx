@@ -6,10 +6,12 @@ import { SubjectAttendanceApplicationService } from "../application/subject-atte
 import type {
   LessonPlan,
   LessonPlanFields,
+  LessonSourceArtifact,
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
+import type { FilePicker } from "../domain/ports/file-picker";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { RecordEntryOutcome, TeachingAssignmentSummary } from "../domain/subject-attendance";
@@ -46,6 +48,26 @@ const PLAN: LessonPlan = {
 };
 
 class FakeLessonPlanRepository implements LessonPlanRepository {
+  artifact: LessonSourceArtifact = {
+    id: "artifact-1",
+    fileName: "source.pdf",
+    mediaType: "application/pdf",
+    byteLength: 20,
+    sha256: "a".repeat(64),
+    ingestedByUserId: "u1",
+    ingestedByName: "Teacher A",
+    createdAt: "now",
+    alreadyImported: false,
+  };
+
+  async ingestSourceFile(): Promise<LessonSourceArtifact> {
+    return this.artifact;
+  }
+
+  async getSourceArtifact(): Promise<LessonSourceArtifact | null> {
+    return null;
+  }
+
   createCalls: Array<{
     teachingAssignmentId: string;
     planDate: string;
@@ -177,8 +199,9 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
 function renderScreen(
   lessonPlanRepo: FakeLessonPlanRepository,
   attendance = new FakeSubjectAttendanceRepository(),
+  filePicker?: FilePicker,
 ) {
-  const lessonPlanService = new LessonPlanApplicationService(lessonPlanRepo);
+  const lessonPlanService = new LessonPlanApplicationService(lessonPlanRepo, filePicker);
   const assignments = new FakeTeachingAssignmentRepository();
   assignments.listMine = () => attendance.listMine();
   const subjectAttendanceService = new SubjectAttendanceApplicationService(attendance, assignments);
@@ -195,6 +218,25 @@ function renderScreen(
 
 describe("LessonPlanScreen", () => {
   beforeEach(() => clearLessonDrafts());
+  it("links a selected exact source file without claiming official verification", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLessonPlanRepository();
+    renderScreen(repo, new FakeSubjectAttendanceRepository(), {
+      async pickSf1Workbook() {
+        return null;
+      },
+      async pickLessonSourceFile() {
+        return "/tmp/source.pdf";
+      },
+    });
+    await screen.findByText("Curriculum / BOW source reference");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    await user.click(screen.getByRole("button", { name: "Attach exact source file" }));
+    expect(await screen.findByText(/SHA-256 integrity record/)).toBeInTheDocument();
+    expect(screen.getByText(/identifies exact bytes only/)).toHaveTextContent("artifact-1");
+    expect(screen.getByText(/does not prove official approval/)).toBeInTheDocument();
+  });
+
   it("retains declared source drafts and locks an existing plan's source", async () => {
     const source = {
       title: "Synthetic BOW",

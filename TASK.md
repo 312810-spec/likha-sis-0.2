@@ -1,6 +1,19 @@
 # Current task — CTOS v3
 
-## Active slice — source provenance amendments
+## Active slice — exact lesson source ingestion
+
+PR114 passed exact-head Quality and Security and merged as
+`e5f4c74c11dd6a81ce15278ae68b39f6e4614459`. The next isolated M10 slice is on
+`ctos/m10-source-ingestion-20261014`: exact PDF/DOCX/XLSX bytes, SHA-256 integrity
+identity, authenticated actor/time, same-school deduplication and a school-scoped
+link from the declared source reference. Read
+`docs/ctos/checkpoints/m10-source-ingestion-2026-10-14.md` next.
+
+This evidence identifies exact bytes only; official approval, applicability and
+competency accuracy remain unverified. Require exact-source Quality/Security before
+merge, then continue teacher-confirmed AI drafts and classroom linkage. No deployment.
+
+## Completed prior slice — source provenance amendments
 
 PR112 merged as `c18383d442af3bd3cdbbe80b15605eab68ff19a9` from verified
 head `f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7`. PR113 passed Quality

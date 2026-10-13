@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -59,6 +60,8 @@ pub struct LessonSourceReference {
     pub term: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope: Option<LessonSourceScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
 }
 
 /// Declared scope checked against canonical assignment context, not official approval.
@@ -84,6 +87,22 @@ pub struct LessonSourceAmendment {
     pub created_at: String,
 }
 
+/// Exact local source bytes plus their integrity fingerprint. The fingerprint
+/// verifies file identity only; it is never an official-approval assertion.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonSourceArtifact {
+    pub id: String,
+    pub file_name: String,
+    pub media_type: String,
+    pub byte_length: i64,
+    pub sha256: String,
+    pub ingested_by_user_id: String,
+    pub ingested_by_name: Option<String>,
+    pub created_at: String,
+    pub already_imported: bool,
+}
+
 impl LessonSourceReference {
     fn normalized(&self) -> AppResult<Self> {
         let source = Self {
@@ -96,6 +115,7 @@ impl LessonSourceReference {
                 school_year: scope.school_year.trim().into(),
                 subject_id: scope.subject_id.trim().into(),
             }),
+            artifact_id: self.artifact_id.as_ref().map(|id| id.trim().into()),
         };
         for value in [
             &source.title,
@@ -120,8 +140,141 @@ impl LessonSourceReference {
                 ));
             }
         }
+        if source.artifact_id.as_ref().is_some_and(|id| id.is_empty()) {
+            return Err(AppError::Validation(
+                "Attached source artifact identifier is required".into(),
+            ));
+        }
         Ok(source)
     }
+}
+
+fn validate_source_artifact(
+    conn: &Connection,
+    school_id: &str,
+    source: &LessonSourceReference,
+) -> AppResult<()> {
+    let Some(artifact_id) = source.artifact_id.as_deref() else {
+        return Ok(());
+    };
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM lesson_source_artifacts WHERE id = ?1 AND school_id = ?2)",
+        (artifact_id, school_id),
+        |row| row.get(0),
+    )?;
+    if !exists {
+        return Err(AppError::Validation(
+            "Attached source file does not belong to this school".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn ingest_source_artifact_authorized(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    file_name: &str,
+    media_type: &str,
+    content: &[u8],
+) -> AppResult<LessonSourceArtifact> {
+    authorize_own_assignment(conn, user_id, school_id, teaching_assignment_id)?;
+    let file_name = file_name.trim();
+    if file_name.is_empty() || file_name.chars().count() > 255 {
+        return Err(AppError::Validation(
+            "Source file name is required and limited to 255 characters".into(),
+        ));
+    }
+    if content.is_empty() || content.len() > 8 * 1024 * 1024 {
+        return Err(AppError::Validation(
+            "Source file must contain data and be no larger than 8 MiB".into(),
+        ));
+    }
+    if !matches!(
+        media_type,
+        "application/pdf"
+            | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ) {
+        return Err(AppError::Validation("Unsupported source file type".into()));
+    }
+    let sha256 = format!("{:x}", Sha256::digest(content));
+    if let Some(mut existing) = find_source_artifact_by_hash(conn, school_id, &sha256)? {
+        existing.already_imported = true;
+        return Ok(existing);
+    }
+    let id = Uuid::now_v7().to_string();
+    conn.execute(
+        "INSERT INTO lesson_source_artifacts \
+         (id, school_id, file_name, media_type, byte_length, sha256, content, ingested_by_user_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            &id,
+            school_id,
+            file_name,
+            media_type,
+            content.len() as i64,
+            &sha256,
+            content,
+            user_id
+        ],
+    )?;
+    find_source_artifact(conn, school_id, &id)?.ok_or_else(|| {
+        AppError::Validation("Stored source artifact could not be read back".into())
+    })
+}
+
+pub fn find_source_artifact(
+    conn: &Connection,
+    school_id: &str,
+    artifact_id: &str,
+) -> AppResult<Option<LessonSourceArtifact>> {
+    find_source_artifact_where(conn, school_id, "a.id = ?2", artifact_id)
+}
+
+fn find_source_artifact_by_hash(
+    conn: &Connection,
+    school_id: &str,
+    sha256: &str,
+) -> AppResult<Option<LessonSourceArtifact>> {
+    find_source_artifact_where(conn, school_id, "a.sha256 = ?2", sha256)
+}
+
+fn find_source_artifact_where(
+    conn: &Connection,
+    school_id: &str,
+    predicate: &str,
+    value: &str,
+) -> AppResult<Option<LessonSourceArtifact>> {
+    conn.query_row(
+        &format!(
+            "SELECT a.id, a.file_name, a.media_type, a.byte_length, a.sha256, \
+                    a.ingested_by_user_id, u.display_name, a.created_at \
+             FROM lesson_source_artifacts a \
+             LEFT JOIN users u ON u.id = a.ingested_by_user_id \
+             WHERE a.school_id = ?1 AND {predicate}"
+        ),
+        (school_id, value),
+        |row| {
+            Ok(LessonSourceArtifact {
+                id: row.get(0)?,
+                file_name: row.get(1)?,
+                media_type: row.get(2)?,
+                byte_length: row.get(3)?,
+                sha256: row.get(4)?,
+                ingested_by_user_id: row.get(5)?,
+                ingested_by_name: row.get(6)?,
+                created_at: row.get(7)?,
+                already_imported: false,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|error| match error {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other.into()),
+    })
 }
 
 fn validate_source_scope(
@@ -277,6 +430,7 @@ pub fn create_with_source(
     )?;
     if let Some(source) = source.as_ref() {
         validate_source_scope(source, Some(&context))?;
+        validate_source_artifact(conn, school_id, source)?;
     }
     let source_json = source
         .as_ref()
@@ -453,6 +607,7 @@ pub fn amend_source_authorized(
     authorize_own_assignment(conn, user_id, school_id, &plan.teaching_assignment_id)?;
     let source = new_source_reference.normalized()?;
     validate_source_scope(&source, plan.teaching_context.as_ref())?;
+    validate_source_artifact(conn, school_id, &source)?;
     let reason = reason.trim();
     if reason.is_empty() || reason.chars().count() > 1000 {
         return Err(AppError::Validation(
@@ -645,6 +800,7 @@ mod tests {
                 school_year: " 2026-2027 ".into(),
                 subject_id: format!(" {} ", assignment.subject_id),
             }),
+            artifact_id: None,
         };
         for (year, subject_id) in [
             ("2025-2026", assignment.subject_id.as_str()),
@@ -727,6 +883,126 @@ mod tests {
             r#"{"title":"Synthetic BOW","version":"v1","citation":"fixture:bow","curriculumName":"Synthetic","term":"Term A"}"#,
         ).unwrap();
         assert_eq!(source.scope, None);
+        assert_eq!(source.artifact_id, None);
+    }
+
+    #[test]
+    fn source_artifacts_are_school_scoped_deduplicated_and_append_only() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let content = b"%PDF-1.7\nsynthetic curriculum fixture";
+        let stored = ingest_source_artifact_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &f.assignment_id,
+            "synthetic-source.pdf",
+            "application/pdf",
+            content,
+        )
+        .unwrap();
+        assert!(!stored.already_imported);
+        assert_eq!(stored.byte_length, content.len() as i64);
+        assert_eq!(stored.sha256.len(), 64);
+        assert_eq!(stored.ingested_by_name.as_deref(), Some("Teacher A"));
+
+        let duplicate = ingest_source_artifact_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &f.assignment_id,
+            "renamed.pdf",
+            "application/pdf",
+            content,
+        )
+        .unwrap();
+        assert_eq!(duplicate.id, stored.id);
+        assert!(duplicate.already_imported);
+        let bytes: Vec<u8> = conn
+            .query_row(
+                "SELECT content FROM lesson_source_artifacts WHERE id = ?1",
+                [&stored.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(bytes, content);
+        assert!(conn
+            .execute(
+                "UPDATE lesson_source_artifacts SET file_name = 'changed.pdf' WHERE id = ?1",
+                [&stored.id],
+            )
+            .is_err());
+        assert!(conn
+            .execute("DELETE FROM lesson_source_artifacts WHERE id = ?1", [&stored.id])
+            .is_err());
+        let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();
+        assert!(matches!(
+            ingest_source_artifact_authorized(
+                &conn,
+                &other.id,
+                &f.school_id,
+                &f.assignment_id,
+                "other.pdf",
+                "application/pdf",
+                b"%PDF-1.7\nother"
+            ),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn source_reference_accepts_only_an_existing_same_school_artifact() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let artifact = ingest_source_artifact_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &f.assignment_id,
+            "source.pdf",
+            "application/pdf",
+            b"%PDF-1.7\nfixture",
+        )
+        .unwrap();
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: None,
+            artifact_id: Some(artifact.id.clone()),
+        };
+        let plan = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            plan.source_reference.unwrap().artifact_id.as_deref(),
+            Some(artifact.id.as_str())
+        );
+        let invalid = LessonSourceReference {
+            artifact_id: Some("missing-artifact".into()),
+            ..source
+        };
+        assert!(create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-08",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&invalid),
+        )
+        .is_err());
     }
 
     #[test]
@@ -740,6 +1016,7 @@ mod tests {
             curriculum_name: " Synthetic curriculum ".into(),
             term: " Term A ".into(),
             scope: None,
+            artifact_id: None,
         };
         let created = create_with_source(
             &conn,
@@ -1152,6 +1429,7 @@ mod tests {
                 school_year: "2026-2027".into(),
                 subject_id: assignment.subject_id.clone(),
             }),
+            artifact_id: None,
         };
         let plan = create_with_source(
             &conn,
@@ -1258,6 +1536,7 @@ mod tests {
                 school_year: context.school_year.clone(),
                 subject_id: context.subject_id.clone(),
             }),
+            artifact_id: None,
         };
         let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();

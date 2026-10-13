@@ -1,6 +1,7 @@
 import type {
   LessonPlan,
   LessonPlanFields,
+  LessonSourceArtifact,
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../../domain/lesson-plan";
@@ -10,6 +11,17 @@ import { invoke } from "./invoke";
 /** Tauri adapter for `create_lesson_plan`/`update_lesson_plan`/
  * `list_lesson_plans_by_assignment` (`src-tauri/src/commands/lesson_plan.rs`). */
 export class TauriLessonPlanRepository implements LessonPlanRepository {
+  ingestSourceFile(teachingAssignmentId: string, filePath: string): Promise<LessonSourceArtifact> {
+    return invoke<LessonSourceArtifact>("ingest_lesson_source_file", {
+      teachingAssignmentId,
+      filePath,
+    });
+  }
+
+  getSourceArtifact(artifactId: string): Promise<LessonSourceArtifact | null> {
+    return invoke<LessonSourceArtifact | null>("get_lesson_source_artifact", { artifactId });
+  }
+
   create(
     teachingAssignmentId: string,
     planDate: string,

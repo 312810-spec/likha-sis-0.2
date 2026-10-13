@@ -5,6 +5,18 @@ import type { FilePicker } from "../../domain/ports/file-picker";
  * official first-party `@tauri-apps/plugin-dialog` (see
  * `docs/SOURCE-REGISTRY.md`). */
 export class TauriFilePicker implements FilePicker {
+  async pickLessonSourceFile(): Promise<string | null> {
+    const selection = await open({
+      title: "Choose a curriculum or BOW source file",
+      multiple: false,
+      directory: false,
+      filters: [
+        { name: "Source document (.pdf, .docx, or .xlsx)", extensions: ["pdf", "docx", "xlsx"] },
+      ],
+    });
+    return typeof selection === "string" ? selection : null;
+  }
+
   async pickSf1Workbook(): Promise<string | null> {
     const selection = await open({
       title: "Choose an SF1 Excel workbook",
