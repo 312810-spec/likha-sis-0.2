@@ -150,6 +150,34 @@ function renderScreen(
 
 describe("LessonPlanScreen", () => {
   beforeEach(() => clearLessonDrafts());
+  it("shows captured class context rather than the assignment's current values", async () => {
+    renderScreen(
+      new FakeLessonPlanRepository([
+        {
+          ...PLAN,
+          teachingContext: {
+            schoolYear: "2025-2026",
+            gradeLevel: "6",
+            sectionId: "old-section",
+            sectionName: "Previous Section",
+            subjectId: "old-subject",
+            subjectName: "Previous Subject",
+          },
+        },
+      ]),
+    );
+    expect(
+      await screen.findByText(
+        "Saved context: 2025-2026 · Grade 6 · Previous Section · Previous Subject",
+      ),
+    ).toBeInTheDocument();
+  });
+  it("labels legacy plans with unavailable historical context", async () => {
+    renderScreen(new FakeLessonPlanRepository([PLAN]));
+    expect(
+      await screen.findByText("Saved class context unavailable for this earlier plan."),
+    ).toBeInTheDocument();
+  });
   it("renders all four ILAW sections", async () => {
     renderScreen(new FakeLessonPlanRepository());
 

@@ -1,5 +1,18 @@
 # Current task — CTOS v3
 
+## Current continuation — 13 October 2026
+
+PR109 merged at `fb928015fcbc2b8a427bb6fc4a218346eca97fdf` from verified head
+`acf1c5bce6c12634f20bde49688c2ff83fe71617`; PR110 retargeted to main and merged
+at `f0884e08a66ab8fb6529cbf52107acf23276cf6b` from verified head
+`47b56475848a98f2fb2446ecc16f5e73fb10bdb0`. Quality and Security passed for
+both heads. The dedicated two-PR CI watch is paused because its scope is complete.
+
+Continue the M10 lesson-context capture slice, then explicit curriculum/BOW
+source versions and subject/term applicability. See
+`docs/ctos/checkpoints/m10-lesson-context-2026-10-13.md`.
+Device/professional acceptance and broader batches B–G remain incomplete.
+
 ## Latest continuation — FORGE audit implementation completed, 12 October 2026
 
 All F01–F16 source fixes and bounded Review/encrypted classroom recovery/provenance/shared-token enhancements are implemented and verified. PR #107 merged to main as `a46eba68f3ca36843d9f8bc34ee844993f9348c8`; verified head `684d2c0`, source tree `67d5b2c06e2f88fa223bab37067c5673083c7e88`. Read `docs/ctos/checkpoints/forge-audit-implementation-2026-10-11.md` first.

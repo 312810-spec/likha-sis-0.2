@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -21,6 +21,7 @@ pub struct LessonPlan {
     pub school_id: String,
     pub teaching_assignment_id: String,
     pub plan_date: String,
+    pub teaching_context: Option<LessonTeachingContext>,
     pub learning_competency: String,
     pub learning_competency_code: String,
     pub learning_objectives: String,
@@ -31,6 +32,19 @@ pub struct LessonPlan {
     pub created_by_user_id: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Canonical assignment context at creation, never re-derived for an existing plan.
+/// This does not establish curriculum/BOW applicability or official provenance.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonTeachingContext {
+    pub school_year: String,
+    pub grade_level: String,
+    pub section_id: String,
+    pub section_name: String,
+    pub subject_id: String,
+    pub subject_name: String,
 }
 
 /// The exact fields a teacher supplies from the authoring screen --
@@ -122,14 +136,35 @@ pub fn create(
         return Ok(None);
     }
 
+    let context = conn.query_row(
+        "SELECT sec.school_year, sec.grade_level, sec.id, sec.name, sub.id, sub.name \
+         FROM teaching_assignments ta \
+         JOIN sections sec ON sec.id = ta.section_id AND sec.school_id = ta.school_id \
+         JOIN subjects sub ON sub.id = ta.subject_id AND sub.school_id = ta.school_id \
+         WHERE ta.id = ?1 AND ta.school_id = ?2",
+        (teaching_assignment_id, school_id),
+        |row| {
+            Ok(LessonTeachingContext {
+                school_year: row.get(0)?,
+                grade_level: row.get(1)?,
+                section_id: row.get(2)?,
+                section_name: row.get(3)?,
+                subject_id: row.get(4)?,
+                subject_name: row.get(5)?,
+            })
+        },
+    )?;
+    let context_json = serde_json::to_string(&context)
+        .map_err(|_| AppError::Validation("Lesson teaching context could not be saved".into()))?;
+
     let id = Uuid::now_v7().to_string();
     conn.execute(
         "INSERT INTO lesson_plans \
              (id, school_id, teaching_assignment_id, plan_date, \
               learning_competency, learning_competency_code, learning_objectives, \
               connection_to_previous_learning, learning_experiences, assessment, \
-              ways_forward, created_by_user_id) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+              ways_forward, created_by_user_id, teaching_context_json) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         (
             &id,
             school_id,
@@ -143,6 +178,7 @@ pub fn create(
             fields.assessment,
             fields.ways_forward,
             created_by_user_id,
+            &context_json,
         ),
     )?;
 
@@ -212,7 +248,7 @@ pub fn find_by_id_in_school(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
          FROM lesson_plans WHERE id = ?1 AND school_id = ?2",
         (id, school_id),
         row_to_plan,
@@ -234,7 +270,7 @@ pub fn find_by_assignment_and_date(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
          FROM lesson_plans \
          WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND plan_date = ?3",
         (school_id, teaching_assignment_id, plan_date),
@@ -259,7 +295,7 @@ pub fn list_by_assignment(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
          FROM lesson_plans \
          WHERE school_id = ?1 AND teaching_assignment_id = ?2 \
          ORDER BY plan_date DESC",
@@ -269,11 +305,24 @@ pub fn list_by_assignment(
 }
 
 fn row_to_plan(row: &rusqlite::Row) -> rusqlite::Result<LessonPlan> {
+    let context_json: Option<String> = row.get(14)?;
+    let teaching_context = context_json
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    14,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
     Ok(LessonPlan {
         id: row.get(0)?,
         school_id: row.get(1)?,
         teaching_assignment_id: row.get(2)?,
         plan_date: row.get(3)?,
+        teaching_context,
         learning_competency: row.get(4)?,
         learning_competency_code: row.get(5)?,
         learning_objectives: row.get(6)?,
@@ -336,6 +385,72 @@ mod tests {
             assessment: "Exit ticket: 3 addition and 2 subtraction items",
             ways_forward: "Reteach denominators via LCD if exit ticket accuracy < 70%",
         }
+    }
+
+    #[test]
+    fn saved_context_survives_assignment_changes_and_content_edits() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let first = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        let captured = first.teaching_context.clone().unwrap();
+        assert_eq!(captured.school_year, "2026-2027");
+        assert_eq!(captured.grade_level, "7");
+        assert_eq!(captured.section_name, "Mabini");
+        assert_eq!(captured.subject_name, "Mathematics");
+        conn.execute(
+            "UPDATE sections SET school_year = '2027-2028', grade_level = '8', name = 'New section' WHERE id = ?1",
+            [&captured.section_id],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE subjects SET name = 'Renamed subject' WHERE id = ?1",
+            [&captured.subject_id],
+        )
+        .unwrap();
+        let edited = update_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &first.id,
+            &f.assignment_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(edited.teaching_context, first.teaching_context);
+        assert_eq!(
+            list_by_assignment(&conn, &f.school_id, &f.assignment_id).unwrap()[0].teaching_context,
+            first.teaching_context
+        );
+        let next = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2027-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        let current = next.teaching_context.unwrap();
+        assert_eq!(current.school_year, "2027-2028");
+        assert_eq!(current.grade_level, "8");
+        assert_eq!(current.subject_name, "Renamed subject");
+        assert!(conn
+            .execute(
+                "UPDATE lesson_plans SET teaching_context_json = NULL WHERE id = ?1",
+                [&first.id]
+            )
+            .is_err());
     }
 
     #[test]
