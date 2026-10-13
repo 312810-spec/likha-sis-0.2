@@ -245,11 +245,12 @@ pub fn fingerprint(inputs: &ConstraintInputs) -> String {
     assignments.sort_by(|a, b| a.id.cmp(&b.id));
     for assignment in &assignments {
         text.push_str(&format!(
-            "assignment:{}|{}|{}|{}|{}\n",
+            "assignment:{}|{}|{}|{}|{}|{}\n",
             assignment.id,
             assignment.teacher_user_id,
             assignment.section_id,
             assignment.subject_id,
+            assignment.school_year,
             assignment.required_weekly_minutes
         ));
     }
@@ -494,6 +495,16 @@ mod tests {
         let reversed = fingerprint(&inputs);
 
         assert_eq!(ordered, reversed);
+    }
+
+    #[test]
+    fn fingerprint_changes_when_the_assignment_school_year_changes() {
+        let conn = open_test_db();
+        let school_id = setup(&conn);
+        let mut inputs = load(&conn, &school_id).unwrap();
+        let previous_year = fingerprint(&inputs);
+        inputs.assignments[0].school_year = "2027-2028".to_string();
+        assert_ne!(previous_year, fingerprint(&inputs));
     }
 
     #[test]
