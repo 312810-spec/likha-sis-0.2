@@ -523,7 +523,9 @@ mod tests {
         )
         .is_err());
         assert_eq!(
-            list_by_assignment(&conn, &f.school_id, &f.assignment_id).unwrap().len(),
+            list_by_assignment(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .len(),
             1
         );
     }
