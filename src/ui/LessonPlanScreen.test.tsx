@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LessonPlanApplicationService } from "../application/lesson-plan-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
@@ -48,6 +53,8 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     sourceReference?: LessonSourceReference;
   }> = [];
   createResult: LessonPlan | null = PLAN;
+  amendments: LessonSourceAmendment[] = [];
+  historyFailure = false;
 
   constructor(private plans: LessonPlan[] = []) {}
 
@@ -73,6 +80,37 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 
   async listByAssignment(): Promise<LessonPlan[]> {
     return this.plans;
+  }
+
+  async amendSource(
+    lessonPlanId: string,
+    _teachingAssignmentId: string,
+    sourceReference: LessonSourceReference,
+    reason: string,
+  ): Promise<LessonPlan | null> {
+    const plan = this.plans.find((item) => item.id === lessonPlanId) ?? null;
+    if (!plan) return null;
+    this.amendments = [
+      {
+        id: `amend-${this.amendments.length + 1}`,
+        lessonPlanId,
+        previousSourceReference: plan.sourceReference,
+        newSourceReference: sourceReference,
+        reason,
+        amendedByUserId: "u1",
+        amendedByName: "Teacher A",
+        createdAt: "now",
+      },
+      ...this.amendments,
+    ];
+    const amended = { ...plan, sourceReference };
+    this.plans = this.plans.map((item) => (item.id === lessonPlanId ? amended : item));
+    return amended;
+  }
+
+  async listSourceAmendments(): Promise<LessonSourceAmendment[]> {
+    if (this.historyFailure) throw new Error("Synthetic history read failure");
+    return this.amendments;
   }
 }
 
@@ -201,6 +239,55 @@ describe("LessonPlanScreen", () => {
     expect(
       screen.getByText(/Declared source: Synthetic BOW.*Subject\/year scope unknown/),
     ).toBeInTheDocument();
+  });
+  it("records a reasoned source correction and exposes its lineage", async () => {
+    const repo = new FakeLessonPlanRepository([
+      {
+        ...PLAN,
+        sourceReference: {
+          title: "Synthetic BOW",
+          version: "v1",
+          citation: "fixture:bow-v1",
+          curriculumName: "Synthetic curriculum",
+          term: "Term A",
+        },
+      },
+    ]);
+    const { container } = renderScreen(repo);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    await user.click(screen.getByRole("button", { name: "Correct source reference" }));
+    await user.clear(screen.getByLabelText("Source version / revision"));
+    await user.type(screen.getByLabelText("Source version / revision"), "v2");
+    await user.clear(screen.getByLabelText("Source citation / location"));
+    await user.type(screen.getByLabelText("Source citation / location"), "fixture:bow-v2");
+    await user.type(screen.getByLabelText("Reason for correction"), "Replaced an outdated copy");
+    await user.click(screen.getByRole("button", { name: "Save source correction" }));
+
+    await screen.findByText(/Source correction saved with an append-only reason and history/);
+    expect(repo.amendments).toHaveLength(1);
+    expect(repo.amendments[0]).toMatchObject({
+      previousSourceReference: { version: "v1" },
+      newSourceReference: { version: "v2", citation: "fixture:bow-v2" },
+      reason: "Replaced an outdated copy",
+    });
+    expect(screen.getByText("v1 → v2")).toBeInTheDocument();
+    expect(screen.getByText("Replaced an outdated copy")).toBeInTheDocument();
+    expect(screen.getByText(/Teacher A/)).toBeInTheDocument();
+    await expectNoAccessibilityViolations(container);
+
+    repo.historyFailure = true;
+    await user.click(screen.getByRole("button", { name: "Correct source reference" }));
+    await user.clear(screen.getByLabelText("Source version / revision"));
+    await user.type(screen.getByLabelText("Source version / revision"), "v3");
+    await user.type(screen.getByLabelText("Reason for correction"), "Fixed another version label");
+    await user.click(screen.getByRole("button", { name: "Save source correction" }));
+    await waitFor(() => expect(repo.amendments).toHaveLength(2));
+    expect(
+      screen.getByText(/Source correction saved with an append-only reason and history/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Could not load source correction history/)).toBeInTheDocument();
   });
   it("submits the selected subject/year only after an explicit scope declaration", async () => {
     const repo = new FakeLessonPlanRepository();

@@ -1,5 +1,10 @@
 import { ValidationError } from "../domain/errors";
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 
 const MAX_LONG_FIELD_LENGTH = 4000;
@@ -58,6 +63,38 @@ export class LessonPlanApplicationService {
     }
     const trimmedFields = validateAndTrimFields(fields);
     return this.lessonPlans.update(trimmedId, trimmedAssignmentId, trimmedFields);
+  }
+
+  async amendSource(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+    sourceReference: LessonSourceReference,
+    reason: string,
+  ): Promise<LessonPlan | null> {
+    const trimmedId = lessonPlanId.trim();
+    const trimmedAssignmentId = teachingAssignmentId.trim();
+    const trimmedReason = reason.trim();
+    if (!trimmedId) throw new ValidationError("Lesson plan is required.");
+    if (!trimmedAssignmentId) throw new ValidationError("Teaching assignment is required.");
+    if (!trimmedReason || trimmedReason.length > 1000) {
+      throw new ValidationError(
+        "Source correction reason is required and limited to 1000 characters.",
+      );
+    }
+    const source = trimSource(sourceReference);
+    if (!source) throw new ValidationError("Corrected source reference is required.");
+    return this.lessonPlans.amendSource(trimmedId, trimmedAssignmentId, source, trimmedReason);
+  }
+
+  listSourceAmendments(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+  ): Promise<LessonSourceAmendment[]> {
+    const trimmedId = lessonPlanId.trim();
+    const trimmedAssignmentId = teachingAssignmentId.trim();
+    if (!trimmedId) throw new ValidationError("Lesson plan is required.");
+    if (!trimmedAssignmentId) throw new ValidationError("Teaching assignment is required.");
+    return this.lessonPlans.listSourceAmendments(trimmedId, trimmedAssignmentId);
   }
 }
 

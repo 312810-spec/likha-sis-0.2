@@ -1,4 +1,9 @@
-import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../../domain/lesson-plan";
+import type {
+  LessonPlan,
+  LessonPlanFields,
+  LessonSourceAmendment,
+  LessonSourceReference,
+} from "../../domain/lesson-plan";
 import type { LessonPlanRepository } from "../../domain/ports/lesson-plan-repository";
 import { invoke } from "./invoke";
 
@@ -33,5 +38,29 @@ export class TauriLessonPlanRepository implements LessonPlanRepository {
 
   listByAssignment(teachingAssignmentId: string): Promise<LessonPlan[]> {
     return invoke<LessonPlan[]>("list_lesson_plans_by_assignment", { teachingAssignmentId });
+  }
+
+  amendSource(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+    sourceReference: LessonSourceReference,
+    reason: string,
+  ): Promise<LessonPlan | null> {
+    return invoke<LessonPlan | null>("amend_lesson_source", {
+      lessonPlanId,
+      teachingAssignmentId,
+      sourceReference,
+      reason,
+    });
+  }
+
+  listSourceAmendments(
+    lessonPlanId: string,
+    teachingAssignmentId: string,
+  ): Promise<LessonSourceAmendment[]> {
+    return invoke<LessonSourceAmendment[]>("list_lesson_source_amendments", {
+      lessonPlanId,
+      teachingAssignmentId,
+    });
   }
 }

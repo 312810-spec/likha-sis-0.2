@@ -196,6 +196,8 @@ pub fn run() {
             commands::lesson_plan::create_lesson_plan,
             commands::lesson_plan::update_lesson_plan,
             commands::lesson_plan::list_lesson_plans_by_assignment,
+            commands::lesson_plan::amend_lesson_source,
+            commands::lesson_plan::list_lesson_source_amendments,
             commands::section_advisory::assign_section_adviser,
             commands::section_advisory::end_section_adviser,
             commands::section_advisory::current_section_adviser,

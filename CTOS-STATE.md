@@ -6,15 +6,15 @@
 
 ## Current execution state
 
-- Execution branch: ctos/m10-source-scope-20261013; source-reference slice remains PR112 pending CI.
-- Active execution: PR111 historical lesson context merged after verified gates as 6725ed6998299e05a3fe5ad78934c74c8d61cc95. Declared source-reference repair and teacher-declared subject/year scope are isolated M10 slices; broader B acceptance and C–G remain incomplete.
+- Execution branch: ctos/m10-source-amendments-20261013, reconciled to main merge 4c365f117846ad1bd724d5189816f97676a9d794 at 58d554997fe228b5dcc5386023b9090b096e2184.
+- Active execution: PR111 historical lesson context, PR112 declared source references and PR113 teacher-declared subject/year scope merged after verified gates. Append-only source amendments are implemented locally through 7f9909788e3cff97c8021c67750c940087bf8893 and reconciled to main as the next isolated M10 slice; broader B acceptance and C–G remain incomplete.
 - Current runtime: Linux frontend/build/browser checks available. Official Rust 1.99 formatter obtained and changed Rust checked; native execution, Windows/Android installed devices and professional acceptance unavailable locally.
-- Publication: PR109/110/111 merged at verified heads; PR112 retargeted to main, repaired source head f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7 has Security PASS and Quality running at last inspection. Source-scope candidate is stacked on that head until gates pass.
+- Publication: PR109/110/111 merged at verified heads. PR112 merged as c18383d442af3bd3cdbbe80b15605eab68ff19a9 from verified head f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7. PR113 passed Quality/Security at reconciled head 240c97ad125c0e396a20e318e246c99b0b8bcfb1 and merged as 4c365f117846ad1bd724d5189816f97676a9d794.
 - Source branch: main
 - Current milestone: M10 — Curriculum, BOW, Teaching Flow, ILAW (pending); M09 remains complete with deferred applicability.
 - Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
 - Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
-- Next action: verify PR112/source-scope live heads and gates; then canonical term/cohort applicability and explicit provenance amendments (CTOS.md §M10).
+- Next action: publish the reconciled append-only source-amendment slice and require exact-source Quality/Security before merge; then continue verified ingestion and teacher-confirmed AI drafts (CTOS.md §M10).
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a

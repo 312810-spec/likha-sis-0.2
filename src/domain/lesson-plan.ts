@@ -9,6 +9,18 @@ export interface LessonSourceReference {
   scope?: { schoolYear: string; subjectId: string };
 }
 
+/** Append-only lineage for a teacher-authored source correction. */
+export interface LessonSourceAmendment {
+  id: string;
+  lessonPlanId: string;
+  previousSourceReference?: LessonSourceReference | null;
+  newSourceReference: LessonSourceReference;
+  reason: string;
+  amendedByUserId: string;
+  amendedByName?: string | null;
+  createdAt: string;
+}
+
 /** Class context captured at creation; absent for plans saved before context capture. */
 interface LessonTeachingContext {
   schoolYear: string;

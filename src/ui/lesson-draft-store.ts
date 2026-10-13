@@ -6,6 +6,8 @@ export interface LessonDraft {
   editingPlanId: string | null;
   fields: LessonPlanFields;
   sourceReference?: LessonSourceReference;
+  amendingSource?: boolean;
+  sourceCorrectionReason?: string;
 }
 interface Workspace {
   confirmation?: string;

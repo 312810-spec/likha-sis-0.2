@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -69,6 +69,21 @@ pub struct LessonSourceScope {
     pub subject_id: String,
 }
 
+/// One append-only correction to a lesson's declared source metadata.
+/// Neither the original declaration nor earlier amendments are overwritten.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonSourceAmendment {
+    pub id: String,
+    pub lesson_plan_id: String,
+    pub previous_source_reference: Option<LessonSourceReference>,
+    pub new_source_reference: LessonSourceReference,
+    pub reason: String,
+    pub amended_by_user_id: String,
+    pub amended_by_name: Option<String>,
+    pub created_at: String,
+}
+
 impl LessonSourceReference {
     fn normalized(&self) -> AppResult<Self> {
         let source = Self {
@@ -107,6 +122,27 @@ impl LessonSourceReference {
         }
         Ok(source)
     }
+}
+
+fn validate_source_scope(
+    source: &LessonSourceReference,
+    context: Option<&LessonTeachingContext>,
+) -> AppResult<()> {
+    let Some(scope) = source.scope.as_ref() else {
+        return Ok(());
+    };
+    let context = context.ok_or_else(|| {
+        AppError::Validation(
+            "This earlier lesson has no captured class context, so subject/year scope cannot be confirmed"
+                .into(),
+        )
+    })?;
+    if scope.school_year != context.school_year || scope.subject_id != context.subject_id {
+        return Err(AppError::Validation(
+            "Source scope does not match this lesson's captured subject and school year".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The exact fields a teacher supplies from the authoring screen --
@@ -239,15 +275,8 @@ pub fn create_with_source(
             })
         },
     )?;
-    if let Some(scope) = source
-        .as_ref()
-        .and_then(|reference| reference.scope.as_ref())
-    {
-        if scope.school_year != context.school_year || scope.subject_id != context.subject_id {
-            return Err(AppError::Validation(
-                "Source scope does not match this class's subject and school year. Review the reference before saving".into(),
-            ));
-        }
+    if let Some(source) = source.as_ref() {
+        validate_source_scope(source, Some(&context))?;
     }
     let source_json = source
         .as_ref()
@@ -348,11 +377,7 @@ pub fn find_by_id_in_school(
     id: &str,
 ) -> AppResult<Option<LessonPlan>> {
     conn.query_row(
-        "SELECT id, school_id, teaching_assignment_id, plan_date, \
-                learning_competency, learning_competency_code, learning_objectives, \
-                connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
-         FROM lesson_plans WHERE id = ?1 AND school_id = ?2",
+        &format!("{PLAN_SELECT} WHERE lp.id = ?1 AND lp.school_id = ?2"),
         (id, school_id),
         row_to_plan,
     )
@@ -370,12 +395,9 @@ pub fn find_by_assignment_and_date(
     plan_date: &str,
 ) -> AppResult<Option<LessonPlan>> {
     conn.query_row(
-        "SELECT id, school_id, teaching_assignment_id, plan_date, \
-                learning_competency, learning_competency_code, learning_objectives, \
-                connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
-         FROM lesson_plans \
-         WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND plan_date = ?3",
+        &format!(
+            "{PLAN_SELECT} WHERE lp.school_id = ?1 AND lp.teaching_assignment_id = ?2 AND lp.plan_date = ?3"
+        ),
         (school_id, teaching_assignment_id, plan_date),
         row_to_plan,
     )
@@ -394,16 +416,118 @@ pub fn list_by_assignment(
     school_id: &str,
     teaching_assignment_id: &str,
 ) -> AppResult<Vec<LessonPlan>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, school_id, teaching_assignment_id, plan_date, \
-                learning_competency, learning_competency_code, learning_objectives, \
-                connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
-         FROM lesson_plans \
-         WHERE school_id = ?1 AND teaching_assignment_id = ?2 \
-         ORDER BY plan_date DESC",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "{PLAN_SELECT} WHERE lp.school_id = ?1 AND lp.teaching_assignment_id = ?2 \
+         ORDER BY lp.plan_date DESC"
+    ))?;
     let rows = stmt.query_map((school_id, teaching_assignment_id), row_to_plan)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+const PLAN_SELECT: &str = "SELECT lp.id, lp.school_id, lp.teaching_assignment_id, lp.plan_date, \
+    lp.learning_competency, lp.learning_competency_code, lp.learning_objectives, \
+    lp.connection_to_previous_learning, lp.learning_experiences, lp.assessment, \
+    lp.ways_forward, lp.created_by_user_id, lp.created_at, lp.updated_at, \
+    lp.teaching_context_json, \
+    COALESCE((SELECT a.new_source_reference_json FROM lesson_source_amendments a \
+      WHERE a.school_id = lp.school_id AND a.lesson_plan_id = lp.id \
+      ORDER BY a.created_at DESC, a.id DESC LIMIT 1), lp.source_reference_json) \
+    FROM lesson_plans lp";
+
+/// Appends a source correction and returns the lesson with its new effective source.
+/// The original declaration remains immutable and every superseded value is retained.
+pub fn amend_source_authorized(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+    lesson_plan_id: &str,
+    expected_assignment_id: &str,
+    new_source_reference: &LessonSourceReference,
+    reason: &str,
+) -> AppResult<Option<LessonPlan>> {
+    let plan =
+        find_by_id_in_school(conn, school_id, lesson_plan_id)?.ok_or(AppError::Unauthorized)?;
+    if plan.teaching_assignment_id != expected_assignment_id {
+        return Err(AppError::Unauthorized);
+    }
+    authorize_own_assignment(conn, user_id, school_id, &plan.teaching_assignment_id)?;
+    let source = new_source_reference.normalized()?;
+    validate_source_scope(&source, plan.teaching_context.as_ref())?;
+    let reason = reason.trim();
+    if reason.is_empty() || reason.chars().count() > 1000 {
+        return Err(AppError::Validation(
+            "Source correction reason is required and limited to 1000 characters".into(),
+        ));
+    }
+    if plan.source_reference.as_ref() == Some(&source) {
+        return Err(AppError::Validation(
+            "Source correction must change at least one source field".into(),
+        ));
+    }
+    let previous_json = plan
+        .source_reference
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|_| AppError::Validation("Previous source reference could not be saved".into()))?;
+    let new_json = serde_json::to_string(&source)
+        .map_err(|_| AppError::Validation("Source correction could not be saved".into()))?;
+    let id = Uuid::now_v7().to_string();
+    conn.execute(
+        "INSERT INTO lesson_source_amendments \
+         (id, school_id, lesson_plan_id, previous_source_reference_json, \
+          new_source_reference_json, reason, amended_by_user_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            id,
+            school_id,
+            lesson_plan_id,
+            previous_json,
+            new_json,
+            reason,
+            user_id
+        ],
+    )?;
+    find_by_id_in_school(conn, school_id, lesson_plan_id)
+}
+
+pub fn list_source_amendments(
+    conn: &Connection,
+    school_id: &str,
+    lesson_plan_id: &str,
+) -> AppResult<Vec<LessonSourceAmendment>> {
+    let mut stmt = conn.prepare(
+        "SELECT a.id, a.lesson_plan_id, a.previous_source_reference_json, \
+                a.new_source_reference_json, a.reason, a.amended_by_user_id, \
+                u.display_name, a.created_at \
+         FROM lesson_source_amendments a \
+         LEFT JOIN users u ON u.id = a.amended_by_user_id \
+         WHERE a.school_id = ?1 AND a.lesson_plan_id = ?2 \
+         ORDER BY a.created_at DESC, a.id DESC",
+    )?;
+    let rows = stmt.query_map((school_id, lesson_plan_id), |row| {
+        let previous_json: Option<String> = row.get(2)?;
+        let new_json: String = row.get(3)?;
+        let parse = |index, json: String| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    index,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        };
+        Ok(LessonSourceAmendment {
+            id: row.get(0)?,
+            lesson_plan_id: row.get(1)?,
+            previous_source_reference: previous_json.map(|json| parse(2, json)).transpose()?,
+            new_source_reference: parse(3, new_json)?,
+            reason: row.get(4)?,
+            amended_by_user_id: row.get(5)?,
+            amended_by_name: row.get(6)?,
+            created_at: row.get(7)?,
+        })
+    })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
@@ -1008,5 +1132,199 @@ mod tests {
         let result = authorize_view(&conn, &head.id, &other_school.id, &f.assignment_id);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn source_amendments_preserve_lineage_and_resolve_the_latest_reference() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap();
+        let original = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:one".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: Some(LessonSourceScope {
+                school_year: "2026-2027".into(),
+                subject_id: assignment.subject_id.clone(),
+            }),
+        };
+        let plan = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&original),
+        )
+        .unwrap()
+        .unwrap();
+        let second = LessonSourceReference {
+            version: "v2".into(),
+            citation: "fixture:two".into(),
+            ..original.clone()
+        };
+        let amended = amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &second,
+            " Corrected the revision and location. ",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(amended.source_reference.as_ref(), Some(&second));
+
+        let third = LessonSourceReference {
+            version: "v3".into(),
+            ..second.clone()
+        };
+        amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &third,
+            "Publisher issued a newer revision.",
+        )
+        .unwrap();
+        let history = list_source_amendments(&conn, &f.school_id, &plan.id).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].previous_source_reference.as_ref(), Some(&second));
+        assert_eq!(history[0].new_source_reference, third);
+        assert_eq!(
+            history[1].previous_source_reference.as_ref(),
+            Some(&original)
+        );
+        assert_eq!(history[1].new_source_reference, second);
+        assert_eq!(history[1].reason, "Corrected the revision and location.");
+        assert_eq!(history[1].amended_by_name.as_deref(), Some("Teacher A"));
+
+        let original_json: String = conn
+            .query_row(
+                "SELECT source_reference_json FROM lesson_plans WHERE id = ?1",
+                [&plan.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<LessonSourceReference>(&original_json).unwrap(),
+            original
+        );
+        assert!(conn
+            .execute(
+                "UPDATE lesson_source_amendments SET reason = 'rewritten' WHERE id = ?1",
+                [&history[0].id]
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                "DELETE FROM lesson_source_amendments WHERE id = ?1",
+                [&history[0].id]
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn source_amendment_rejects_wrong_owner_noop_reason_and_historical_scope_mismatch() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let plan = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        let context = plan.teaching_context.as_ref().unwrap();
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:one".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: Some(LessonSourceScope {
+                school_year: context.school_year.clone(),
+                subject_id: context.subject_id.clone(),
+            }),
+        };
+        let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();
+        assert!(matches!(
+            amend_source_authorized(
+                &conn,
+                &other.id,
+                &f.school_id,
+                &plan.id,
+                &f.assignment_id,
+                &source,
+                "Correction"
+            ),
+            Err(AppError::Unauthorized)
+        ));
+        assert!(amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &source,
+            " "
+        )
+        .is_err());
+        amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &source,
+            "Added the missing source declaration",
+        )
+        .unwrap();
+        assert!(amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &source,
+            "No actual change"
+        )
+        .is_err());
+        let wrong_scope = LessonSourceReference {
+            scope: Some(LessonSourceScope {
+                school_year: "2027-2028".into(),
+                subject_id: context.subject_id.clone(),
+            }),
+            ..source
+        };
+        assert!(amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &wrong_scope,
+            "Wrong year"
+        )
+        .is_err());
+        assert_eq!(
+            list_source_amendments(&conn, &f.school_id, &plan.id)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

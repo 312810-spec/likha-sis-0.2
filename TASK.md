@@ -1,29 +1,35 @@
 # Current task — CTOS v3
 
-## Active slice — source references
+## Active slice — source provenance amendments
 
-PR111 remains draft: native CI found a missing-parent legacy fixture; repair
-`aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998` is published and rerunning.
-The source-reference slice is stacked on it. Read
-`docs/ctos/checkpoints/m10-source-reference-2026-10-13.md` next. Merge only
-at verified passing heads; retarget the child after PR111 merges.
+PR112 merged as `c18383d442af3bd3cdbbe80b15605eab68ff19a9` from verified
+head `f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7`. PR113 passed Quality
+and Security at `240c97ad125c0e396a20e318e246c99b0b8bcfb1`, then merged as
+`4c365f117846ad1bd724d5189816f97676a9d794`.
+
+The next slice is implemented through `7f9909788e3cff97c8021c67750c940087bf8893`:
+append-only lesson source corrections preserve previous/new metadata, reason,
+authenticated teacher and timestamp. Read
+`docs/ctos/checkpoints/m10-source-amendments-2026-10-13.md` next. It is reconciled
+to main at `58d554997fe228b5dcc5386023b9090b096e2184` without changing the
+candidate tree. Publish with an expected-head lease and require exact-source
+Quality/Security before merge.
 
 ## Current continuation — 13 October 2026
 
 PR111 merged as `6725ed6998299e05a3fe5ad78934c74c8d61cc95` from
 `aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998` after Quality/Security PASS.
-PR112 is on main; native formatting repaired at `4bbbb9348e02511d6bffa8eb0becfc84e4a534af`,
-checkpoint head `f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7`.
-Security PASS; Quality running at last inspection. Inspect live heads before merge.
+PR112 merged as `c18383d442af3bd3cdbbe80b15605eab68ff19a9` from checkpoint
+head `f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7` after exact-head gates passed.
 
-Next isolated candidate: teacher-declared source subject/year scope with canonical
-native mismatch rejection, retained drafts, immutable saved scope and truthful
-unknown/declared labels. See `docs/ctos/checkpoints/m10-source-scope-2026-10-13.md`.
-Publish/reconcile its exact-source CI before merging; if stacked, retarget after PR112.
-Then continue canonical term/cohort applicability, explicit provenance amendments,
-verified source ingestion and teacher-confirmed AI drafts. Existing classroom target
-seeding already exists; inspect it before adding linkage. Device/professional
-acceptance and broader batches B–G remain incomplete; no deployment.
+PR113 adds teacher-declared source subject/year scope with canonical native mismatch
+rejection, retained drafts, immutable saved scope and truthful unknown/declared
+labels. See `docs/ctos/checkpoints/m10-source-scope-2026-10-13.md`. Its child adds
+append-only provenance amendments; see the active-slice checkpoint above. After both
+pass exact-source CI and merge in order, continue verified source ingestion and
+teacher-confirmed AI drafts. Term/cohort authority, approved sources, installed-device
+evidence and professional acceptance remain external. Broader batches B–G are
+incomplete; no deployment.
 
 ## Latest continuation — FORGE audit implementation completed, 12 October 2026
 

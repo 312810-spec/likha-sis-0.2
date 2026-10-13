@@ -116,7 +116,21 @@ try {
   await page.getByRole("button", { name: "Retry lesson plans", exact: true }).waitFor();
   await inspect(page, "lesson-confirmed-refresh-failure");
   await page.getByRole("button", { name: "Retry lesson plans", exact: true }).click();
-  await page.getByRole("button", { name: "Edit", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByText("Curriculum / BOW source reference", { exact: true }).click();
+  await page.getByRole("button", { name: "Correct source reference", exact: true }).click();
+  await page.getByLabel("Source title", { exact: true }).fill("Synthetic BOW");
+  await page.getByLabel("Source version / revision", { exact: true }).fill("v1");
+  await page.getByLabel("Source citation / location", { exact: true }).fill("fixture:bow-v1");
+  await page.getByLabel("Curriculum name", { exact: true }).fill("Synthetic curriculum");
+  await page.getByLabel("Applicable term", { exact: true }).fill("Term A");
+  await page
+    .getByLabel("Reason for correction", { exact: true })
+    .fill("Added the teacher's source declaration");
+  await page.getByRole("button", { name: "Save source correction", exact: true }).click();
+  await page.getByText(/Source correction saved with an append-only reason/).waitFor();
+  await page.getByText("Unknown source → v1", { exact: true }).waitFor();
+  await inspect(page, "lesson-source-amendment");
   await open(page, "schedule-planner", "refresh-error");
   const generate = page.getByRole("button", { name: "Generate plan", exact: true });
   await generate.click();
