@@ -1,5 +1,5 @@
 import { ValidationError } from "../domain/errors";
-import type { LessonPlan, LessonPlanFields } from "../domain/lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 
 const MAX_LONG_FIELD_LENGTH = 4000;
@@ -26,6 +26,7 @@ export class LessonPlanApplicationService {
     teachingAssignmentId: string,
     planDate: string,
     fields: LessonPlanFields,
+    sourceReference?: LessonSourceReference,
   ): Promise<LessonPlan | null> {
     const trimmedAssignmentId = teachingAssignmentId.trim();
     const trimmedDate = planDate.trim();
@@ -36,7 +37,10 @@ export class LessonPlanApplicationService {
       throw new ValidationError("Plan date is required.");
     }
     const trimmedFields = validateAndTrimFields(fields);
-    return this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields);
+    const source = sourceReference ? trimSource(sourceReference) : undefined;
+    return source
+      ? this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields, source)
+      : this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields);
   }
 
   async update(
@@ -117,4 +121,23 @@ function fieldLabel(key: string): string {
     default:
       return key;
   }
+}
+
+function trimSource(source: LessonSourceReference): LessonSourceReference | undefined {
+  const trimmed = {
+    title: source.title.trim(),
+    version: source.version.trim(),
+    citation: source.citation.trim(),
+    curriculumName: source.curriculumName.trim(),
+    term: source.term.trim(),
+  };
+  if (Object.values(trimmed).every((value) => value.length === 0)) return undefined;
+  for (const [label, value] of Object.entries(trimmed)) {
+    if (!value || value.length > MAX_LONG_FIELD_LENGTH) {
+      throw new ValidationError(
+        `Source ${label} is required and must be at most ${MAX_LONG_FIELD_LENGTH} characters.`,
+      );
+    }
+  }
+  return trimmed;
 }

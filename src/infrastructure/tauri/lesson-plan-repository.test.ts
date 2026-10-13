@@ -31,6 +31,23 @@ const PLAN: LessonPlan = {
 };
 
 describe("TauriLessonPlanRepository", () => {
+  it("passes source metadata only on creation, without changing authorization parameters", async () => {
+    const source = {
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+    };
+    mockInvoke.mockResolvedValueOnce({ ...PLAN, sourceReference: source });
+    await new TauriLessonPlanRepository().create("ta-1", "2026-09-07", FIELDS, source);
+    expect(mockInvoke).toHaveBeenLastCalledWith("create_lesson_plan", {
+      teachingAssignmentId: "ta-1",
+      planDate: "2026-09-07",
+      ...FIELDS,
+      sourceReference: source,
+    });
+  });
   it("create invokes create_lesson_plan with the assignment, date, and every field", async () => {
     mockInvoke.mockResolvedValueOnce(PLAN);
 

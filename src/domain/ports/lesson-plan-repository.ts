@@ -1,4 +1,4 @@
-import type { LessonPlan, LessonPlanFields } from "../lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../lesson-plan";
 
 /**
  * Port for the structured lesson-plan builder (Creation Studio sub-scope
@@ -12,6 +12,7 @@ export interface LessonPlanRepository {
     teachingAssignmentId: string,
     planDate: string,
     fields: LessonPlanFields,
+    sourceReference?: LessonSourceReference,
   ): Promise<LessonPlan | null>;
   update(
     id: string,

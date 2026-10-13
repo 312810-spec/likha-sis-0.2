@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import type { LessonPlanApplicationService } from "../application/lesson-plan-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { LessonPlan, LessonPlanFields } from "../domain/lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { ValidationError } from "../domain/errors";
 import { Alert } from "./components/Alert";
@@ -71,7 +71,7 @@ function LessonPlanWorkspace({
         drafts: {} as Record<string, LessonDraft>,
       },
   );
-  const { assignmentId, planDate, editingPlanId, fields } = workspace.active;
+  const { assignmentId, planDate, editingPlanId, fields, sourceReference } = workspace.active;
   const currentAssignment = useRef(assignmentId);
   useEffect(() => {
     currentAssignment.current = assignmentId;
@@ -202,6 +202,7 @@ function LessonPlanWorkspace({
       assignmentId,
       planDate: plan.planDate,
       editingPlanId: plan.id,
+      sourceReference: plan.sourceReference ?? undefined,
       fields: {
         learningCompetency: plan.learningCompetency,
         learningCompetencyCode: plan.learningCompetencyCode,
@@ -246,7 +247,7 @@ function LessonPlanWorkspace({
     try {
       const result = editingPlanId
         ? await lessonPlanService.update(editingPlanId, assignmentId, fields)
-        : await lessonPlanService.create(assignmentId, planDate, fields);
+        : await lessonPlanService.create(assignmentId, planDate, fields, sourceReference);
       if (lessonDraftEpoch() !== epoch) return;
       if (!alive.current) {
         // A completed local write must not become a resubmission draft after navigation.
@@ -256,14 +257,21 @@ function LessonPlanWorkspace({
           delete drafts[lessonDraftKey(submitted)];
           const sameSubmission =
             lessonDraftKey(retained.active) === lessonDraftKey(submitted) &&
-            JSON.stringify(retained.active.fields) === JSON.stringify(submitted.fields);
+            JSON.stringify(retained.active.fields) === JSON.stringify(submitted.fields) &&
+            JSON.stringify(retained.active.sourceReference) ===
+              JSON.stringify(submitted.sourceReference);
           retainLessonWorkspace(
             owner,
             {
               drafts,
               confirmation: `Lesson plan ${submitted.editingPlanId ? "updated" : "saved"} on this device for ${submitted.planDate}.`,
               active: sameSubmission
-                ? { ...retained.active, editingPlanId: null, fields: EMPTY_FIELDS }
+                ? {
+                    ...retained.active,
+                    editingPlanId: null,
+                    fields: EMPTY_FIELDS,
+                    sourceReference: undefined,
+                  }
                 : retained.active,
             },
             epoch,
@@ -290,7 +298,15 @@ function LessonPlanWorkspace({
         delete drafts[lessonDraftKey(submitted)];
         if (lessonDraftKey(current.active) !== lessonDraftKey(submitted))
           return { ...current, drafts };
-        return { drafts, active: { ...submitted, fields: EMPTY_FIELDS, editingPlanId: null } };
+        return {
+          drafts,
+          active: {
+            ...submitted,
+            fields: EMPTY_FIELDS,
+            editingPlanId: null,
+            sourceReference: undefined,
+          },
+        };
       });
       const refreshed = await lessonPlanService.listByAssignment(submitted.assignmentId);
       if (alive.current && currentAssignment.current === submitted.assignmentId) {
@@ -401,6 +417,50 @@ function LessonPlanWorkspace({
               />
             </div>
           </div>
+
+          <details>
+            <summary>Curriculum / BOW source reference</summary>
+            <p className="muted">
+              Optional teacher-provided reference, saved with this lesson's class context. It is not
+              officially verified and stays fixed after creation.
+            </p>
+            {(
+              [
+                ["title", "Source title"],
+                ["version", "Source version / revision"],
+                ["citation", "Source citation / location"],
+                ["curriculumName", "Curriculum name"],
+                ["term", "Applicable term"],
+              ] as const
+            ).map(([key, label]) => (
+              <div className="field" key={key}>
+                <label htmlFor={`lesson-source-${key}`}>{label}</label>
+                <input
+                  id={`lesson-source-${key}`}
+                  value={sourceReference?.[key] ?? ""}
+                  maxLength={4000}
+                  disabled={saving || editingPlanId !== null}
+                  onChange={(event) =>
+                    changeWorkspace((current) => ({
+                      ...current,
+                      active: {
+                        ...current.active,
+                        sourceReference: {
+                          title: "",
+                          version: "",
+                          citation: "",
+                          curriculumName: "",
+                          term: "",
+                          ...current.active.sourceReference,
+                          [key]: event.target.value,
+                        } satisfies LessonSourceReference,
+                      },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </details>
 
           <h3>Intentions</h3>
           <div className="field">

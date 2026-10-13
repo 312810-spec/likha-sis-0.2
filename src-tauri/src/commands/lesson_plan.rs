@@ -6,7 +6,7 @@ use tauri::State;
 use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
-use crate::repository::lesson_plan::{self, LessonPlan, LessonPlanFields};
+use crate::repository::lesson_plan::{self, LessonPlan, LessonPlanFields, LessonSourceReference};
 
 /// Every command in this file gates on `lesson_plan::authorize_own_assignment`
 /// (create/update) or `lesson_plan::authorize_view` (read) -- the caller
@@ -33,11 +33,12 @@ pub fn create_lesson_plan(
     learning_experiences: String,
     assessment: String,
     ways_forward: String,
+    source_reference: Option<LessonSourceReference>,
 ) -> AppResult<Option<LessonPlan>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     lesson_plan::authorize_own_assignment(&conn, &user_id, &school_id, &teaching_assignment_id)?;
-    lesson_plan::create(
+    lesson_plan::create_with_source(
         &conn,
         &school_id,
         &teaching_assignment_id,
@@ -52,6 +53,7 @@ pub fn create_lesson_plan(
             assessment: &assessment,
             ways_forward: &ways_forward,
         },
+        source_reference.as_ref(),
     )
 }
 

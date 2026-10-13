@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { LessonPlan, LessonPlanFields } from "../domain/lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import { LessonPlanApplicationService } from "./lesson-plan-service";
 
@@ -30,6 +30,7 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     teachingAssignmentId: string;
     planDate: string;
     fields: LessonPlanFields;
+    sourceReference?: LessonSourceReference;
   }> = [];
   updateCalls: Array<{
     id: string;
@@ -44,8 +45,14 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     teachingAssignmentId: string,
     planDate: string,
     fields: LessonPlanFields,
+    sourceReference?: LessonSourceReference,
   ): Promise<LessonPlan | null> {
-    this.createCalls.push({ teachingAssignmentId, planDate, fields });
+    this.createCalls.push({
+      teachingAssignmentId,
+      planDate,
+      fields,
+      ...(sourceReference ? { sourceReference } : {}),
+    });
     return this.createResult;
   }
 
@@ -64,6 +71,40 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("stores a trimmed declared source version only when every source field is supplied", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const source = {
+      title: " Synthetic BOW ",
+      version: " v1 ",
+      citation: " fixture:bow ",
+      curriculumName: " Synthetic curriculum ",
+      term: " Term A ",
+    };
+    await service.create("ta-1", "2026-09-07", VALID_FIELDS, source);
+    expect(repo.createCalls[0]?.sourceReference).toEqual({
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+    });
+    await expect(
+      service.create("ta-1", "2026-09-08", VALID_FIELDS, { ...source, version: " " }),
+    ).rejects.toThrow(ValidationError);
+    expect(repo.createCalls).toHaveLength(1);
+  });
+  it("allows unknown source metadata without making a source claim", async () => {
+    const repo = new FakeLessonPlanRepository();
+    await new LessonPlanApplicationService(repo).create("ta-1", "2026-09-07", VALID_FIELDS, {
+      title: " ",
+      version: "",
+      citation: "",
+      curriculumName: "",
+      term: "",
+    });
+    expect(repo.createCalls[0]?.sourceReference).toBeUndefined();
+  });
   it("trims and forwards fields to create", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);

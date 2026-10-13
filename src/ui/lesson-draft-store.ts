@@ -1,10 +1,11 @@
-import type { LessonPlanFields } from "../domain/lesson-plan";
+import type { LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
 
 export interface LessonDraft {
   assignmentId: string;
   planDate: string;
   editingPlanId: string | null;
   fields: LessonPlanFields;
+  sourceReference?: LessonSourceReference;
 }
 interface Workspace {
   confirmation?: string;
