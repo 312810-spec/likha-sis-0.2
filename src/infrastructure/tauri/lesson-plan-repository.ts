@@ -1,4 +1,4 @@
-import type { LessonPlan, LessonPlanFields } from "../../domain/lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../../domain/lesson-plan";
 import type { LessonPlanRepository } from "../../domain/ports/lesson-plan-repository";
 import { invoke } from "./invoke";
 
@@ -9,11 +9,13 @@ export class TauriLessonPlanRepository implements LessonPlanRepository {
     teachingAssignmentId: string,
     planDate: string,
     fields: LessonPlanFields,
+    sourceReference?: LessonSourceReference,
   ): Promise<LessonPlan | null> {
     return invoke<LessonPlan | null>("create_lesson_plan", {
       teachingAssignmentId,
       planDate,
       ...fields,
+      ...(sourceReference ? { sourceReference } : {}),
     });
   }
 

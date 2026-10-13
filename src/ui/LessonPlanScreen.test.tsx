@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LessonPlanApplicationService } from "../application/lesson-plan-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { LessonPlan, LessonPlanFields } from "../domain/lesson-plan";
+import type { LessonPlan, LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
@@ -45,6 +45,7 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     teachingAssignmentId: string;
     planDate: string;
     fields: LessonPlanFields;
+    sourceReference?: LessonSourceReference;
   }> = [];
   createResult: LessonPlan | null = PLAN;
 
@@ -54,8 +55,14 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     teachingAssignmentId: string,
     planDate: string,
     fields: LessonPlanFields,
+    sourceReference?: LessonSourceReference,
   ): Promise<LessonPlan | null> {
-    this.createCalls.push({ teachingAssignmentId, planDate, fields });
+    this.createCalls.push({
+      teachingAssignmentId,
+      planDate,
+      fields,
+      ...(sourceReference ? { sourceReference } : {}),
+    });
     if (this.createResult) this.plans = [...this.plans, this.createResult];
     return this.createResult;
   }
@@ -150,6 +157,28 @@ function renderScreen(
 
 describe("LessonPlanScreen", () => {
   beforeEach(() => clearLessonDrafts());
+  it("retains declared source drafts and locks an existing plan's source", async () => {
+    const source = {
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+    };
+    const repo = new FakeLessonPlanRepository([{ ...PLAN, sourceReference: source }]);
+    const first = renderScreen(repo);
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Curriculum / BOW source reference"));
+    await user.type(screen.getByLabelText("Source title"), "Draft reference");
+    first.unmount();
+    renderScreen(repo);
+    await user.click(await screen.findByText("Curriculum / BOW source reference"));
+    expect(screen.getByLabelText("Source title")).toHaveValue("Draft reference");
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Source title")).toHaveValue("Synthetic BOW");
+    expect(screen.getByLabelText("Source title")).toBeDisabled();
+    expect(screen.getByLabelText("Applicable term")).toHaveValue("Term A");
+  });
   it("shows captured class context rather than the assignment's current values", async () => {
     renderScreen(
       new FakeLessonPlanRepository([

@@ -1,3 +1,12 @@
+/** Teacher-provided source metadata; not a claim of official verification. */
+export interface LessonSourceReference {
+  title: string;
+  version: string;
+  citation: string;
+  curriculumName: string;
+  term: string;
+}
+
 /** Class context captured at creation; absent for plans saved before context capture. */
 interface LessonTeachingContext {
   schoolYear: string;
@@ -25,6 +34,7 @@ export interface LessonPlan {
   teachingAssignmentId: string;
   planDate: string;
   teachingContext?: LessonTeachingContext | null;
+  sourceReference?: LessonSourceReference | null;
   /** Intentions: the DepEd learning competency text (from the MATATAG
    * Curriculum Guide). */
   learningCompetency: string;

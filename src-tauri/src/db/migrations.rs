@@ -2448,6 +2448,19 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: optional teacher-provided source revision; never backfill a claim.
+        ALTER TABLE lesson_plans ADD COLUMN source_reference_json TEXT
+            CHECK (source_reference_json IS NULL OR json_valid(source_reference_json));
+        CREATE TRIGGER lesson_plan_source_immutable
+        BEFORE UPDATE OF source_reference_json ON lesson_plans
+        WHEN NEW.source_reference_json IS NOT OLD.source_reference_json
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson source reference is immutable');
+        END;
+        "#,
+        ),
     ])
 }
 

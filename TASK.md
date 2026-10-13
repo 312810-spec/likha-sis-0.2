@@ -1,5 +1,13 @@
 # Current task — CTOS v3
 
+## Active slice — source references
+
+PR111 remains draft: native CI found a missing-parent legacy fixture; repair
+`aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998` is published and rerunning.
+The source-reference slice is stacked on it. Read
+`docs/ctos/checkpoints/m10-source-reference-2026-10-13.md` next. Merge only
+at verified passing heads; retarget the child after PR111 merges.
+
 ## Current continuation — 13 October 2026
 
 PR109 merged at `fb928015fcbc2b8a427bb6fc4a218346eca97fdf` from verified head

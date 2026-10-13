@@ -22,6 +22,7 @@ pub struct LessonPlan {
     pub teaching_assignment_id: String,
     pub plan_date: String,
     pub teaching_context: Option<LessonTeachingContext>,
+    pub source_reference: Option<LessonSourceReference>,
     pub learning_competency: String,
     pub learning_competency_code: String,
     pub learning_objectives: String,
@@ -45,6 +46,43 @@ pub struct LessonTeachingContext {
     pub section_name: String,
     pub subject_id: String,
     pub subject_name: String,
+}
+
+/// Teacher-provided declaration, not verified official curriculum metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonSourceReference {
+    pub title: String,
+    pub version: String,
+    pub citation: String,
+    pub curriculum_name: String,
+    pub term: String,
+}
+
+impl LessonSourceReference {
+    fn normalized(&self) -> AppResult<Self> {
+        let source = Self {
+            title: self.title.trim().into(),
+            version: self.version.trim().into(),
+            citation: self.citation.trim().into(),
+            curriculum_name: self.curriculum_name.trim().into(),
+            term: self.term.trim().into(),
+        };
+        for value in [
+            &source.title,
+            &source.version,
+            &source.citation,
+            &source.curriculum_name,
+            &source.term,
+        ] {
+            if value.is_empty() || value.chars().count() > 4000 {
+                return Err(AppError::Validation(
+                    "Source reference fields are required and limited to 4000 characters".into(),
+                ));
+            }
+        }
+        Ok(source)
+    }
 }
 
 /// The exact fields a teacher supplies from the authoring screen --
@@ -128,6 +166,32 @@ pub fn create(
     created_by_user_id: &str,
     fields: &LessonPlanFields<'_>,
 ) -> AppResult<Option<LessonPlan>> {
+    create_with_source(
+        conn,
+        school_id,
+        teaching_assignment_id,
+        plan_date,
+        created_by_user_id,
+        fields,
+        None,
+    )
+}
+
+pub fn create_with_source(
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    plan_date: &str,
+    created_by_user_id: &str,
+    fields: &LessonPlanFields<'_>,
+    source_reference: Option<&LessonSourceReference>,
+) -> AppResult<Option<LessonPlan>> {
+    let source_json = source_reference
+        .map(|source| {
+            serde_json::to_string(&source.normalized()?)
+                .map_err(|_| AppError::Validation("Source reference could not be saved".into()))
+        })
+        .transpose()?;
     if teaching_assignment::find_by_id_in_school(conn, school_id, teaching_assignment_id)?.is_none()
     {
         return Ok(None);
@@ -163,8 +227,8 @@ pub fn create(
              (id, school_id, teaching_assignment_id, plan_date, \
               learning_competency, learning_competency_code, learning_objectives, \
               connection_to_previous_learning, learning_experiences, assessment, \
-              ways_forward, created_by_user_id, teaching_context_json) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+              ways_forward, created_by_user_id, teaching_context_json, source_reference_json) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         (
             &id,
             school_id,
@@ -179,6 +243,7 @@ pub fn create(
             fields.ways_forward,
             created_by_user_id,
             &context_json,
+            &source_json,
         ),
     )?;
 
@@ -248,7 +313,7 @@ pub fn find_by_id_in_school(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
          FROM lesson_plans WHERE id = ?1 AND school_id = ?2",
         (id, school_id),
         row_to_plan,
@@ -270,7 +335,7 @@ pub fn find_by_assignment_and_date(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
          FROM lesson_plans \
          WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND plan_date = ?3",
         (school_id, teaching_assignment_id, plan_date),
@@ -295,7 +360,7 @@ pub fn list_by_assignment(
         "SELECT id, school_id, teaching_assignment_id, plan_date, \
                 learning_competency, learning_competency_code, learning_objectives, \
                 connection_to_previous_learning, learning_experiences, assessment, \
-                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json \
+                ways_forward, created_by_user_id, created_at, updated_at, teaching_context_json, source_reference_json \
          FROM lesson_plans \
          WHERE school_id = ?1 AND teaching_assignment_id = ?2 \
          ORDER BY plan_date DESC",
@@ -317,12 +382,25 @@ fn row_to_plan(row: &rusqlite::Row) -> rusqlite::Result<LessonPlan> {
             })
         })
         .transpose()?;
+    let source_json: Option<String> = row.get(15)?;
+    let source_reference = source_json
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    15,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
     Ok(LessonPlan {
         id: row.get(0)?,
         school_id: row.get(1)?,
         teaching_assignment_id: row.get(2)?,
         plan_date: row.get(3)?,
         teaching_context,
+        source_reference,
         learning_competency: row.get(4)?,
         learning_competency_code: row.get(5)?,
         learning_objectives: row.get(6)?,
@@ -385,6 +463,69 @@ mod tests {
             assessment: "Exit ticket: 3 addition and 2 subtraction items",
             ways_forward: "Reteach denominators via LCD if exit ticket accuracy < 70%",
         }
+    }
+
+    #[test]
+    fn source_reference_is_normalized_and_preserved_during_content_updates() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let source = LessonSourceReference {
+            title: " Synthetic BOW ".into(),
+            version: " v1 ".into(),
+            citation: " fixture:bow ".into(),
+            curriculum_name: " Synthetic curriculum ".into(),
+            term: " Term A ".into(),
+        };
+        let created = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .unwrap();
+        let captured = created.source_reference.clone().unwrap();
+        assert_eq!(captured.title, "Synthetic BOW");
+        assert_eq!(captured.version, "v1");
+        assert_eq!(captured.term, "Term A");
+        let edited = update_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &created.id,
+            &f.assignment_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(edited.source_reference, created.source_reference);
+        assert!(conn
+            .execute(
+                "UPDATE lesson_plans SET source_reference_json = NULL WHERE id = ?1",
+                [&created.id]
+            )
+            .is_err());
+        let invalid = LessonSourceReference {
+            version: "".into(),
+            ..source
+        };
+        assert!(create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-08",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&invalid),
+        )
+        .is_err());
+        assert_eq!(
+            list_by_assignment(&conn, &f.school_id, &f.assignment_id).unwrap().len(),
+            1
+        );
     }
 
     #[test]
