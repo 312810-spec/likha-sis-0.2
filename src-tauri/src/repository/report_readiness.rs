@@ -88,7 +88,11 @@ pub fn check_report_card_draft_source_authorized(
 ) -> AppResult<Option<ReportCardDraftSourceCheck>> {
     let tx = conn.unchecked_transaction()?;
     let check = check_report_card_draft_source_in_snapshot(
-        &tx, actor_user_id, school_id, class_record_id, draft_id,
+        &tx,
+        actor_user_id,
+        school_id,
+        class_record_id,
+        draft_id,
     )?;
     tx.commit()?;
     Ok(check)

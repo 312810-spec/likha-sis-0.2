@@ -38,6 +38,14 @@ Branch: `ctos/m11-preparation-review-20261015`.
 
 ## Remaining
 
+PR130 initial published head `a8206a72fc444b409f9d4fba6f575876d2035c4c`
+had identical local/remote tree `f0c39805d3814987b87b19b911e29dff1502a670`.
+Quality run 38629394227 Ubuntu job 116076874149 failed at `cargo fmt --check`
+before tests. Applied its 20 exact formatter hunks across three native files;
+verified whitespace/trailing-comma-only equivalence. Native behavior is unchanged,
+but conservatively captured implementation fingerprints change. Documentation
+formatting PASS. Require fresh exact-head gates for the repair; no failure bypass.
+
 Require applicable exact-head Quality/Security before merge. Next: explicit review
 UI with uncertain-write handling, issuance revalidation, append-only amendments,
 cross-form reconciliation and remaining milestones in controlling order. Official

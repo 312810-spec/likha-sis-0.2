@@ -118,7 +118,11 @@ pub fn record_report_card_preparation_review(
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     crate::repository::report_preparation_review::record_authorized(
-        &conn, &user_id, &school_id, class_record_id.trim(), &request,
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+        &request,
     )
 }
 
@@ -131,7 +135,10 @@ pub fn list_recent_report_card_preparation_reviews(
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     crate::repository::report_preparation_review::list_recent_authorized(
-        &conn, &user_id, &school_id, class_record_id.trim(),
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
     )
 }
 
