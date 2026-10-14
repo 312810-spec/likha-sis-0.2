@@ -1,6 +1,17 @@
 # Current task — CTOS v3
 
-## Current active slice — local planning-draft review
+## Current active slice — stored source integrity
+
+PR117 passed Quality/Security at `a521f0ec55030d79e847f2622783e6414896010d`
+and merged as `10b189d26217de06e2d1397fd1b1ccbd2f6ee141`. Active branch:
+`ctos/m10-source-integrity-20261014`; read
+`docs/ctos/checkpoints/m10-source-integrity-2026-10-14.md` next. Source metadata
+reads and links verify stored bytes against their hash; the teacher can inspect
+file identity without an official-approval claim. Require exact-source gates before
+merge. Next: declared term/cohort applicability and durable draft-review lineage.
+Device, official-source and professional acceptance remain pending. No deployment.
+
+## Completed prior slice — local planning-draft review
 
 PR116 passed Quality/Security at `aa9eeb5cf26191ccc90d241c253cce07b3e8b974`
 and merged as `c2ccb996890474051c72e57e1fbd53c8792c7212`. New branch:

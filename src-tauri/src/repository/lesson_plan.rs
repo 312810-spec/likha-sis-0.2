@@ -157,12 +157,7 @@ fn validate_source_artifact(
     let Some(artifact_id) = source.artifact_id.as_deref() else {
         return Ok(());
     };
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM lesson_source_artifacts WHERE id = ?1 AND school_id = ?2)",
-        (artifact_id, school_id),
-        |row| row.get(0),
-    )?;
-    if !exists {
+    if find_source_artifact(conn, school_id, artifact_id)?.is_none() {
         return Err(AppError::Validation(
             "Attached source file does not belong to this school".into(),
         ));
@@ -199,10 +194,7 @@ pub fn ingest_source_artifact_authorized(
     ) {
         return Err(AppError::Validation("Unsupported source file type".into()));
     }
-    let sha256: String = Sha256::digest(content)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let sha256 = source_sha256(content);
     if let Some(mut existing) = find_source_artifact_by_hash(conn, school_id, &sha256)? {
         existing.already_imported = true;
         return Ok(existing);
@@ -249,34 +241,53 @@ fn find_source_artifact_where(
     predicate: &str,
     value: &str,
 ) -> AppResult<Option<LessonSourceArtifact>> {
-    conn.query_row(
-        &format!(
-            "SELECT a.id, a.file_name, a.media_type, a.byte_length, a.sha256, \
-                    a.ingested_by_user_id, u.display_name, a.created_at \
+    let stored = conn
+        .query_row(
+            &format!(
+                "SELECT a.id, a.file_name, a.media_type, a.byte_length, a.sha256, \
+                    a.ingested_by_user_id, u.display_name, a.created_at, a.content \
              FROM lesson_source_artifacts a \
              LEFT JOIN users u ON u.id = a.ingested_by_user_id \
              WHERE a.school_id = ?1 AND {predicate}"
-        ),
-        (school_id, value),
-        |row| {
-            Ok(LessonSourceArtifact {
-                id: row.get(0)?,
-                file_name: row.get(1)?,
-                media_type: row.get(2)?,
-                byte_length: row.get(3)?,
-                sha256: row.get(4)?,
-                ingested_by_user_id: row.get(5)?,
-                ingested_by_name: row.get(6)?,
-                created_at: row.get(7)?,
-                already_imported: false,
-            })
-        },
-    )
-    .map(Some)
-    .or_else(|error| match error {
-        rusqlite::Error::QueryReturnedNoRows => Ok(None),
-        other => Err(other.into()),
-    })
+            ),
+            (school_id, value),
+            |row| {
+                let artifact = LessonSourceArtifact {
+                    id: row.get(0)?,
+                    file_name: row.get(1)?,
+                    media_type: row.get(2)?,
+                    byte_length: row.get(3)?,
+                    sha256: row.get(4)?,
+                    ingested_by_user_id: row.get(5)?,
+                    ingested_by_name: row.get(6)?,
+                    created_at: row.get(7)?,
+                    already_imported: false,
+                };
+                let content: Vec<u8> = row.get(8)?;
+                Ok((artifact, content))
+            },
+        )
+        .map(Some)
+        .or_else(|error| match error {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(AppError::from(other)),
+        })?;
+    let Some((artifact, content)) = stored else {
+        return Ok(None);
+    };
+    if artifact.byte_length != content.len() as i64 || artifact.sha256 != source_sha256(&content) {
+        return Err(AppError::Validation(
+            "Stored source bytes do not match their recorded integrity identity".into(),
+        ));
+    }
+    Ok(Some(artifact))
+}
+
+fn source_sha256(content: &[u8]) -> String {
+    Sha256::digest(content)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn validate_source_scope(
@@ -1011,6 +1022,54 @@ mod tests {
             Some(&invalid),
         )
         .is_err());
+    }
+
+    #[test]
+    fn corrupt_source_identity_is_rejected_on_read_and_link() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        // Synthetic corruption fixture: valid FK parents and schema constraints,
+        // but metadata hash differs from content. No triggers or FKs are disabled.
+        conn.execute(
+            "INSERT INTO lesson_source_artifacts \
+             (id, school_id, file_name, media_type, byte_length, sha256, content, ingested_by_user_id) \
+             VALUES ('corrupt', ?1, 'synthetic.pdf', 'application/pdf', ?2, ?3, ?4, ?5)",
+            params![
+                &f.school_id,
+                8,
+                "0".repeat(64),
+                b"%PDF-1.7".as_slice(),
+                &f.teacher_id
+            ],
+        )
+        .unwrap();
+        assert!(find_source_artifact(&conn, &f.school_id, "corrupt").is_err());
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Term A".into(),
+            scope: None,
+            artifact_id: Some("corrupt".into()),
+        };
+        assert!(create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .is_err());
+        let other_school = school::create(&conn, "Synthetic Other School").unwrap();
+        assert!(find_source_artifact(&conn, &other_school.id, "corrupt")
+            .unwrap()
+            .is_none());
+        assert!(list_by_assignment(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
