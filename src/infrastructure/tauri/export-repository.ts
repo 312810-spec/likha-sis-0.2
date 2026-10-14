@@ -15,6 +15,7 @@ import type { ReportReadinessRepository } from "../../domain/ports/report-readin
 import type {
   ReportCardDraft,
   ReportCardDraftComparison,
+  ReportCardDraftSourceCheck,
   ReportCardReadiness,
 } from "../../domain/report-readiness";
 import type { ReportDraftRepository } from "../../domain/ports/report-draft-repository";
@@ -23,6 +24,15 @@ import type { ReportDraftRepository } from "../../domain/ports/report-draft-repo
 export class TauriExportRepository
   implements ExportRepository, ReportReadinessRepository, ReportDraftRepository
 {
+  checkReportCardDraftSource(
+    classRecordId: string,
+    draftId: string,
+  ): Promise<ReportCardDraftSourceCheck | null> {
+    return invoke<ReportCardDraftSourceCheck | null>("check_report_card_draft_source", {
+      classRecordId,
+      draftId,
+    });
+  }
   captureReportCardDraft(classRecordId: string): Promise<ReportCardDraft | null> {
     return invoke<ReportCardDraft | null>("capture_report_card_draft", { classRecordId });
   }

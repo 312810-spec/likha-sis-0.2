@@ -56,6 +56,7 @@ function setup(
     captureReportCardDraft,
     listRecentReportCardDrafts,
     compareReportCardDraft: vi.fn(),
+    checkReportCardDraftSource: vi.fn(),
   });
   const props = { service, classRecordId: "cr-1", revision: 0, disabled: false };
   const view = (changes: Partial<typeof props> = {}) => (

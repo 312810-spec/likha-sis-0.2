@@ -1,5 +1,20 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 readiness input evidence viewing
+
+PR128 passed Quality/Security at `03f221281258ef6ed80317872011216737456aaf`
+and merged as `5885032d1b66e8b0943f86eda42d38dc4b3c9bdd`. Active branch:
+`ctos/m11-source-check-ui-20261015`; read
+`docs/ctos/checkpoints/m11-source-check-ui-2026-10-15.md` next. Each retained draft
+offers an explicit native source check. Matches, changed inputs/implementation,
+legacy absence and unsupported protocol remain distinct; no raw learner input JSON
+crosses IPC, no write/review/approval occurs. A match is read-time evidence only.
+Require applicable verified-head Quality/Security before merge. Next implement
+atomic native review/issue with actual user confirmation and issue-time source
+revalidation, then append-only amendments and cross-form reconciliation. Never
+authorize issuance from this UI verdict or legacy/unsupported evidence. M10/M11
+and official-source/installed-device/professional acceptance incomplete. No deployment.
+
 ## Current active slice — M11 native readiness source fingerprints
 
 PR127 passed Quality/Security at `b3b93011267272aeb63bcb802ec618ae221825b8`

@@ -14,6 +14,7 @@ import type { ReportReadinessRepository } from "../domain/ports/report-readiness
 import type {
   ReportCardDraft,
   ReportCardDraftComparison,
+  ReportCardDraftSourceCheck,
   ReportCardReadiness,
 } from "../domain/report-readiness";
 import type { ReportDraftRepository } from "../domain/ports/report-draft-repository";
@@ -40,6 +41,17 @@ export class ExportApplicationService {
     if (!id) throw new ValidationError("Class record is required.");
     if (!this.drafts) throw new ValidationError("Reporting drafts are unavailable.");
     return this.drafts.captureReportCardDraft(id);
+  }
+
+  checkReportCardDraftSource(
+    classRecordId: string,
+    draftId: string,
+  ): Promise<ReportCardDraftSourceCheck | null> {
+    const record = classRecordId.trim();
+    const draft = draftId.trim();
+    if (!record || !draft) throw new ValidationError("Class record and draft are required.");
+    if (!this.drafts) throw new ValidationError("Reporting source check is unavailable.");
+    return this.drafts.checkReportCardDraftSource(record, draft);
   }
 
   compareReportCardDraft(

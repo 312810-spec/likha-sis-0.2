@@ -1,6 +1,16 @@
 import type { FieldDisclosure } from "./export";
 import type { ComputedTermGrade } from "./learner-score";
 
+/** Read-time local readiness evidence only; never review/issuance permission. */
+export interface ReportCardDraftSourceCheck {
+  draftId: string;
+  classRecordId: string;
+  sourceStatus: "matches" | "changed" | "legacy_unavailable" | "unsupported_version";
+  sourceVersion: string | null;
+  storedSourceSha256: string | null;
+  currentSourceSha256: string | null;
+}
+
 /** Native-retained preparation evidence, never reviewed or issued. */
 export interface ReportCardDraft {
   id: string;

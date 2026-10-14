@@ -120,12 +120,33 @@ class FakeExportRepository implements ExportRepository {
 }
 
 describe("ExportApplicationService", () => {
+  it("checks readiness inputs using trimmed identities and no client fingerprint or authority", async () => {
+    const checkReportCardDraftSource = vi.fn().mockResolvedValue(null);
+    const service = new ExportApplicationService(new FakeExportRepository(), undefined, {
+      captureReportCardDraft: vi.fn(),
+      listRecentReportCardDrafts: vi.fn(),
+      compareReportCardDraft: vi.fn(),
+      checkReportCardDraftSource,
+    });
+    expect(() => service.checkReportCardDraftSource(" ", "draft")).toThrow(ValidationError);
+    expect(() => service.checkReportCardDraftSource("record", " ")).toThrow(ValidationError);
+    expect(checkReportCardDraftSource).not.toHaveBeenCalled();
+    await expect(service.checkReportCardDraftSource(" record ", " draft ")).resolves.toBeNull();
+    expect(checkReportCardDraftSource).toHaveBeenCalledExactlyOnceWith("record", "draft");
+    expect(() =>
+      new ExportApplicationService(new FakeExportRepository()).checkReportCardDraftSource(
+        "record",
+        "draft",
+      ),
+    ).toThrow(ValidationError);
+  });
   it("validates and trims comparison identities without supplying authority or evidence", async () => {
     const compareReportCardDraft = vi.fn().mockResolvedValue(null);
     const service = new ExportApplicationService(new FakeExportRepository(), undefined, {
       captureReportCardDraft: vi.fn(),
       listRecentReportCardDrafts: vi.fn(),
       compareReportCardDraft,
+      checkReportCardDraftSource: vi.fn(),
     });
     expect(() => service.compareReportCardDraft(" ", "draft")).toThrow(ValidationError);
     expect(() => service.compareReportCardDraft("record", " ")).toThrow(ValidationError);
@@ -147,6 +168,7 @@ describe("ExportApplicationService", () => {
       captureReportCardDraft,
       listRecentReportCardDrafts,
       compareReportCardDraft: vi.fn(),
+      checkReportCardDraftSource: vi.fn(),
     });
     expect(() => service.captureReportCardDraft(" ")).toThrow(ValidationError);
     expect(() => service.listRecentReportCardDrafts(" ")).toThrow(ValidationError);

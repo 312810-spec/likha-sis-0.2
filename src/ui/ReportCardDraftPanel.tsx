@@ -5,6 +5,7 @@ import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 import { ReportCardDraftComparisonPanel } from "./ReportCardDraftComparisonPanel";
+import { ReportCardDraftSourcePanel } from "./ReportCardDraftSourcePanel";
 
 interface Props {
   service: ExportApplicationService;
@@ -222,6 +223,13 @@ export function ReportCardDraftPanel(props: Props) {
           <ReportCardDraftComparisonPanel
             service={service}
             draft={draft}
+            revision={revision}
+            disabled={disabled || busy}
+          />
+          <ReportCardDraftSourcePanel
+            service={service}
+            classRecordId={classRecordId}
+            draftId={draft.id}
             revision={revision}
             disabled={disabled || busy}
           />
