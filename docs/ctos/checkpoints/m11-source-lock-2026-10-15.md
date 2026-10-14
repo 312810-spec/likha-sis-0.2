@@ -70,6 +70,15 @@ authorization, professional approval, source verification or official fidelity.
 
 ## Continue
 
+At head `25dc1198a924371976703005ac9f98d53e0cb917`, Security `38605816054`
+and Windows native package/tests passed. Quality `38605815621` failed at Ubuntu
+job `115996355833` on `cargo fmt --check`: 18 layout hunks in the migration test
+and readiness implementation/tests. Applied exact formatter output, including two
+equivalent closure blocks, without grading/auth/SQL/retention behavior changes.
+The intentionally conservative implementation fingerprint changes with formatted
+source bytes; it is not falsely represented as identical. Require applicable
+Quality/Security at the repaired head before merge; no failed gate waived.
+
 Publish with expected-head lease and verify remote/local tree identity. Inspect
 failed excerpts and apply minimum repairs; merge only at applicable green verified
 head. Expose source-check states next, then atomic native review/issue semantics,

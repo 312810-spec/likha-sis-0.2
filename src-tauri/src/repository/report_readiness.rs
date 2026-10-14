@@ -124,8 +124,9 @@ pub fn check_report_card_draft_source_authorized(
                 "Stored reporting source integrity check failed".into(),
             ));
         }
-        let source: serde_json::Value = serde_json::from_str(&source_json)
-            .map_err(|_| AppError::Validation("Stored reporting source could not be read".into()))?;
+        let source: serde_json::Value = serde_json::from_str(&source_json).map_err(|_| {
+            AppError::Validation("Stored reporting source could not be read".into())
+        })?;
         if source["schoolId"].as_str() != Some(school_id)
             || source["classRecordId"].as_str() != Some(class_record_id)
             || source["version"].as_str() != Some(version.as_str())
@@ -634,12 +635,19 @@ mod tests {
         );
         assert_eq!(same.stored_snapshot_sha256, draft.snapshot_sha256);
         let source_check = check_report_card_draft_source_authorized(
-            &conn, &teacher.id, &school.id, &record.id, &draft.id,
+            &conn,
+            &teacher.id,
+            &school.id,
+            &record.id,
+            &draft.id,
         )
         .unwrap()
         .unwrap();
         assert_eq!(source_check.source_status, "matches");
-        assert_eq!(source_check.stored_source_sha256, source_check.current_source_sha256);
+        assert_eq!(
+            source_check.stored_source_sha256,
+            source_check.current_source_sha256
+        );
         assert_eq!(conn.total_changes(), changes);
         assert!(compare_report_card_draft_authorized(
             &conn,
@@ -694,7 +702,11 @@ mod tests {
         assert_eq!(changed.stored_snapshot_sha256, draft.snapshot_sha256);
         assert_eq!(
             check_report_card_draft_source_authorized(
-                &conn, &teacher.id, &school.id, &record.id, &draft.id,
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &draft.id,
             )
             .unwrap()
             .unwrap()
@@ -752,23 +764,35 @@ mod tests {
         ));
         assert!(matches!(
             check_report_card_draft_source_authorized(
-                &conn, &outsider.id, &school.id, &record.id, &draft.id,
+                &conn,
+                &outsider.id,
+                &school.id,
+                &record.id,
+                &draft.id,
             ),
             Err(AppError::Unauthorized)
         ));
         assert!(check_report_card_draft_source_authorized(
-            &conn, &teacher.id, &foreign.id, &record.id, &draft.id,
+            &conn,
+            &teacher.id,
+            &foreign.id,
+            &record.id,
+            &draft.id,
         )
         .unwrap()
         .is_none());
-        assert!(conn.execute(
-            "UPDATE report_card_draft_source_locks SET source_json = '{}' WHERE draft_id = ?1",
-            params![draft.id],
-        ).is_err());
-        assert!(conn.execute(
-            "DELETE FROM report_card_draft_source_locks WHERE draft_id = ?1",
-            params![draft.id],
-        ).is_err());
+        assert!(conn
+            .execute(
+                "UPDATE report_card_draft_source_locks SET source_json = '{}' WHERE draft_id = ?1",
+                params![draft.id],
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                "DELETE FROM report_card_draft_source_locks WHERE draft_id = ?1",
+                params![draft.id],
+            )
+            .is_err());
         conn.execute(
             "INSERT INTO report_card_drafts \
              (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
@@ -793,37 +817,58 @@ mod tests {
             "INSERT INTO report_card_drafts \
              (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
              VALUES ('legacy-draft', ?1, ?2, ?3, ?4, ?5)",
-            params![school.id, record.id, snapshot_json, snapshot_sha256(&snapshot_json), teacher.id],
+            params![
+                school.id,
+                record.id,
+                snapshot_json,
+                snapshot_sha256(&snapshot_json),
+                teacher.id
+            ],
         )
         .unwrap();
         assert_eq!(
             check_report_card_draft_source_authorized(
-                &conn, &teacher.id, &school.id, &record.id, "legacy-draft",
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                "legacy-draft",
             )
             .unwrap()
             .unwrap()
             .source_status,
             "legacy_unavailable"
         );
-        assert!(conn.execute(
-            "INSERT INTO report_card_draft_source_locks \
+        assert!(conn
+            .execute(
+                "INSERT INTO report_card_draft_source_locks \
              (draft_id, school_id, source_version, source_json, source_sha256) \
              VALUES ('legacy-draft', ?1, 'foreign', '{}', ?2)",
-            params![foreign.id, "0".repeat(64)],
-        ).is_err());
+                params![foreign.id, "0".repeat(64)],
+            )
+            .is_err());
         let future_source = serde_json::json!({
             "schoolId": school.id, "classRecordId": record.id, "version": "future-unrecognized"
-        }).to_string();
+        })
+        .to_string();
         conn.execute(
             "INSERT INTO report_card_draft_source_locks \
              (draft_id, school_id, source_version, source_json, source_sha256) \
              VALUES ('legacy-draft', ?1, 'future-unrecognized', ?2, ?3)",
-            params![school.id, future_source, report_source_lock::hash(&future_source)],
+            params![
+                school.id,
+                future_source,
+                report_source_lock::hash(&future_source)
+            ],
         )
         .unwrap();
         assert_eq!(
             check_report_card_draft_source_authorized(
-                &conn, &teacher.id, &school.id, &record.id, "legacy-draft",
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                "legacy-draft",
             )
             .unwrap()
             .unwrap()
@@ -832,52 +877,178 @@ mod tests {
         );
 
         // Actual LRN digits and raw scores are not present in the projection.
-        conn.execute("UPDATE learners SET lrn = '123456789012' WHERE id = ?1", params![earlier.id]).unwrap();
+        conn.execute(
+            "UPDATE learners SET lrn = '123456789012' WHERE id = ?1",
+            params![earlier.id],
+        )
+        .unwrap();
         let item = crate::repository::assessment_item::create(
-            &conn, &school.id, &record.id, "00000000-0000-7000-8000-000000000311",
-            "Synthetic Quiz", 10.0,
-        ).unwrap().unwrap();
+            &conn,
+            &school.id,
+            &record.id,
+            "00000000-0000-7000-8000-000000000311",
+            "Synthetic Quiz",
+            10.0,
+        )
+        .unwrap()
+        .unwrap();
         conn.execute(
             "INSERT INTO learner_scores \
              (id, school_id, assessment_item_id, learner_id, status, score, recorded_by_user_id) \
              VALUES ('synthetic-score', ?1, ?2, ?3, 'scored', 5, ?4)",
             params![school.id, item.id, earlier.id, teacher.id],
-        ).unwrap();
-        let raw_draft = capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id).unwrap().unwrap();
-        conn.execute("UPDATE learners SET lrn = '123456789013' WHERE id = ?1", params![earlier.id]).unwrap();
-        assert!(compare_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id, &raw_draft.id).unwrap().unwrap().projection_matches);
-        assert_eq!(check_report_card_draft_source_authorized(&conn, &teacher.id, &school.id, &record.id, &raw_draft.id).unwrap().unwrap().source_status, "changed");
-        let score_draft = capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id).unwrap().unwrap();
-        conn.execute("UPDATE learner_scores SET score = 6 WHERE id = 'synthetic-score'", []).unwrap();
-        assert!(compare_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id, &score_draft.id).unwrap().unwrap().projection_matches);
-        assert_eq!(check_report_card_draft_source_authorized(&conn, &teacher.id, &school.id, &record.id, &score_draft.id).unwrap().unwrap().source_status, "changed");
-        let policy_draft = capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id).unwrap().unwrap();
+        )
+        .unwrap();
+        let raw_draft =
+            capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .unwrap()
+                .unwrap();
+        conn.execute(
+            "UPDATE learners SET lrn = '123456789013' WHERE id = ?1",
+            params![earlier.id],
+        )
+        .unwrap();
+        assert!(
+            compare_report_card_draft_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &raw_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .projection_matches
+        );
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &raw_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "changed"
+        );
+        let score_draft =
+            capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .unwrap()
+                .unwrap();
+        conn.execute(
+            "UPDATE learner_scores SET score = 6 WHERE id = 'synthetic-score'",
+            [],
+        )
+        .unwrap();
+        assert!(
+            compare_report_card_draft_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &score_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .projection_matches
+        );
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &score_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "changed"
+        );
+        let policy_draft =
+            capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .unwrap()
+                .unwrap();
         learner::create(&conn, &foreign.id, "Unrelated", "Learner", None, None).unwrap();
-        assert_eq!(check_report_card_draft_source_authorized(&conn, &teacher.id, &school.id, &record.id, &policy_draft.id).unwrap().unwrap().source_status, "matches");
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &policy_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "matches"
+        );
         conn.execute("UPDATE grading_weight_components SET weight_percent = 19 WHERE id = '00000000-0000-7000-8000-000000000411'", []).unwrap();
-        assert_eq!(check_report_card_draft_source_authorized(&conn, &teacher.id, &school.id, &record.id, &policy_draft.id).unwrap().unwrap().source_status, "changed");
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                &policy_draft.id
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "changed"
+        );
 
         conn.execute(
             "INSERT INTO report_card_drafts \
              (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
              VALUES ('invalid-source-draft', ?1, ?2, ?3, ?4, ?5)",
-            params![school.id, record.id, snapshot_json, snapshot_sha256(&snapshot_json), teacher.id],
-        ).unwrap();
+            params![
+                school.id,
+                record.id,
+                snapshot_json,
+                snapshot_sha256(&snapshot_json),
+                teacher.id
+            ],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO report_card_draft_source_locks \
              (draft_id, school_id, source_version, source_json, source_sha256) \
              VALUES ('invalid-source-draft', ?1, 'invalid', '{}', ?2)",
             params![school.id, "0".repeat(64)],
-        ).unwrap();
+        )
+        .unwrap();
         assert!(matches!(
-            check_report_card_draft_source_authorized(&conn, &teacher.id, &school.id, &record.id, "invalid-source-draft"),
+            check_report_card_draft_source_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                "invalid-source-draft"
+            ),
             Err(AppError::Validation(_))
         ));
 
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM report_card_drafts", [], |row| row.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM report_card_drafts", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         conn.execute_batch("CREATE TRIGGER synthetic_lock_failure BEFORE INSERT ON report_card_draft_source_locks BEGIN SELECT RAISE(ABORT, 'Synthetic failure'); END;").unwrap();
-        assert!(capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id).is_err());
-        let after: i64 = conn.query_row("SELECT COUNT(*) FROM report_card_drafts", [], |row| row.get(0)).unwrap();
-        assert_eq!(count, after, "draft and source lock must roll back together");
+        assert!(
+            capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .is_err()
+        );
+        let after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM report_card_drafts", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            count, after,
+            "draft and source lock must roll back together"
+        );
     }
 }

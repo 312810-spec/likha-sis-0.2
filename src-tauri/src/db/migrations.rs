@@ -2661,15 +2661,24 @@ mod tests {
              (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
              VALUES ('legacy', 'source-school', 'source-record', ?1, ?2, 'source-user')",
             (json, &hash),
-        ).unwrap();
+        )
+        .unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        let retained: String = conn.query_row(
-            "SELECT snapshot_json FROM report_card_drafts WHERE id = 'legacy'", [], |row| row.get(0),
-        ).unwrap();
+        let retained: String = conn
+            .query_row(
+                "SELECT snapshot_json FROM report_card_drafts WHERE id = 'legacy'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(retained, json);
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM report_card_draft_source_locks", [], |row| row.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM report_card_draft_source_locks",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 0, "legacy source history must not be invented");
     }
 
