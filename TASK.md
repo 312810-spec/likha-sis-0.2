@@ -1,17 +1,17 @@
 # Current task — CTOS v3
 
-## Current active slice — M11 teacher-facing reporting preview
+## Current active slice — M11 immutable preparation drafts
 
-PR122 passed Quality/Security at `e11600141e60a18b16fcbd59a7444b4ff68e0624`
-and merged as `dea115f75eeb970efed7dd319257310858bf1977`. Active branch:
-`ctos/m11-readiness-ui-20261014`; read
-`docs/ctos/checkpoints/m11-readiness-ui-2026-10-14.md` next. Teacher-facing full-period
-preview uses port/service/native adapter, is on demand/read only, shows omissions
-and missing/provisional evidence, and clears mismatched or obsolete results. No
-exports or lifecycle approvals occur. Require exact-source applicable gates before merge.
-Next: implement reviewed issued-snapshot/amendment lifecycle and cross-form
-reconciliation, with revalidated native authorization. Do not claim M10/M11 complete;
-source/provider/professional M10 acceptance remains parked.
+PR123 passed Quality/Security at `9c470f7acba1c97cfff0970cfaf901b783b92b7b`
+and merged as `105e7c6b7cfeee2787d62d0efd5275bc4a3c6d53`. Active branch:
+`ctos/m11-report-drafts-20261014`; read
+`docs/ctos/checkpoints/m11-report-drafts-2026-10-14.md` next. Native preparation
+drafts capture current server-derived JSON, hash, actor/time and explicit draft
+stage. History reads reauthorize and verify integrity without recomputing grades.
+No client payload, professional review or issuance is accepted. Require exact-source
+native/Security gates before merge. Next: teacher-facing draft capture/history,
+then reviewed issued-snapshot/amendment lifecycle with source-freshness rejection
+and cross-form reconciliation. Do not claim M10/M11 complete; M10 external acceptance parked.
 Official sources, installed devices and professional acceptance remain pending.
 No deployment.
 
