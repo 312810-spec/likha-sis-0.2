@@ -1,5 +1,5 @@
 //! Report-card preparation evidence and immutable drafts, never official issuance.
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -51,6 +51,82 @@ pub struct ReportCardDraft {
     pub snapshot_sha256: String,
     pub created_by_user_id: String,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportCardDraftComparison {
+    pub draft_id: String,
+    pub class_record_id: String,
+    pub stored_snapshot_sha256: String,
+    pub projection_matches: bool,
+    pub changed_fields: Vec<String>,
+    pub current: ReportCardReadiness,
+    pub comparison_scope: &'static str,
+}
+
+/// Compare the projected evidence, excluding only the volatile read timestamp.
+/// This deliberately is not a raw-source lock or issuance authorization.
+fn changed_projection_fields(
+    stored: &serde_json::Value,
+    current: &serde_json::Value,
+) -> AppResult<Vec<String>> {
+    let old = stored.as_object().ok_or_else(|| {
+        AppError::Validation("Stored reporting projection is not an object".into())
+    })?;
+    let new = current.as_object().ok_or_else(|| {
+        AppError::Validation("Current reporting projection is not an object".into())
+    })?;
+    let fields: std::collections::BTreeSet<_> = old.keys().chain(new.keys()).collect();
+    Ok(fields
+        .into_iter()
+        .filter(|key| key.as_str() != "checkedAt" && old.get(*key) != new.get(*key))
+        .cloned()
+        .collect())
+}
+
+/// Reauthorize one exact retained draft; never search a truncated recent-history list.
+/// No write, grade approval, review event or issue transition occurs.
+pub fn compare_report_card_draft_authorized(
+    conn: &Connection,
+    actor_user_id: &str,
+    school_id: &str,
+    class_record_id: &str,
+    draft_id: &str,
+) -> AppResult<Option<ReportCardDraftComparison>> {
+    if authorized_record(conn, actor_user_id, school_id, class_record_id)?.is_none() {
+        return Ok(None);
+    }
+    let stored = conn
+        .query_row(
+            "SELECT id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id, created_at \
+             FROM report_card_drafts WHERE id = ?1 AND school_id = ?2 AND class_record_id = ?3",
+            params![draft_id, school_id, class_record_id],
+            stored_draft,
+        )
+        .optional()?;
+    let Some(stored) = stored else {
+        return Ok(None);
+    };
+    let draft = decode_draft(stored)?;
+    let Some(current) =
+        preview_report_card_authorized(conn, actor_user_id, school_id, class_record_id)?
+    else {
+        return Ok(None);
+    };
+    let current_json = serde_json::to_value(&current).map_err(|_| {
+        AppError::Validation("Current reporting projection could not be read".into())
+    })?;
+    let changed_fields = changed_projection_fields(&draft.snapshot, &current_json)?;
+    Ok(Some(ReportCardDraftComparison {
+        draft_id: draft.id,
+        class_record_id: draft.class_record_id,
+        stored_snapshot_sha256: draft.snapshot_sha256,
+        projection_matches: changed_fields.is_empty(),
+        changed_fields,
+        current,
+        comparison_scope: "reporting_projection_only_not_source_lock_or_approval",
+    }))
 }
 
 fn snapshot_sha256(content: &str) -> String {
@@ -273,6 +349,36 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    fn comparison_excludes_only_clock_and_reports_sorted_projection_changes() {
+        let old = serde_json::json!({
+            "checkedAt": "old-time", "sectionName": "old", "learners": [],
+            "missingLrnCount": 0, "disclosure": {"omittedFields": []}
+        });
+        let mut current = old.clone();
+        current["checkedAt"] = serde_json::json!("new-time");
+        assert!(changed_projection_fields(&old, &current)
+            .unwrap()
+            .is_empty());
+        current["sectionName"] = serde_json::json!("changed");
+        current["learners"] = serde_json::json!([{"learnerId": "new"}]);
+        current["missingLrnCount"] = serde_json::json!(1);
+        current["disclosure"] = serde_json::json!({"omittedFields": ["new"]});
+        current["newField"] = serde_json::json!(true);
+        assert_eq!(
+            changed_projection_fields(&old, &current).unwrap(),
+            vec![
+                "disclosure",
+                "learners",
+                "missingLrnCount",
+                "newField",
+                "sectionName",
+            ]
+        );
+        assert!(changed_projection_fields(&serde_json::Value::Null, &current).is_err());
+        assert!(changed_projection_fields(&old, &serde_json::Value::Null).is_err());
+    }
+
+    #[test]
     fn draft_hash_and_context_checks_reject_corrupt_or_foreign_snapshots() {
         assert_eq!(
             snapshot_sha256("abc"),
@@ -400,6 +506,52 @@ mod tests {
         assert_eq!(draft.created_by_user_id, teacher.id);
         assert!(!draft.created_at.is_empty());
         assert_eq!(draft.snapshot["sectionName"], "Synthetic Section");
+        let changes = conn.total_changes();
+        let same = compare_report_card_draft_authorized(
+            &conn,
+            &teacher.id,
+            &school.id,
+            &record.id,
+            &draft.id,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(same.projection_matches);
+        assert!(same.changed_fields.is_empty());
+        assert_eq!(same.draft_id, draft.id);
+        assert_eq!(same.class_record_id, record.id);
+        assert_eq!(
+            same.comparison_scope,
+            "reporting_projection_only_not_source_lock_or_approval"
+        );
+        assert_eq!(same.stored_snapshot_sha256, draft.snapshot_sha256);
+        assert_eq!(conn.total_changes(), changes);
+        assert!(compare_report_card_draft_authorized(
+            &conn,
+            &teacher.id,
+            &school.id,
+            &record.id,
+            "missing-draft",
+        )
+        .unwrap()
+        .is_none());
+        assert!(compare_report_card_draft_authorized(
+            &conn,
+            &teacher.id,
+            &foreign.id,
+            &record.id,
+            &draft.id,
+        )
+        .unwrap()
+        .is_none());
+        assert!(
+            compare_report_card_draft_authorized(
+                &conn, &other.id, &school.id, &record.id, &draft.id,
+            )
+            .unwrap()
+            .unwrap()
+            .projection_matches
+        );
         conn.execute(
             "UPDATE sections SET name = 'Changed Section' WHERE id = ?1",
             params![sec.id],
@@ -411,6 +563,21 @@ mod tests {
         assert_eq!(retained.len(), 1);
         assert_eq!(retained[0].snapshot, draft.snapshot);
         assert_eq!(retained[0].snapshot_sha256, draft.snapshot_sha256);
+        let changes = conn.total_changes();
+        let changed = compare_report_card_draft_authorized(
+            &conn,
+            &teacher.id,
+            &school.id,
+            &record.id,
+            &draft.id,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(!changed.projection_matches);
+        assert_eq!(changed.changed_fields, vec!["sectionName"]);
+        assert_eq!(changed.current.section_name, "Changed Section");
+        assert_eq!(changed.stored_snapshot_sha256, draft.snapshot_sha256);
+        assert_eq!(conn.total_changes(), changes);
         assert!(conn
             .execute(
                 "UPDATE report_card_drafts SET snapshot_json = '{}' WHERE id = ?1",
@@ -448,6 +615,33 @@ mod tests {
         assert!(matches!(
             list_recent_report_card_drafts_authorized(&conn, &outsider.id, &school.id, &record.id),
             Err(AppError::Unauthorized)
+        ));
+        assert!(matches!(
+            compare_report_card_draft_authorized(
+                &conn,
+                &outsider.id,
+                &school.id,
+                &record.id,
+                &draft.id,
+            ),
+            Err(AppError::Unauthorized)
+        ));
+        conn.execute(
+            "INSERT INTO report_card_drafts \
+             (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
+             VALUES ('corrupt-draft', ?1, ?2, '{}', ?3, ?4)",
+            params![school.id, record.id, "0".repeat(64), teacher.id],
+        )
+        .unwrap();
+        assert!(matches!(
+            compare_report_card_draft_authorized(
+                &conn,
+                &teacher.id,
+                &school.id,
+                &record.id,
+                "corrupt-draft",
+            ),
+            Err(AppError::Validation(_))
         ));
     }
 }
