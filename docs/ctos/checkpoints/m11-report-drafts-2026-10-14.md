@@ -48,6 +48,15 @@ device/professional acceptance distinct. No deployment or real records mutated.
 - No draft UI, installed-device migration, manual screen-reader or professional
   acceptance claimed. No provider/source approval assumption introduced.
 
+## Exact-head formatting repair
+
+At head `cb108bd9c9394eed9d7f54af3affb3ca89a79a9f`, Security `38554616971`
+passed. Quality `38554616950` failed only at Ubuntu job `115820636800`'s
+`cargo fmt --check`, on two test-layout differences. Windows compilation passed;
+native Windows tests were still running when inspected. Apply the exact formatter
+output without a behavior change. Require both applicable gates at the repaired
+head before merge; unchanged frontend evidence remains valid.
+
 ## Continue
 
 Publish with expected-head lease and compare exact remote/local trees. Inspect any

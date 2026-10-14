@@ -392,9 +392,10 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        let draft = capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
-            .unwrap()
-            .unwrap();
+        let draft =
+            capture_report_card_draft_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .unwrap()
+                .unwrap();
         assert_eq!(draft.stage, "draft");
         assert_eq!(draft.created_by_user_id, teacher.id);
         assert!(!draft.created_at.is_empty());
@@ -404,13 +405,9 @@ mod tests {
             params![sec.id],
         )
         .unwrap();
-        let retained = list_recent_report_card_drafts_authorized(
-            &conn,
-            &teacher.id,
-            &school.id,
-            &record.id,
-        )
-        .unwrap();
+        let retained =
+            list_recent_report_card_drafts_authorized(&conn, &teacher.id, &school.id, &record.id)
+                .unwrap();
         assert_eq!(retained.len(), 1);
         assert_eq!(retained[0].snapshot, draft.snapshot);
         assert_eq!(retained[0].snapshot_sha256, draft.snapshot_sha256);
