@@ -62,6 +62,16 @@ pub struct LessonSourceReference {
     pub scope: Option<LessonSourceScope>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub applicable_dates: Option<LessonSourceDates>,
+}
+
+/// Teacher-declared inclusive date window, not an official term calendar.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonSourceDates {
+    pub starts_on: String,
+    pub ends_on: String,
 }
 
 /// Declared scope checked against canonical assignment context, not official approval.
@@ -116,6 +126,10 @@ impl LessonSourceReference {
                 subject_id: scope.subject_id.trim().into(),
             }),
             artifact_id: self.artifact_id.as_ref().map(|id| id.trim().into()),
+            applicable_dates: self.applicable_dates.as_ref().map(|dates| LessonSourceDates {
+                starts_on: dates.starts_on.trim().into(),
+                ends_on: dates.ends_on.trim().into(),
+            }),
         };
         for value in [
             &source.title,
@@ -145,8 +159,58 @@ impl LessonSourceReference {
                 "Attached source artifact identifier is required".into(),
             ));
         }
+        if let Some(dates) = &source.applicable_dates {
+            if !is_calendar_date(&dates.starts_on)
+                || !is_calendar_date(&dates.ends_on)
+                || dates.starts_on > dates.ends_on
+            {
+                return Err(AppError::Validation(
+                    "Source date window requires real ordered dates".into(),
+                ));
+            }
+        }
         Ok(source)
     }
+}
+
+fn is_calendar_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    if !bytes
+        .iter()
+        .enumerate()
+        .all(|(index, byte)| index == 4 || index == 7 || byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let year: u32 = value[..4].parse().unwrap_or(0);
+    let month: u32 = value[5..7].parse().unwrap_or(0);
+    let day: u32 = value[8..].parse().unwrap_or(0);
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let days = match month {
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        _ => 0,
+    };
+    year > 0 && day > 0 && day <= days
+}
+
+fn validate_source_dates(source: &LessonSourceReference, plan_date: &str) -> AppResult<()> {
+    if let Some(dates) = &source.applicable_dates {
+        if !is_calendar_date(plan_date)
+            || plan_date < dates.starts_on.as_str()
+            || plan_date > dates.ends_on.as_str()
+        {
+            return Err(AppError::Validation(
+                "Lesson date is outside the declared source date window".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_source_artifact(
@@ -443,6 +507,7 @@ pub fn create_with_source(
     )?;
     if let Some(source) = source.as_ref() {
         validate_source_scope(source, Some(&context))?;
+        validate_source_dates(source, plan_date)?;
         validate_source_artifact(conn, school_id, source)?;
     }
     let source_json = source
@@ -620,6 +685,7 @@ pub fn amend_source_authorized(
     authorize_own_assignment(conn, user_id, school_id, &plan.teaching_assignment_id)?;
     let source = new_source_reference.normalized()?;
     validate_source_scope(&source, plan.teaching_context.as_ref())?;
+    validate_source_dates(&source, &plan.plan_date)?;
     validate_source_artifact(conn, school_id, &source)?;
     let reason = reason.trim();
     if reason.is_empty() || reason.chars().count() > 1000 {
@@ -814,6 +880,7 @@ mod tests {
                 subject_id: format!(" {} ", assignment.subject_id),
             }),
             artifact_id: None,
+            applicable_dates: None,
         };
         for (year, subject_id) in [
             ("2025-2026", assignment.subject_id.as_str()),
@@ -897,6 +964,93 @@ mod tests {
         ).unwrap();
         assert_eq!(source.scope, None);
         assert_eq!(source.artifact_id, None);
+        assert_eq!(source.applicable_dates, None);
+    }
+
+    #[test]
+    fn declared_source_dates_are_real_inclusive_and_historical() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic curriculum".into(),
+            term: "Synthetic term".into(),
+            scope: None,
+            artifact_id: None,
+            applicable_dates: Some(LessonSourceDates {
+                starts_on: "2026-09-07".into(),
+                ends_on: "2026-09-08".into(),
+            }),
+        };
+        for date in ["2026-09-06", "2026-09-09", "2026-02-30"] {
+            assert!(create_with_source(
+                &conn,
+                &f.school_id,
+                &f.assignment_id,
+                date,
+                &f.teacher_id,
+                &sample_fields(),
+                Some(&source),
+            )
+            .is_err());
+        }
+        let plan = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-08",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .is_some());
+        let wrong_dates = LessonSourceReference {
+            applicable_dates: Some(LessonSourceDates {
+                starts_on: "2027-09-07".into(),
+                ends_on: "2027-09-08".into(),
+            }),
+            ..source.clone()
+        };
+        assert!(amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &wrong_dates,
+            "Synthetic later term",
+        )
+        .is_err());
+        assert!(list_source_amendments(&conn, &f.school_id, &plan.id)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            find_by_id_in_school(&conn, &f.school_id, &plan.id)
+                .unwrap()
+                .unwrap()
+                .source_reference,
+            Some(source)
+        );
+        for value in ["2026-02-29", "1900-02-29", "2026-04-31", "0000-01-01"] {
+            assert!(!is_calendar_date(value));
+        }
+        for value in ["2024-02-29", "2000-02-29"] {
+            assert!(is_calendar_date(value));
+        }
     }
 
     #[test]
@@ -992,6 +1146,7 @@ mod tests {
             term: "Term A".into(),
             scope: None,
             artifact_id: Some(artifact.id.clone()),
+            applicable_dates: None,
         };
         let plan = create_with_source(
             &conn,
@@ -1052,6 +1207,7 @@ mod tests {
             term: "Term A".into(),
             scope: None,
             artifact_id: Some("corrupt".into()),
+            applicable_dates: None,
         };
         assert!(create_with_source(
             &conn,
@@ -1084,6 +1240,7 @@ mod tests {
             term: " Term A ".into(),
             scope: None,
             artifact_id: None,
+            applicable_dates: None,
         };
         let created = create_with_source(
             &conn,
@@ -1497,6 +1654,7 @@ mod tests {
                 subject_id: assignment.subject_id.clone(),
             }),
             artifact_id: None,
+            applicable_dates: None,
         };
         let plan = create_with_source(
             &conn,
@@ -1604,6 +1762,7 @@ mod tests {
                 subject_id: context.subject_id.clone(),
             }),
             artifact_id: None,
+            applicable_dates: None,
         };
         let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();

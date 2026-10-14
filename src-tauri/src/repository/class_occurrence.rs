@@ -1126,6 +1126,7 @@ mod tests {
             term: "Term A".into(),
             scope: None,
             artifact_id: None,
+            applicable_dates: None,
         };
         lesson_plan::amend_source_authorized(
             &conn,

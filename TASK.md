@@ -1,6 +1,18 @@
 # Current task — CTOS v3
 
-## Current active slice — stored source integrity
+## Current active slice — declared source date applicability
+
+PR118 passed Quality/Security at `2e95fcc3689bbe6c00f824976e7c0fa3d9e46575`
+and merged as `eded81dbc79841e17ac8786fe93e481bc746e7c7`. Active branch:
+`ctos/m10-source-date-scope-20261014`; read
+`docs/ctos/checkpoints/m10-source-date-scope-2026-10-14.md` next. Optional real
+ordered inclusive dates are checked against the lesson's historical date; they
+remain teacher-declared metadata, not an official term calendar. Require exact-source
+gates before merge. Next: durable draft-review lineage and configured cohort scope.
+Official sources, installed devices and professional acceptance remain pending.
+No deployment.
+
+## Completed prior slice — stored source integrity
 
 PR117 passed Quality/Security at `a521f0ec55030d79e847f2622783e6414896010d`
 and merged as `10b189d26217de06e2d1397fd1b1ccbd2f6ee141`. Active branch:

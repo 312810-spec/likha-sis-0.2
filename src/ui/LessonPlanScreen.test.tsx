@@ -218,6 +218,40 @@ function renderScreen(
 
 describe("LessonPlanScreen", () => {
   beforeEach(() => clearLessonDrafts());
+  it("retains optional declared source dates and locks them on saved lessons", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLessonPlanRepository([
+      {
+        ...PLAN,
+        sourceReference: {
+          title: "Synthetic BOW",
+          version: "v1",
+          citation: "fixture:bow",
+          curriculumName: "Synthetic",
+          term: "Synthetic term",
+          applicableDates: { startsOn: "2026-09-01", endsOn: "2026-09-30" },
+        },
+      },
+    ]);
+    const first = renderScreen(repo);
+    await screen.findByLabelText("Learning competency");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Declare an inclusive source date window" }),
+    );
+    await user.type(screen.getByLabelText("Source applies from"), "2026-09-01");
+    await user.type(screen.getByLabelText("Source applies through"), "2026-09-30");
+    first.unmount();
+    const second = renderScreen(repo);
+    await screen.findByLabelText("Learning competency");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    expect(screen.getByLabelText("Source applies from")).toHaveValue("2026-09-01");
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Source applies through")).toHaveValue("2026-09-30");
+    expect(screen.getByLabelText("Source applies through")).toBeDisabled();
+    expect(screen.getByText(/Dates are teacher-declared/)).toBeInTheDocument();
+    await expectNoAccessibilityViolations(second.container);
+  });
   it("applies a reviewed suggestion only to unsaved planning fields and saves separately", async () => {
     const user = userEvent.setup();
     const repo = new FakeLessonPlanRepository();
