@@ -107,6 +107,25 @@ pub fn list_recent_report_card_drafts(
     )
 }
 
+/// Read-only readiness source fingerprint check, never approval or issuance.
+#[tauri::command]
+pub fn check_report_card_draft_source(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+    draft_id: String,
+) -> AppResult<Option<crate::repository::report_readiness::ReportCardDraftSourceCheck>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    crate::repository::report_readiness::check_report_card_draft_source_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+        draft_id.trim(),
+    )
+}
+
 /// Read-only retained/current projection comparison, not source locking or approval.
 #[tauri::command]
 pub fn compare_report_card_draft(

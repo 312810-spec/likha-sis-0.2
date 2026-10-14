@@ -2597,6 +2597,36 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M11: readiness source fingerprints; existing drafts stay explicitly legacy.
+        CREATE TABLE report_card_draft_source_locks (
+            draft_id TEXT PRIMARY KEY REFERENCES report_card_drafts(id),
+            school_id TEXT NOT NULL REFERENCES schools(id),
+            source_version TEXT NOT NULL,
+            source_json TEXT NOT NULL CHECK (json_valid(source_json)),
+            source_sha256 TEXT NOT NULL CHECK (
+                length(source_sha256) = 64 AND source_sha256 = lower(source_sha256)
+                AND source_sha256 NOT GLOB '*[^0-9a-f]*'
+            )
+        );
+        CREATE TRIGGER report_card_source_lock_no_update BEFORE UPDATE ON report_card_draft_source_locks
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting draft source locks are immutable');
+        END;
+        CREATE TRIGGER report_card_source_lock_no_delete BEFORE DELETE ON report_card_draft_source_locks
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting draft source locks are retained evidence');
+        END;
+        CREATE TRIGGER report_card_source_lock_school_scope BEFORE INSERT ON report_card_draft_source_locks
+        WHEN NOT EXISTS (
+            SELECT 1 FROM report_card_drafts d WHERE d.id = NEW.draft_id AND d.school_id = NEW.school_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting source lock must belong to its draft school');
+        END;
+        "#,
+        ),
     ])
 }
 
@@ -2604,6 +2634,44 @@ pub fn migrations() -> Migrations<'static> {
 mod tests {
     use super::*;
     use rusqlite::Connection;
+
+    #[test]
+    fn migration_55_preserves_legacy_drafts_without_backfilling_sources() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 54).unwrap();
+        conn.execute_batch(
+            "INSERT INTO schools (id, name) VALUES ('source-school', 'Synthetic');
+             INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('source-user', 'source-user', 'synthetic-hash', 'Synthetic');
+             INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('source-section', 'source-school', '2026-2027', '7', 'Synthetic');
+             INSERT INTO subjects (id, school_id, name) \
+             VALUES ('source-subject', 'source-school', 'Synthetic');
+             INSERT INTO grading_periods (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
+             VALUES ('source-period', 'source-school', '2026-2027', \
+             '00000000-0000-7000-8000-000000000011', '2026-06-08', '2026-09-15');
+             INSERT INTO class_records (id, school_id, section_id, subject_id, grading_period_id) \
+             VALUES ('source-record', 'source-school', 'source-section', 'source-subject', 'source-period');",
+        ).unwrap();
+        let json = r#"{"classRecordId":"source-record","officialFidelity":"not_verified"}"#;
+        let hash = crate::repository::report_source_lock::hash(json);
+        conn.execute(
+            "INSERT INTO report_card_drafts \
+             (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
+             VALUES ('legacy', 'source-school', 'source-record', ?1, ?2, 'source-user')",
+            (json, &hash),
+        ).unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let retained: String = conn.query_row(
+            "SELECT snapshot_json FROM report_card_drafts WHERE id = 'legacy'", [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(retained, json);
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM report_card_draft_source_locks", [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(count, 0, "legacy source history must not be invented");
+    }
 
     #[test]
     fn migration_53_preserves_earlier_lesson_text_without_inventing_review() {

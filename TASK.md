@@ -1,5 +1,20 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 native readiness source fingerprints
+
+PR127 passed Quality/Security at `b3b93011267272aeb63bcb802ec618ae221825b8`
+and merged as `1bac457279eb7ce7d2a9dc4bc60ca3eb35933f8c`. Active branch:
+`ctos/m11-source-lock-20261015`; read
+`docs/ctos/checkpoints/m11-source-lock-2026-10-15.md` next. New drafts atomically
+retain raw readiness inputs and exact implementation/dependency/schema identity.
+Legacy drafts have no backfilled lock. Native read-only checks verify integrity
+and current authorization; matches/changed/legacy/unsupported are distinct.
+This is not an atomic issue authorization or official-source approval. Require
+exact-head native/Security gates before merge. Next expose source-check evidence,
+then implement atomic native review/issue behavior, append-only amendments and
+cross-form reconciliation. Unavailable official-source, installed-device and
+professional acceptance remains parked; M10/M11 incomplete. No deployment.
+
 ## Current active slice — M11 comparison viewing
 
 PR126 passed Quality/Security at `754773336d2c696ddedcbe3616bb816f9cfddfbc`
