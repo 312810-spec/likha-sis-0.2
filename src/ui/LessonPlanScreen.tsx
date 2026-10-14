@@ -15,6 +15,7 @@ import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { SessionDraftContext } from "./session-draft-context";
 import { localIsoDate } from "./local-date";
+import { LessonSuggestionReview } from "./LessonSuggestionReview";
 import {
   lessonDraftEpoch,
   lessonDraftKey,
@@ -385,6 +386,7 @@ function LessonPlanWorkspace({
                     editingPlanId: null,
                     fields: EMPTY_FIELDS,
                     sourceReference: undefined,
+                    externalSuggestionRaw: undefined,
                   }
                 : retained.active,
             },
@@ -419,6 +421,7 @@ function LessonPlanWorkspace({
             fields: EMPTY_FIELDS,
             editingPlanId: null,
             sourceReference: undefined,
+            externalSuggestionRaw: undefined,
           },
         };
       });
@@ -532,6 +535,34 @@ function LessonPlanWorkspace({
               />
             </div>
           </div>
+
+          {!editingPlanId && (
+            <LessonSuggestionReview
+              key={JSON.stringify([assignmentId, planDate])}
+              raw={workspace.active.externalSuggestionRaw ?? ""}
+              disabled={saving || !validAssignment}
+              onStage={(raw) => lessonPlanService.stagePlanningSuggestion(raw)}
+              onRawChange={(raw) =>
+                changeWorkspace((current) => ({
+                  ...current,
+                  active: { ...current.active, externalSuggestionRaw: raw },
+                }))
+              }
+              onApply={(suggestion) => {
+                changeWorkspace((current) => ({
+                  ...current,
+                  active: {
+                    ...current.active,
+                    fields: { ...current.active.fields, ...suggestion },
+                    externalSuggestionRaw: undefined,
+                  },
+                }));
+                setConfirmation(
+                  "Reviewed suggestion applied to the unsaved draft. Save separately after final review.",
+                );
+              }}
+            />
+          )}
 
           <details>
             <summary>Curriculum / BOW source reference</summary>

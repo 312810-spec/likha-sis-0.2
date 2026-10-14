@@ -5,6 +5,7 @@ export interface LessonDraft {
   planDate: string;
   editingPlanId: string | null;
   fields: LessonPlanFields;
+  externalSuggestionRaw?: string;
   sourceReference?: LessonSourceReference;
   amendingSource?: boolean;
   sourceCorrectionReason?: string;

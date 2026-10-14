@@ -1,6 +1,17 @@
 # Current task — CTOS v3
 
-## Latest active slice — classroom lesson origin
+## Current active slice — local planning-draft review
+
+PR116 passed Quality/Security at `aa9eeb5cf26191ccc90d241c253cce07b3e8b974`
+and merged as `c2ccb996890474051c72e57e1fbd53c8792c7212`. New branch:
+`ctos/m10-draft-review-20261014`. Read
+`docs/ctos/checkpoints/m10-draft-review-2026-10-14.md` next. This is offline
+teacher-pasted staging/review/application only, not live AI generation or durable
+AI provenance. Require exact-source applicable Quality/Security before merge;
+local Chromium crashes before execution. Continue declared term/cohort rules,
+source verification workflow and durable review lineage. No deployment.
+
+## Completed prior slice — classroom lesson origin
 
 PR115 passed Quality/Security at `ffd647800f57aaa09d39b86ee0ea372aa236f0e7`
 and merged as `30cfd9df08072d83c331b5ab000e0ba74a71f50b`. Classroom lesson
