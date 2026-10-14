@@ -92,8 +92,9 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
       fields,
       ...(sourceReference ? { sourceReference } : {}),
     });
-    if (this.createResult) this.plans = [...this.plans, this.createResult];
-    return this.createResult;
+    const result = this.createResult ? { ...this.createResult, sourceReference } : null;
+    if (result) this.plans = [...this.plans, result];
+    return result;
   }
 
   async update(): Promise<LessonPlan | null> {
@@ -427,6 +428,43 @@ describe("LessonPlanScreen", () => {
       schoolYear: ASSIGNMENT.schoolYear,
       subjectId: ASSIGNMENT.subjectId,
     });
+  });
+  it("retains optional grade scope, saves it explicitly and locks it except for correction", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const user = userEvent.setup();
+    const first = renderScreen(repo);
+    await screen.findByLabelText("Learning competency");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    expect(screen.queryByLabelText("Declared source grade (optional)")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText(/I confirm this reference applies/));
+    await user.type(screen.getByLabelText("Declared source grade (optional)"), "7");
+    first.unmount();
+    const second = renderScreen(repo);
+    await screen.findByLabelText("Learning competency");
+    await user.click(screen.getByText("Curriculum / BOW source reference"));
+    expect(screen.getByLabelText("Declared source grade (optional)")).toHaveValue("7");
+    await expectNoAccessibilityViolations(second.container);
+    for (const label of [
+      "Learning competency",
+      "Learning objectives (2–3, one per line)",
+      "Planned activities",
+      "How learning will be checked",
+      "Source title",
+      "Source version / revision",
+      "Source citation / location",
+      "Curriculum name",
+      "Applicable term",
+    ])
+      await user.type(screen.getByLabelText(label), "Synthetic");
+    await user.click(screen.getByRole("button", { name: "Save lesson plan" }));
+    await screen.findByText(/Lesson plan saved on this device/);
+    expect(repo.createCalls[0]?.sourceReference?.scope?.gradeLevel).toBe("7");
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Declared source grade (optional)")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Correct source reference" }));
+    expect(screen.getByLabelText("Declared source grade (optional)")).toBeEnabled();
+    await user.click(screen.getByLabelText(/I confirm this reference applies/));
+    expect(screen.queryByLabelText("Declared source grade (optional)")).not.toBeInTheDocument();
   });
   it("shows captured class context rather than the assignment's current values", async () => {
     renderScreen(

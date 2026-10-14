@@ -6,7 +6,7 @@
 
 ## Current execution state
 
-- Current continuation: PR118 merged as eded81dbc79841e17ac8786fe93e481bc746e7c7 after exact-head Quality/Security PASS at 2e95fcc3689bbe6c00f824976e7c0fa3d9e46575. Active branch ctos/m10-source-date-scope-20261014 adds optional teacher-declared inclusive source dates checked against the historical lesson date. See docs/ctos/checkpoints/m10-source-date-scope-2026-10-14.md. Local Chromium launch SIGSEGV persists; exact-source CI required. M10 remains incomplete.
+- Current continuation: PR119 merged as ebb13de145a08da60746fba4348675538969c22a after exact-head Quality/Security PASS at fbae7411d9f5b8b83e0be7e32c3d2cbb122521c5 (Quality 38503472166; Security 38503472171). Active branch ctos/m10-source-grade-scope-20261014 adds optional teacher-declared grade scope checked against captured historical context, without backfill or official cohort claims. See docs/ctos/checkpoints/m10-source-grade-scope-2026-10-14.md. Exact-source native/security CI required; M10 remains incomplete.
 
 - Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
 

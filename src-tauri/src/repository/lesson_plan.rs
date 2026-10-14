@@ -80,6 +80,8 @@ pub struct LessonSourceDates {
 pub struct LessonSourceScope {
     pub school_year: String,
     pub subject_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grade_level: Option<String>,
 }
 
 /// One append-only correction to a lesson's declared source metadata.
@@ -124,6 +126,7 @@ impl LessonSourceReference {
             scope: self.scope.as_ref().map(|scope| LessonSourceScope {
                 school_year: scope.school_year.trim().into(),
                 subject_id: scope.subject_id.trim().into(),
+                grade_level: scope.grade_level.as_ref().map(|grade| grade.trim().into()),
             }),
             artifact_id: self.artifact_id.as_ref().map(|id| id.trim().into()),
             applicable_dates: self
@@ -148,6 +151,15 @@ impl LessonSourceReference {
             }
         }
         if let Some(scope) = &source.scope {
+            if scope
+                .grade_level
+                .as_ref()
+                .is_some_and(|grade| grade.is_empty() || grade.chars().count() > 4000)
+            {
+                return Err(AppError::Validation(
+                    "Declared source grade must be nonblank and at most 4000 characters".into(),
+                ));
+            }
             if [&scope.school_year, &scope.subject_id]
                 .iter()
                 .any(|value| value.is_empty() || value.chars().count() > 4000)
@@ -373,6 +385,15 @@ fn validate_source_scope(
     if scope.school_year != context.school_year || scope.subject_id != context.subject_id {
         return Err(AppError::Validation(
             "Source scope does not match this lesson's captured subject and school year".into(),
+        ));
+    }
+    if scope
+        .grade_level
+        .as_ref()
+        .is_some_and(|grade| grade != &context.grade_level)
+    {
+        return Err(AppError::Validation(
+            "Source grade does not match this lesson's captured grade".into(),
         ));
     }
     Ok(())
@@ -865,6 +886,107 @@ mod tests {
     }
 
     #[test]
+    fn declared_grade_scope_preserves_historical_grade_and_amendment_lineage() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap();
+        let source = LessonSourceReference {
+            title: "Synthetic BOW".into(),
+            version: "v1".into(),
+            citation: "fixture:bow".into(),
+            curriculum_name: "Synthetic".into(),
+            term: "Synthetic term".into(),
+            scope: Some(LessonSourceScope {
+                school_year: "2026-2027".into(),
+                subject_id: assignment.subject_id.clone(),
+                grade_level: Some(" 7 ".into()),
+            }),
+            artifact_id: None,
+            applicable_dates: None,
+        };
+        for grade in ["8".to_string(), " ".to_string(), "x".repeat(4001)] {
+            let mut invalid = source.clone();
+            invalid.scope.as_mut().unwrap().grade_level = Some(grade);
+            assert!(create_with_source(
+                &conn,
+                &f.school_id,
+                &f.assignment_id,
+                "2026-09-07",
+                &f.teacher_id,
+                &sample_fields(),
+                Some(&invalid)
+            )
+            .is_err());
+        }
+        assert!(list_by_assignment(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .is_empty());
+        let plan = create_with_source(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            Some(&source),
+        )
+        .unwrap()
+        .unwrap();
+        let original = plan.source_reference.unwrap();
+        assert_eq!(
+            original.scope.as_ref().unwrap().grade_level.as_deref(),
+            Some("7")
+        );
+        conn.execute(
+            "UPDATE sections SET grade_level = '8' WHERE id = ?1",
+            params![assignment.section_id],
+        )
+        .unwrap();
+        let mut correction = original.clone();
+        correction.version = "v2".into();
+        correction.scope.as_mut().unwrap().grade_level = Some("8".into());
+        assert!(amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &correction,
+            "Incorrect current grade"
+        )
+        .is_err());
+        assert!(list_source_amendments(&conn, &f.school_id, &plan.id)
+            .unwrap()
+            .is_empty());
+        correction.scope.as_mut().unwrap().grade_level = Some("7".into());
+        amend_source_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &correction,
+            "Corrected revision for historical grade",
+        )
+        .unwrap();
+        let history = list_source_amendments(&conn, &f.school_id, &plan.id).unwrap();
+        assert_eq!(
+            history[0].previous_source_reference.as_ref(),
+            Some(&original)
+        );
+        assert_eq!(history[0].new_source_reference, correction);
+        let legacy: LessonSourceScope = serde_json::from_str(
+            r#"{"schoolYear":"2026-2027","subjectId":"fixture:subject"}"#,
+        )
+        .unwrap();
+        assert_eq!(legacy.grade_level, None);
+        assert!(!serde_json::to_string(&legacy).unwrap().contains("gradeLevel"));
+    }
+
+    #[test]
     fn declared_source_scope_rejects_other_subjects_and_years_without_inserting() {
         let conn = open_test_db();
         let f = seed(&conn);
@@ -881,6 +1003,7 @@ mod tests {
             scope: Some(LessonSourceScope {
                 school_year: " 2026-2027 ".into(),
                 subject_id: format!(" {} ", assignment.subject_id),
+                grade_level: None,
             }),
             artifact_id: None,
             applicable_dates: None,
@@ -894,6 +1017,7 @@ mod tests {
                 scope: Some(LessonSourceScope {
                     school_year: year.into(),
                     subject_id: subject_id.into(),
+                    grade_level: None,
                 }),
                 ..source.clone()
             };
@@ -1655,6 +1779,7 @@ mod tests {
             scope: Some(LessonSourceScope {
                 school_year: "2026-2027".into(),
                 subject_id: assignment.subject_id.clone(),
+                grade_level: None,
             }),
             artifact_id: None,
             applicable_dates: None,
@@ -1763,6 +1888,7 @@ mod tests {
             scope: Some(LessonSourceScope {
                 school_year: context.school_year.clone(),
                 subject_id: context.subject_id.clone(),
+                grade_level: None,
             }),
             artifact_id: None,
             applicable_dates: None,
@@ -1815,6 +1941,7 @@ mod tests {
             scope: Some(LessonSourceScope {
                 school_year: "2027-2028".into(),
                 subject_id: context.subject_id.clone(),
+                grade_level: None,
             }),
             ..source
         };

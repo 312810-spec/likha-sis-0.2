@@ -1,14 +1,15 @@
 # Current task — CTOS v3
 
-## Current active slice — declared source date applicability
+## Current active slice — declared source grade applicability
 
-PR118 passed Quality/Security at `2e95fcc3689bbe6c00f824976e7c0fa3d9e46575`
-and merged as `eded81dbc79841e17ac8786fe93e481bc746e7c7`. Active branch:
-`ctos/m10-source-date-scope-20261014`; read
-`docs/ctos/checkpoints/m10-source-date-scope-2026-10-14.md` next. Optional real
-ordered inclusive dates are checked against the lesson's historical date; they
-remain teacher-declared metadata, not an official term calendar. Require exact-source
-gates before merge. Next: durable draft-review lineage and configured cohort scope.
+PR119 passed Quality/Security at `fbae7411d9f5b8b83e0be7e32c3d2cbb122521c5`
+and merged as `ebb13de145a08da60746fba4348675538969c22a`. Active branch:
+`ctos/m10-source-grade-scope-20261014`; read
+`docs/ctos/checkpoints/m10-source-grade-scope-2026-10-14.md` next. Optional
+teacher-declared grade is checked against captured historical context, not the
+assignment's current grade. No official cohort policy is inferred. Require exact-source
+gates before merge. Next: durable external-draft review lineage, then remaining
+unblocked controlling milestones; approved curriculum/cohort rules remain external.
 Official sources, installed devices and professional acceptance remain pending.
 No deployment.
 

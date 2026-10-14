@@ -6,7 +6,7 @@ export interface LessonSourceReference {
   curriculumName: string;
   term: string;
   /** Explicit teacher declaration; absent means subject/year applicability is unknown. */
-  scope?: { schoolYear: string; subjectId: string };
+  scope?: { schoolYear: string; subjectId: string; gradeLevel?: string };
   /** Exact local source-file identity; never an official-approval assertion. */
   artifactId?: string;
   /** Teacher-declared inclusive window; not a verified official term calendar. */

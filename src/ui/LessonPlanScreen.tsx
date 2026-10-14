@@ -734,6 +734,40 @@ function LessonPlanWorkspace({
                 Term remains teacher-provided metadata; official applicability is not verified.
               </p>
             </div>
+            {sourceReference?.scope && (
+              <div className="field">
+                <label htmlFor="lesson-source-grade">Declared source grade (optional)</label>
+                <input
+                  id="lesson-source-grade"
+                  value={sourceReference.scope.gradeLevel ?? ""}
+                  maxLength={4000}
+                  aria-describedby="lesson-source-grade-help"
+                  disabled={saving || (editingPlanId !== null && !amendingSource)}
+                  onChange={(event) => {
+                    const gradeLevel = event.target.value || undefined;
+                    changeWorkspace((current) => {
+                      const reference = current.active.sourceReference;
+                      if (!reference?.scope) return current;
+                      return {
+                        ...current,
+                        active: {
+                          ...current.active,
+                          sourceReference: {
+                            ...reference,
+                            scope: { ...reference.scope, gradeLevel },
+                          },
+                        },
+                      };
+                    });
+                  }}
+                />
+                <p id="lesson-source-grade-help" className="muted">
+                  Enter the grade exactly as configured for the class, or leave it unknown. Saving
+                  checks against the lesson's captured grade. This declaration does not verify
+                  official cohort or curriculum applicability.
+                </p>
+              </div>
+            )}
             {editingPlanId && !amendingSource && (
               <>
                 <button
@@ -991,7 +1025,7 @@ function LessonPlanWorkspace({
                     </small>
                     <small className="muted">
                       {plan.sourceReference
-                        ? `Declared source: ${plan.sourceReference.title} · ${plan.sourceReference.version} · ${plan.sourceReference.term}. ${plan.sourceReference.scope ? `Subject/year scope declared for ${plan.sourceReference.scope.schoolYear}.` : "Subject/year scope unknown."} Official applicability is not verified.`
+                        ? `Declared source: ${plan.sourceReference.title} · ${plan.sourceReference.version} · ${plan.sourceReference.term}. ${plan.sourceReference.scope ? `Subject/year scope declared for ${plan.sourceReference.scope.schoolYear}.` : "Subject/year scope unknown."} ${plan.sourceReference.scope?.gradeLevel ? `Grade ${plan.sourceReference.scope.gradeLevel} declared.` : "Grade applicability unknown."} Official applicability is not verified.`
                         : "Curriculum / BOW source unknown."}
                     </small>
                   </span>
