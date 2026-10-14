@@ -31,6 +31,32 @@ const PLAN: LessonPlan = {
 };
 
 describe("TauriLessonPlanRepository", () => {
+  it("passes confirmed external review only at creation, without actor or timestamps", async () => {
+    const reviewedDraft = {
+      teacherConfirmed: true,
+      suggestion: {
+        learningObjectives: "Synthetic objective",
+        connectionToPreviousLearning: "",
+        learningExperiences: "Synthetic activity",
+        assessment: "Synthetic assessment",
+        waysForward: "",
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(PLAN);
+    await new TauriLessonPlanRepository().create(
+      "ta-1",
+      "2026-09-07",
+      FIELDS,
+      undefined,
+      reviewedDraft,
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("create_lesson_plan", {
+      teachingAssignmentId: "ta-1",
+      planDate: "2026-09-07",
+      ...FIELDS,
+      reviewedDraft,
+    });
+  });
   it("routes exact source ingestion and school-scoped artifact reads", async () => {
     mockInvoke.mockResolvedValueOnce({ id: "artifact-1" });
     await new TauriLessonPlanRepository().ingestSourceFile("ta-1", "/tmp/source.pdf");

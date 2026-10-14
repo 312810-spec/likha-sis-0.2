@@ -6,7 +6,7 @@
 
 ## Current execution state
 
-- Current continuation: PR119 merged as ebb13de145a08da60746fba4348675538969c22a after exact-head Quality/Security PASS at fbae7411d9f5b8b83e0be7e32c3d2cbb122521c5 (Quality 38503472166; Security 38503472171). Active branch ctos/m10-source-grade-scope-20261014 adds optional teacher-declared grade scope checked against captured historical context, without backfill or official cohort claims. See docs/ctos/checkpoints/m10-source-grade-scope-2026-10-14.md. Exact-source native/security CI required; M10 remains incomplete.
+- Current continuation: PR120 merged as 31530f93ca3ee8677f43ef5178fd9677d11f93c5 after exact-head Quality/Security PASS at 701f1d7f0e8f30276a9b5f2ed2d36e69f8d336be (Quality 38510739285; Security 38510739234). Active branch ctos/m10-draft-lineage-20261014 preserves the last applied teacher-confirmed external suggestion at creation with native actor/time and immutable storage. See docs/ctos/checkpoints/m10-draft-lineage-2026-10-14.md. Frontend verified; exact-source native/browser/security CI required. M10 remains incomplete; no provider or official approval claims.
 
 - Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
 

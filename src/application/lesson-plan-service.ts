@@ -8,7 +8,11 @@ import type {
 } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import type { FilePicker } from "../domain/ports/file-picker";
-import { parseLessonSuggestion, type LessonSuggestion } from "../domain/lesson-suggestion";
+import {
+  parseLessonSuggestion,
+  type LessonSuggestion,
+  type LessonDraftReviewInput,
+} from "../domain/lesson-suggestion";
 
 const MAX_LONG_FIELD_LENGTH = 4000;
 
@@ -57,6 +61,7 @@ export class LessonPlanApplicationService {
     planDate: string,
     fields: LessonPlanFields,
     sourceReference?: LessonSourceReference,
+    reviewedDraft?: LessonDraftReviewInput,
   ): Promise<LessonPlan | null> {
     const trimmedAssignmentId = teachingAssignmentId.trim();
     const trimmedDate = planDate.trim();
@@ -68,6 +73,16 @@ export class LessonPlanApplicationService {
     }
     const trimmedFields = validateAndTrimFields(fields);
     const source = sourceReference ? trimSource(sourceReference, trimmedDate) : undefined;
+    if (reviewedDraft) {
+      if (reviewedDraft.teacherConfirmed !== true) {
+        throw new ValidationError("External draft requires teacher confirmation.");
+      }
+      const suggestion = parseLessonSuggestion(JSON.stringify(reviewedDraft.suggestion));
+      return this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields, source, {
+        suggestion,
+        teacherConfirmed: true,
+      });
+    }
     return source
       ? this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields, source)
       : this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields);

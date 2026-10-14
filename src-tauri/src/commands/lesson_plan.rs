@@ -9,8 +9,8 @@ use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::{AppError, AppResult};
 use crate::repository::lesson_plan::{
-    self, LessonPlan, LessonPlanFields, LessonSourceAmendment, LessonSourceArtifact,
-    LessonSourceReference,
+    self, LessonDraftReviewInput, LessonPlan, LessonPlanFields, LessonSourceAmendment,
+    LessonSourceArtifact, LessonSourceReference,
 };
 
 const MAX_SOURCE_FILE_BYTES: u64 = 8 * 1024 * 1024;
@@ -114,11 +114,12 @@ pub fn create_lesson_plan(
     assessment: String,
     ways_forward: String,
     source_reference: Option<LessonSourceReference>,
+    reviewed_draft: Option<LessonDraftReviewInput>,
 ) -> AppResult<Option<LessonPlan>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     lesson_plan::authorize_own_assignment(&conn, &user_id, &school_id, &teaching_assignment_id)?;
-    lesson_plan::create_with_source(
+    lesson_plan::create_with_review(
         &conn,
         &school_id,
         &teaching_assignment_id,
@@ -134,6 +135,7 @@ pub fn create_lesson_plan(
             ways_forward: &ways_forward,
         },
         source_reference.as_ref(),
+        reviewed_draft.as_ref(),
     )
 }
 

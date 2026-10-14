@@ -20,6 +20,7 @@ import { expectNoAccessibilityViolations } from "../test/a11y";
 import { clearLessonDrafts } from "./lesson-draft-store";
 import { LessonPlanScreen } from "./LessonPlanScreen";
 import { ModeProvider } from "./theme/ModeContext";
+import type { LessonDraftReviewInput } from "../domain/lesson-suggestion";
 
 const ASSIGNMENT: TeachingAssignmentSummary = {
   id: "ta-1",
@@ -73,6 +74,7 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     planDate: string;
     fields: LessonPlanFields;
     sourceReference?: LessonSourceReference;
+    reviewedDraft?: LessonDraftReviewInput;
   }> = [];
   createResult: LessonPlan | null = PLAN;
   amendments: LessonSourceAmendment[] = [];
@@ -85,14 +87,28 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     planDate: string,
     fields: LessonPlanFields,
     sourceReference?: LessonSourceReference,
+    reviewedDraft?: LessonDraftReviewInput,
   ): Promise<LessonPlan | null> {
     this.createCalls.push({
       teachingAssignmentId,
       planDate,
       fields,
       ...(sourceReference ? { sourceReference } : {}),
+      ...(reviewedDraft ? { reviewedDraft } : {}),
     });
-    const result = this.createResult ? { ...this.createResult, sourceReference } : null;
+    const result = this.createResult
+      ? {
+          ...this.createResult,
+          sourceReference,
+          externalDraftReview: reviewedDraft
+            ? {
+                suggestion: reviewedDraft.suggestion,
+                savedByUserId: "u1",
+                savedAt: "synthetic-save-time",
+              }
+            : undefined,
+        }
+      : null;
     if (result) this.plans = [...this.plans, result];
     return result;
   }
@@ -256,7 +272,7 @@ describe("LessonPlanScreen", () => {
   it("applies a reviewed suggestion only to unsaved planning fields and saves separately", async () => {
     const user = userEvent.setup();
     const repo = new FakeLessonPlanRepository();
-    renderScreen(repo);
+    const first = renderScreen(repo);
     await user.type(await screen.findByLabelText("Learning competency"), "Teacher-entered target");
     await user.type(screen.getByLabelText("Planned activities"), "Original manual activity");
     await user.click(screen.getByText("Review an external AI-assisted planning draft"));
@@ -278,9 +294,25 @@ describe("LessonPlanScreen", () => {
     expect(screen.getByLabelText("Learning competency")).toHaveValue("Teacher-entered target");
     expect(screen.getByLabelText("Planned activities")).toHaveValue("Reviewed synthetic activity");
     expect(repo.createCalls).toHaveLength(0);
+    await user.clear(screen.getByLabelText("Planned activities"));
+    await user.type(screen.getByLabelText("Planned activities"), "Teacher final edit");
+    first.unmount();
+    const second = renderScreen(repo);
+    expect(await screen.findByLabelText("Planned activities")).toHaveValue("Teacher final edit");
+    expect(
+      screen.getByText(/last applied teacher-confirmed suggestion will be retained/),
+    ).toBeInTheDocument();
+    await expectNoAccessibilityViolations(second.container);
     await user.click(screen.getByRole("button", { name: "Save lesson plan" }));
     await waitFor(() => expect(repo.createCalls).toHaveLength(1));
     expect(repo.createCalls[0]?.fields.learningCompetency).toBe("Teacher-entered target");
+    expect(repo.createCalls[0]?.fields.learningExperiences).toBe("Teacher final edit");
+    expect(repo.createCalls[0]?.reviewedDraft?.teacherConfirmed).toBe(true);
+    expect(repo.createCalls[0]?.reviewedDraft?.suggestion.learningExperiences).toBe(
+      "Reviewed synthetic activity",
+    );
+    await user.click(await screen.findByText("External draft review provenance"));
+    expect(screen.getByText(/recorded at save by u1/)).toBeInTheDocument();
   });
 
   it("links a selected exact source file without claiming official verification", async () => {

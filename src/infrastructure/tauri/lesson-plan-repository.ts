@@ -7,6 +7,7 @@ import type {
 } from "../../domain/lesson-plan";
 import type { LessonPlanRepository } from "../../domain/ports/lesson-plan-repository";
 import { invoke } from "./invoke";
+import type { LessonDraftReviewInput } from "../../domain/lesson-suggestion";
 
 /** Tauri adapter for `create_lesson_plan`/`update_lesson_plan`/
  * `list_lesson_plans_by_assignment` (`src-tauri/src/commands/lesson_plan.rs`). */
@@ -27,12 +28,14 @@ export class TauriLessonPlanRepository implements LessonPlanRepository {
     planDate: string,
     fields: LessonPlanFields,
     sourceReference?: LessonSourceReference,
+    reviewedDraft?: LessonDraftReviewInput,
   ): Promise<LessonPlan | null> {
     return invoke<LessonPlan | null>("create_lesson_plan", {
       teachingAssignmentId,
       planDate,
       ...fields,
       ...(sourceReference ? { sourceReference } : {}),
+      ...(reviewedDraft ? { reviewedDraft } : {}),
     });
   }
 

@@ -1,4 +1,5 @@
 import type { LessonPlanFields, LessonSourceReference } from "../domain/lesson-plan";
+import type { LessonDraftReviewInput } from "../domain/lesson-suggestion";
 
 export interface LessonDraft {
   assignmentId: string;
@@ -6,6 +7,7 @@ export interface LessonDraft {
   editingPlanId: string | null;
   fields: LessonPlanFields;
   externalSuggestionRaw?: string;
+  reviewedDraft?: LessonDraftReviewInput;
   sourceReference?: LessonSourceReference;
   amendingSource?: boolean;
   sourceCorrectionReason?: string;

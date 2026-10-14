@@ -363,7 +363,13 @@ function LessonPlanWorkspace({
     try {
       const result = editingPlanId
         ? await lessonPlanService.update(editingPlanId, assignmentId, fields)
-        : await lessonPlanService.create(assignmentId, planDate, fields, sourceReference);
+        : await lessonPlanService.create(
+            assignmentId,
+            planDate,
+            fields,
+            sourceReference,
+            submitted.reviewedDraft,
+          );
       if (lessonDraftEpoch() !== epoch) return;
       if (!alive.current) {
         // A completed local write must not become a resubmission draft after navigation.
@@ -375,7 +381,9 @@ function LessonPlanWorkspace({
             lessonDraftKey(retained.active) === lessonDraftKey(submitted) &&
             JSON.stringify(retained.active.fields) === JSON.stringify(submitted.fields) &&
             JSON.stringify(retained.active.sourceReference) ===
-              JSON.stringify(submitted.sourceReference);
+              JSON.stringify(submitted.sourceReference) &&
+            JSON.stringify(retained.active.reviewedDraft) ===
+              JSON.stringify(submitted.reviewedDraft);
           retainLessonWorkspace(
             owner,
             {
@@ -388,6 +396,7 @@ function LessonPlanWorkspace({
                     fields: EMPTY_FIELDS,
                     sourceReference: undefined,
                     externalSuggestionRaw: undefined,
+                    reviewedDraft: undefined,
                   }
                 : retained.active,
             },
@@ -423,6 +432,7 @@ function LessonPlanWorkspace({
             editingPlanId: null,
             sourceReference: undefined,
             externalSuggestionRaw: undefined,
+            reviewedDraft: undefined,
           },
         };
       });
@@ -556,6 +566,7 @@ function LessonPlanWorkspace({
                     ...current.active,
                     fields: { ...current.active.fields, ...suggestion },
                     externalSuggestionRaw: undefined,
+                    reviewedDraft: { suggestion, teacherConfirmed: true },
                   },
                 }));
                 setConfirmation(
@@ -563,6 +574,14 @@ function LessonPlanWorkspace({
                 );
               }}
             />
+          )}
+
+          {!editingPlanId && workspace.active.reviewedDraft && (
+            <p className="muted" role="status">
+              The last applied teacher-confirmed suggestion will be retained as provenance when you
+              save. You may edit the lesson fields; the original suggestion stays unchanged. AI
+              origin and official approval are not verified.
+            </p>
           )}
 
           <details>
@@ -1032,6 +1051,26 @@ function LessonPlanWorkspace({
                   <button type="button" disabled={saving} onClick={() => startEditingPlan(plan)}>
                     Edit
                   </button>
+                  {plan.externalDraftReview && (
+                    <details>
+                      <summary>External draft review provenance</summary>
+                      <p>
+                        Teacher-confirmed suggestion recorded at save by{" "}
+                        {plan.externalDraftReview.savedByUserId}
+                        {" · "}
+                        {plan.externalDraftReview.savedAt}. Later edits do not rewrite this
+                        snapshot. AI origin and official approval are not verified.
+                      </p>
+                      <dl>
+                        {Object.entries(plan.externalDraftReview.suggestion).map(([key, value]) => (
+                          <div key={key}>
+                            <dt>{key}</dt>
+                            <dd>{value || "Blank"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
                 </li>
               ))}
             </ul>

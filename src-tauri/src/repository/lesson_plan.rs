@@ -24,6 +24,7 @@ pub struct LessonPlan {
     pub plan_date: String,
     pub teaching_context: Option<LessonTeachingContext>,
     pub source_reference: Option<LessonSourceReference>,
+    pub external_draft_review: Option<LessonDraftReview>,
     pub learning_competency: String,
     pub learning_competency_code: String,
     pub learning_objectives: String,
@@ -34,6 +35,84 @@ pub struct LessonPlan {
     pub created_by_user_id: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Bounded teacher-pasted planning text; never competencies, records or authority.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LessonPlanningSuggestion {
+    pub learning_objectives: String,
+    pub connection_to_previous_learning: String,
+    pub learning_experiences: String,
+    pub assessment: String,
+    pub ways_forward: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LessonDraftReviewInput {
+    pub suggestion: LessonPlanningSuggestion,
+    pub teacher_confirmed: bool,
+}
+
+/// Teacher-asserted review preserved at save; AI origin/official approval unverified.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LessonDraftReview {
+    pub suggestion: LessonPlanningSuggestion,
+    pub saved_by_user_id: String,
+    pub saved_at: String,
+}
+
+impl LessonDraftReviewInput {
+    fn snapshot(&self, conn: &Connection, user_id: &str) -> AppResult<LessonDraftReview> {
+        if !self.teacher_confirmed {
+            return Err(AppError::Validation(
+                "External draft requires teacher confirmation".into(),
+            ));
+        }
+        let suggestion = LessonPlanningSuggestion {
+            learning_objectives: self.suggestion.learning_objectives.trim().into(),
+            connection_to_previous_learning: self
+                .suggestion
+                .connection_to_previous_learning
+                .trim()
+                .into(),
+            learning_experiences: self.suggestion.learning_experiences.trim().into(),
+            assessment: self.suggestion.assessment.trim().into(),
+            ways_forward: self.suggestion.ways_forward.trim().into(),
+        };
+        if [
+            &suggestion.learning_objectives,
+            &suggestion.learning_experiences,
+            &suggestion.assessment,
+        ]
+        .iter()
+        .any(|value| value.is_empty())
+            || [
+                &suggestion.learning_objectives,
+                &suggestion.connection_to_previous_learning,
+                &suggestion.learning_experiences,
+                &suggestion.assessment,
+                &suggestion.ways_forward,
+            ]
+            .iter()
+            .any(|value| value.chars().count() > 4000)
+        {
+            return Err(AppError::Validation(
+                "External draft fields are missing or exceed 4000 characters".into(),
+            ));
+        }
+        Ok(LessonDraftReview {
+            suggestion,
+            saved_by_user_id: user_id.into(),
+            saved_at: conn.query_row(
+                "SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+                [],
+                |row| row.get(0),
+            )?,
+        })
+    }
 }
 
 /// Canonical assignment context at creation, never re-derived for an existing plan.
@@ -500,6 +579,40 @@ pub fn create_with_source(
     fields: &LessonPlanFields<'_>,
     source_reference: Option<&LessonSourceReference>,
 ) -> AppResult<Option<LessonPlan>> {
+    create_with_review(
+        conn,
+        school_id,
+        teaching_assignment_id,
+        plan_date,
+        created_by_user_id,
+        fields,
+        source_reference,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn create_with_review(
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    plan_date: &str,
+    created_by_user_id: &str,
+    fields: &LessonPlanFields<'_>,
+    source_reference: Option<&LessonSourceReference>,
+    reviewed_draft: Option<&LessonDraftReviewInput>,
+) -> AppResult<Option<LessonPlan>> {
+    // Recheck at this expanded write boundary; actor is never supplied in the review payload.
+    if reviewed_draft.is_some() {
+        authorize_own_assignment(conn, created_by_user_id, school_id, teaching_assignment_id)?;
+    }
+    let review_json = reviewed_draft
+        .map(|input| input.snapshot(conn, created_by_user_id))
+        .transpose()?
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|_| AppError::Validation("External draft review could not be saved".into()))?;
     let source = source_reference
         .map(LessonSourceReference::normalized)
         .transpose()?;
@@ -550,8 +663,9 @@ pub fn create_with_source(
              (id, school_id, teaching_assignment_id, plan_date, \
               learning_competency, learning_competency_code, learning_objectives, \
               connection_to_previous_learning, learning_experiences, assessment, \
-              ways_forward, created_by_user_id, teaching_context_json, source_reference_json) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+              ways_forward, created_by_user_id, teaching_context_json, source_reference_json, \
+              external_draft_review_json) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         (
             &id,
             school_id,
@@ -567,6 +681,7 @@ pub fn create_with_source(
             created_by_user_id,
             &context_json,
             &source_json,
+            &review_json,
         ),
     )?;
 
@@ -687,7 +802,8 @@ const PLAN_SELECT: &str = "SELECT lp.id, lp.school_id, lp.teaching_assignment_id
     lp.teaching_context_json, \
     COALESCE((SELECT a.new_source_reference_json FROM lesson_source_amendments a \
       WHERE a.school_id = lp.school_id AND a.lesson_plan_id = lp.id \
-      ORDER BY a.created_at DESC, a.id DESC LIMIT 1), lp.source_reference_json) \
+      ORDER BY a.created_at DESC, a.id DESC LIMIT 1), lp.source_reference_json), \
+    lp.external_draft_review_json \
     FROM lesson_plans lp";
 
 /// Appends a source correction and returns the lesson with its new effective source.
@@ -790,6 +906,18 @@ pub fn list_source_amendments(
 }
 
 fn row_to_plan(row: &rusqlite::Row) -> rusqlite::Result<LessonPlan> {
+    let review_json: Option<String> = row.get(16)?;
+    let external_draft_review = review_json
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    16,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()?;
     let context_json: Option<String> = row.get(14)?;
     let teaching_context = context_json
         .map(|json| {
@@ -821,6 +949,7 @@ fn row_to_plan(row: &rusqlite::Row) -> rusqlite::Result<LessonPlan> {
         plan_date: row.get(3)?,
         teaching_context,
         source_reference,
+        external_draft_review,
         learning_competency: row.get(4)?,
         learning_competency_code: row.get(5)?,
         learning_objectives: row.get(6)?,
@@ -883,6 +1012,122 @@ mod tests {
             assessment: "Exit ticket: 3 addition and 2 subtraction items",
             ways_forward: "Reteach denominators via LCD if exit ticket accuracy < 70%",
         }
+    }
+
+    #[test]
+    fn external_draft_review_is_actor_stamped_and_preserved_after_lesson_edits() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let input = LessonDraftReviewInput {
+            teacher_confirmed: true,
+            suggestion: LessonPlanningSuggestion {
+                learning_objectives: " Synthetic objective ".into(),
+                connection_to_previous_learning: String::new(),
+                learning_experiences: "Synthetic activity".into(),
+                assessment: "Synthetic assessment".into(),
+                ways_forward: String::new(),
+            },
+        };
+        let plan = create_with_review(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+            None,
+            Some(&input),
+        )
+        .unwrap()
+        .unwrap();
+        let review = plan.external_draft_review.as_ref().unwrap();
+        assert_eq!(review.saved_by_user_id, f.teacher_id);
+        assert!(!review.saved_at.is_empty());
+        assert_eq!(review.suggestion.learning_objectives, "Synthetic objective");
+        let edited = update_authorized(
+            &conn,
+            &f.teacher_id,
+            &f.school_id,
+            &plan.id,
+            &f.assignment_id,
+            &LessonPlanFields {
+                learning_experiences: "Teacher's final activity",
+                ..sample_fields()
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(edited.learning_experiences, "Teacher's final activity");
+        assert_eq!(edited.external_draft_review.as_ref(), Some(review));
+        assert!(conn
+            .execute(
+                "UPDATE lesson_plans SET external_draft_review_json = NULL WHERE id = ?1",
+                params![plan.id],
+            )
+            .is_err());
+        assert!(create_with_review(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-08",
+            "not-the-teacher",
+            &sample_fields(),
+            None,
+            Some(&input),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn external_draft_review_rejects_unconfirmed_or_invalid_content_without_writing() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let mut input = LessonDraftReviewInput {
+            teacher_confirmed: false,
+            suggestion: LessonPlanningSuggestion {
+                learning_objectives: "Synthetic".into(),
+                connection_to_previous_learning: String::new(),
+                learning_experiences: "Synthetic".into(),
+                assessment: "Synthetic".into(),
+                ways_forward: String::new(),
+            },
+        };
+        for index in 0..3 {
+            if index == 1 {
+                input.teacher_confirmed = true;
+                input.suggestion.assessment = " ".into();
+            } else if index == 2 {
+                input.suggestion.assessment = "x".repeat(4001);
+            }
+            assert!(create_with_review(
+                &conn,
+                &f.school_id,
+                &f.assignment_id,
+                "2026-09-07",
+                &f.teacher_id,
+                &sample_fields(),
+                None,
+                Some(&input),
+            )
+            .is_err());
+        }
+        assert!(list_by_assignment(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .is_empty());
+        let mut value = serde_json::to_value(&input.suggestion).unwrap();
+        value["learningCompetency"] = serde_json::json!("Forbidden authority");
+        assert!(serde_json::from_value::<LessonPlanningSuggestion>(value).is_err());
+        let legacy = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(legacy.external_draft_review, None);
     }
 
     #[test]

@@ -66,6 +66,12 @@ export interface LessonPlan {
   planDate: string;
   teachingContext?: LessonTeachingContext | null;
   sourceReference?: LessonSourceReference | null;
+  /** Immutable last applied external suggestion recorded at creation, not verified AI origin. */
+  externalDraftReview?: {
+    suggestion: import("./lesson-suggestion").LessonSuggestion;
+    savedByUserId: string;
+    savedAt: string;
+  } | null;
   /** Intentions: the DepEd learning competency text (from the MATATAG
    * Curriculum Guide). */
   learningCompetency: string;
