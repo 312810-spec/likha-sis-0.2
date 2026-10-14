@@ -978,12 +978,13 @@ mod tests {
             Some(&original)
         );
         assert_eq!(history[0].new_source_reference, correction);
-        let legacy: LessonSourceScope = serde_json::from_str(
-            r#"{"schoolYear":"2026-2027","subjectId":"fixture:subject"}"#,
-        )
-        .unwrap();
+        let legacy: LessonSourceScope =
+            serde_json::from_str(r#"{"schoolYear":"2026-2027","subjectId":"fixture:subject"}"#)
+                .unwrap();
         assert_eq!(legacy.grade_level, None);
-        assert!(!serde_json::to_string(&legacy).unwrap().contains("gradeLevel"));
+        assert!(!serde_json::to_string(&legacy)
+            .unwrap()
+            .contains("gradeLevel"));
     }
 
     #[test]

@@ -39,7 +39,17 @@ applicability. Professional acceptance remains separate; M10 is not complete.
 - One focused failure was a source-less fake create response, repaired to return
   the submitted source reference without changing production logic.
 
-## Continue
+## Exact-head CI repair
+
+At published head `b600693c5140d63c001763eee26407cfb80a3bb9`, Security
+`38509918314` passed. Quality `38509918289` passed frontend, browser accessibility
+and recovery checks; Ubuntu job `115675856715` then stopped at `cargo fmt --check`
+on two formatting-only differences in the legacy JSON test. Apply the exact
+formatter output without behavior changes. Reuse unchanged frontend evidence,
+but require both applicable gates at the repaired published head before merge.
+Windows build/tests were still running when this failure was inspected.
+
+## Next action
 
 Publish with an expected-head lease and verify the remote tree against local Git.
 Inspect any failing CI excerpts; do not weaken gates. Merge only at a verified head
