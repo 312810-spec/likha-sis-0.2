@@ -74,6 +74,39 @@ pub fn preview_class_record_report_card(
     )
 }
 
+/// Immutable local preparation draft, not review/issuance or file export.
+#[tauri::command]
+pub fn capture_report_card_draft(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+) -> AppResult<Option<crate::repository::report_readiness::ReportCardDraft>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    crate::repository::report_readiness::capture_report_card_draft_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+    )
+}
+
+#[tauri::command]
+pub fn list_recent_report_card_drafts(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+) -> AppResult<Vec<crate::repository::report_readiness::ReportCardDraft>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    crate::repository::report_readiness::list_recent_report_card_drafts_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+    )
+}
+
 /// Writes a section-level, DepEd-SF2-inspired monthly attendance export to
 /// `<Documents>/LIKHA-SIS/` (falling back to the app data directory if the
 /// Documents directory cannot be resolved). `school_id` is derived from the

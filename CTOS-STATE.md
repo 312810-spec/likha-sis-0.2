@@ -6,7 +6,7 @@
 
 ## Current execution state
 
-- Current continuation: PR122 merged as dea115f75eeb970efed7dd319257310858bf1977 after exact-head Quality/Security PASS at e11600141e60a18b16fcbd59a7444b4ff68e0624 (Quality 38537534183; Security 38537534016). Active branch ctos/m11-readiness-ui-20261014 wires the full-period read-only preparation preview through port/service/native adapter into the class record workspace, with explicit issues and stale/error handling. See docs/ctos/checkpoints/m11-readiness-ui-2026-10-14.md. Exact-source UI/Security CI required. Issued snapshot/amendment/reconciliation remain unimplemented; M10/M11 are incomplete and no official fidelity/deployment is claimed.
+- Current continuation: PR123 merged as 105e7c6b7cfeee2787d62d0efd5275bc4a3c6d53 after exact-head Quality/Security PASS at 9c470f7acba1c97cfff0970cfaf901b783b92b7b (Quality 38545207071; Security 38545207091). Active branch ctos/m11-report-drafts-20261014 adds native immutable preparation drafts with exact JSON hashes, authenticated actor/time, scoped recent reads and integrity checks. See docs/ctos/checkpoints/m11-report-drafts-2026-10-14.md. Native CI pending; draft UI, professional review/issued/amendment transitions and reconciliation remain unimplemented. M10/M11 incomplete; no official fidelity/deployment claimed.
 
 - Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
 

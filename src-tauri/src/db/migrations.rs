@@ -2561,6 +2561,42 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M11: local preparation drafts only, never inferred reviews or issuance.
+        CREATE TABLE report_card_drafts (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id),
+            class_record_id TEXT NOT NULL REFERENCES class_records(id),
+            stage TEXT NOT NULL DEFAULT 'draft' CHECK (stage = 'draft'),
+            snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+            snapshot_sha256 TEXT NOT NULL CHECK (
+                length(snapshot_sha256) = 64 AND snapshot_sha256 = lower(snapshot_sha256)
+                AND snapshot_sha256 NOT GLOB '*[^0-9a-f]*'
+            ),
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX idx_report_card_drafts_school_record_created
+            ON report_card_drafts(school_id, class_record_id, created_at DESC, id DESC);
+        CREATE TRIGGER report_card_draft_no_update BEFORE UPDATE ON report_card_drafts
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting preparation drafts are immutable');
+        END;
+        CREATE TRIGGER report_card_draft_no_delete BEFORE DELETE ON report_card_drafts
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting preparation drafts are retained evidence');
+        END;
+        CREATE TRIGGER report_card_draft_school_scope BEFORE INSERT ON report_card_drafts
+        WHEN NOT EXISTS (
+            SELECT 1 FROM class_records cr
+            WHERE cr.id = NEW.class_record_id AND cr.school_id = NEW.school_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Reporting draft class record must belong to its school');
+        END;
+        "#,
+        ),
     ])
 }
 
