@@ -10,6 +10,8 @@ import type {
   Sf6ExportResult,
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
+import type { ReportReadinessRepository } from "../domain/ports/report-readiness-repository";
+import type { ReportCardReadiness } from "../domain/report-readiness";
 
 /**
  * Orchestrates official-form export use cases. UI code depends on this,
@@ -22,7 +24,17 @@ import type { ExportRepository } from "../domain/ports/export-repository";
  * may diverge later.
  */
 export class ExportApplicationService {
-  constructor(private readonly exports: ExportRepository) {}
+  constructor(
+    private readonly exports: ExportRepository,
+    private readonly readiness?: ReportReadinessRepository,
+  ) {}
+
+  previewReportCard(classRecordId: string): Promise<ReportCardReadiness | null> {
+    const id = classRecordId.trim();
+    if (!id) throw new ValidationError("Class record is required.");
+    if (!this.readiness) throw new ValidationError("Reporting preview is unavailable.");
+    return this.readiness.previewReportCard(id);
+  }
 
   async exportSectionMonthlySf2(
     sectionId: string,

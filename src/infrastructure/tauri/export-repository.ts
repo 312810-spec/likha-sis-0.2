@@ -11,9 +11,16 @@ import type {
   Sf6ExportResult,
 } from "../../domain/export";
 import type { ExportRepository } from "../../domain/ports/export-repository";
+import type { ReportReadinessRepository } from "../../domain/ports/report-readiness-repository";
+import type { ReportCardReadiness } from "../../domain/report-readiness";
 
 /** Tauri/SQLite implementation of {@link ExportRepository}. */
-export class TauriExportRepository implements ExportRepository {
+export class TauriExportRepository implements ExportRepository, ReportReadinessRepository {
+  previewReportCard(classRecordId: string): Promise<ReportCardReadiness | null> {
+    return invoke<ReportCardReadiness | null>("preview_class_record_report_card", {
+      classRecordId,
+    });
+  }
   exportSectionMonthlySf2(
     sectionId: string,
     year: number,

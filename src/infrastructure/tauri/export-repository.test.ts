@@ -16,6 +16,13 @@ vi.mock("@tauri-apps/api/core", () => ({
 const mockInvoke = vi.mocked(invoke);
 
 describe("TauriExportRepository", () => {
+  it("requests read-only reporting preview with record identity, never actor/school/file inputs", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+    await expect(new TauriExportRepository().previewReportCard("cr-1")).resolves.toBeNull();
+    expect(mockInvoke).toHaveBeenCalledWith("preview_class_record_report_card", {
+      classRecordId: "cr-1",
+    });
+  });
   it("exportSectionMonthlySf2 invokes export_section_monthly_sf2 with sectionId/year/month", async () => {
     const result: Sf2ExportResult = {
       filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv",
