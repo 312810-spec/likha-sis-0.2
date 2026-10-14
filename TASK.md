@@ -1,5 +1,19 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 teacher-facing retained drafts
+
+PR124 passed Quality/Security at `aad6bbaec035b4ed00149f6e52803d79c76ef02b`
+and merged as `1d9669e85fb84ccc5ee04430781c03d584e55cde`. Active branch:
+`ctos/m11-report-draft-ui-20261014`; read
+`docs/ctos/checkpoints/m11-report-draft-ui-2026-10-14.md` next. Explicit native
+capture requires fresh draft-only confirmation; retained history shows native
+snapshot evidence without recomputing. Failed/interrupted capture may already
+have persisted; inspect history before another capture. No automatic retries,
+professional review or issuance. Require exact-head applicable Quality/Security
+before merge. Next: reviewed issued-snapshot/amendment lifecycle with stable
+source-freshness rejection, then cross-form reconciliation. Official sources,
+installed-device and professional acceptance remain pending. No deployment.
+
 ## Current active slice — M11 immutable preparation drafts
 
 PR123 passed Quality/Security at `9c470f7acba1c97cfff0970cfaf901b783b92b7b`

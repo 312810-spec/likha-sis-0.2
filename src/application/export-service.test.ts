@@ -120,6 +120,29 @@ class FakeExportRepository implements ExportRepository {
 }
 
 describe("ExportApplicationService", () => {
+  it("validates draft identities and delegates without client evidence or authority", async () => {
+    const captureReportCardDraft = vi.fn().mockResolvedValue(null);
+    const listRecentReportCardDrafts = vi.fn().mockResolvedValue([]);
+    const exports = new FakeExportRepository();
+    const service = new ExportApplicationService(exports, undefined, {
+      captureReportCardDraft,
+      listRecentReportCardDrafts,
+    });
+    expect(() => service.captureReportCardDraft(" ")).toThrow(ValidationError);
+    expect(() => service.listRecentReportCardDrafts(" ")).toThrow(ValidationError);
+    expect(captureReportCardDraft).not.toHaveBeenCalled();
+    expect(listRecentReportCardDrafts).not.toHaveBeenCalled();
+    await expect(service.captureReportCardDraft(" cr-1 ")).resolves.toBeNull();
+    await expect(service.listRecentReportCardDrafts(" cr-1 ")).resolves.toEqual([]);
+    expect(captureReportCardDraft).toHaveBeenCalledWith("cr-1");
+    expect(listRecentReportCardDrafts).toHaveBeenCalledWith("cr-1");
+    expect(() => new ExportApplicationService(exports).captureReportCardDraft("cr-1")).toThrow(
+      ValidationError,
+    );
+    expect(() => new ExportApplicationService(exports).listRecentReportCardDrafts("cr-1")).toThrow(
+      ValidationError,
+    );
+  });
   it("previews a trimmed record through the read-only port and rejects unavailable or blank requests", async () => {
     const exports = new FakeExportRepository();
     const previewReportCard = vi.fn().mockResolvedValue(null);
