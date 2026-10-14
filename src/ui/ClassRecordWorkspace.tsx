@@ -25,6 +25,7 @@ import { Page } from "./components/Page";
 import { StatusChip } from "./components/StatusChip";
 import { useSessionDraft } from "./useSessionDraft";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import { ReportCardReadinessPanel } from "./ReportCardReadinessPanel";
 
 interface ClassRecordWorkspaceProps {
   classRecordId: string;
@@ -59,6 +60,10 @@ export function ClassRecordWorkspace({
   const [syncCheckRevision, setSyncCheckRevision] = useState(0);
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
+  const reportingRevision = useMemo(
+    () => ({ items, syncCheckRevision, weightPolicyName }),
+    [items, syncCheckRevision, weightPolicyName],
+  );
   const [itemsLoading, setItemsLoading] = useState(true);
   const [itemsSource, setItemsSource] = useState<{
     service: AssessmentApplicationService;
@@ -1429,6 +1434,14 @@ export function ClassRecordWorkspace({
               </div>
             </>
           )}
+
+          <ReportCardReadinessPanel
+            key={classRecordId}
+            service={exportService}
+            classRecordId={classRecordId}
+            revision={reportingRevision}
+            disabled={!itemsReady || savingLearnerIds.size > 0}
+          />
 
           {roster.length > 0 && (
             <div className="term-grades">

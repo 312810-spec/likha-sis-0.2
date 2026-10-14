@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type {
   ClassSummaryExportResult,
@@ -120,6 +120,18 @@ class FakeExportRepository implements ExportRepository {
 }
 
 describe("ExportApplicationService", () => {
+  it("previews a trimmed record through the read-only port and rejects unavailable or blank requests", async () => {
+    const exports = new FakeExportRepository();
+    const previewReportCard = vi.fn().mockResolvedValue(null);
+    const service = new ExportApplicationService(exports, { previewReportCard });
+    expect(() => service.previewReportCard(" ")).toThrow(ValidationError);
+    expect(previewReportCard).not.toHaveBeenCalled();
+    await expect(service.previewReportCard(" cr-1 ")).resolves.toBeNull();
+    expect(previewReportCard).toHaveBeenCalledWith("cr-1");
+    expect(() => new ExportApplicationService(exports).previewReportCard("cr-1")).toThrow(
+      ValidationError,
+    );
+  });
   it("exports with a trimmed section id", async () => {
     const repo = new FakeExportRepository();
     const service = new ExportApplicationService(repo);

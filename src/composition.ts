@@ -93,7 +93,8 @@ export const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
   new TauriEnrollmentHistoryRepository(),
   sectionRepository,
 );
-export const exportService = new ExportApplicationService(new TauriExportRepository());
+const exportRepository = new TauriExportRepository();
+export const exportService = new ExportApplicationService(exportRepository, exportRepository);
 export const formGenerationService = new FormGenerationApplicationService(
   new TauriFormGenerationRepository(),
 );

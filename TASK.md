@@ -1,17 +1,17 @@
 # Current task — CTOS v3
 
-## Current active slice — M11 report-card readiness read model
+## Current active slice — M11 teacher-facing reporting preview
 
-PR121 passed Quality/Security at `79a4d35b33ac0dd66d633103e0405259cfd890f7`
-and merged as `e1f808f4cfe70c625a7790fb76700eeba345699a`. Active branch:
-`ctos/m11-readiness-20261014`; read
-`docs/ctos/checkpoints/m11-readiness-2026-10-14.md` next. Native preparation preview
-uses the complete period roster, distinguishes missing/provisional grades and
-missing LRNs, reuses CSV omissions, and gates by teacher assignment/School Head.
-No files or records are written. Require exact-source native/Security gates before merge.
-Next: wire the teacher-facing preview through service/port/adapter, then implement
-reviewed issued-snapshot/amendment lifecycle and cross-form reconciliation. Do not
-claim M10/M11 complete; source/provider/professional M10 acceptance remains parked.
+PR122 passed Quality/Security at `e11600141e60a18b16fcbd59a7444b4ff68e0624`
+and merged as `dea115f75eeb970efed7dd319257310858bf1977`. Active branch:
+`ctos/m11-readiness-ui-20261014`; read
+`docs/ctos/checkpoints/m11-readiness-ui-2026-10-14.md` next. Teacher-facing full-period
+preview uses port/service/native adapter, is on demand/read only, shows omissions
+and missing/provisional evidence, and clears mismatched or obsolete results. No
+exports or lifecycle approvals occur. Require exact-source applicable gates before merge.
+Next: implement reviewed issued-snapshot/amendment lifecycle and cross-form
+reconciliation, with revalidated native authorization. Do not claim M10/M11 complete;
+source/provider/professional M10 acceptance remains parked.
 Official sources, installed devices and professional acceptance remain pending.
 No deployment.
 
