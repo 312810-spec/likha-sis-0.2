@@ -42,6 +42,17 @@ change is introduced. This is an applicability slice, not completion of M10.
   exact-source Quality CI must pass before merge.
 - Local security scanners unavailable; exact-source Security CI required.
 
+## Exact-head CI repair
+
+At published head `3cce97fd9725c0fe1455a3fa9af3f601760c384b`, Security
+`38496783864` passed. Quality `38496783787` passed frontend/browser/recovery and
+Windows build/native testing, but Ubuntu stopped at `cargo fmt --check` before its
+native tests or Clippy. Job `115634312701` showed one formatting-only diff in the
+optional date normalization chain. The exact formatter layout is applied without a
+behavior change. Reuse unchanged frontend evidence; require both gates on the new
+published head before merging. Windows packaging/test CI is not installed-device
+or professional acceptance. No deployment.
+
 ## Continue
 
 Publish a small draft PR with an expected-head lease; compare remote/local trees.

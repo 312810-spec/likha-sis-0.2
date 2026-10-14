@@ -126,10 +126,13 @@ impl LessonSourceReference {
                 subject_id: scope.subject_id.trim().into(),
             }),
             artifact_id: self.artifact_id.as_ref().map(|id| id.trim().into()),
-            applicable_dates: self.applicable_dates.as_ref().map(|dates| LessonSourceDates {
-                starts_on: dates.starts_on.trim().into(),
-                ends_on: dates.ends_on.trim().into(),
-            }),
+            applicable_dates: self
+                .applicable_dates
+                .as_ref()
+                .map(|dates| LessonSourceDates {
+                    starts_on: dates.starts_on.trim().into(),
+                    ends_on: dates.ends_on.trim().into(),
+                }),
         };
         for value in [
             &source.title,
