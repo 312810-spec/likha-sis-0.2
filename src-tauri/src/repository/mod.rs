@@ -20,6 +20,7 @@ pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;
 pub mod report_readiness;
+pub(crate) mod report_source_lock;
 pub mod role;
 pub mod schedule_meeting;
 pub mod schedule_plan;
