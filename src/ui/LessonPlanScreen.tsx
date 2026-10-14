@@ -16,6 +16,7 @@ import { Page } from "./components/Page";
 import { SessionDraftContext } from "./session-draft-context";
 import { localIsoDate } from "./local-date";
 import { LessonSuggestionReview } from "./LessonSuggestionReview";
+import { LessonSourceIntegrity } from "./LessonSourceIntegrity";
 import {
   lessonDraftEpoch,
   lessonDraftKey,
@@ -582,6 +583,13 @@ function LessonPlanWorkspace({
                 ? `A local integrity record is linked (${sourceReference.artifactId}). It identifies exact bytes only and does not prove official approval or applicability.`
                 : "PDF, DOCX, or XLSX up to 8 MiB. The stored fingerprint does not prove official approval or applicability."}
             </p>
+            {sourceReference?.artifactId && (
+              <LessonSourceIntegrity
+                key={sourceReference.artifactId}
+                artifactId={sourceReference.artifactId}
+                service={lessonPlanService}
+              />
+            )}
             {(
               [
                 ["title", "Source title"],

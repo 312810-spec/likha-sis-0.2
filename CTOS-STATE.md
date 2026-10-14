@@ -6,7 +6,7 @@
 
 ## Current execution state
 
-- Current continuation: PR116 merged as c2ccb996890474051c72e57e1fbd53c8792c7212 after exact-head Quality/Security PASS. Active branch ctos/m10-draft-review-20261014 adds local teacher-pasted planning draft staging, explicit review and separate save, without a provider or imported competencies. See docs/ctos/checkpoints/m10-draft-review-2026-10-14.md. Local browser execution is currently unavailable due to Chromium launch SIGSEGV; CI required. M10 remains incomplete.
+- Current continuation: PR117 merged as 10b189d26217de06e2d1397fd1b1ccbd2f6ee141 after exact-head Quality/Security PASS at a521f0ec55030d79e847f2622783e6414896010d. Active branch ctos/m10-source-integrity-20261014 verifies stored source bytes before metadata reads/linking and exposes an honest integrity-only inspection. See docs/ctos/checkpoints/m10-source-integrity-2026-10-14.md. Local Chromium launch SIGSEGV persists; exact-source CI required. M10 remains incomplete.
 
 - Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
 
