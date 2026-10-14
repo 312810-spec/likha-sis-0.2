@@ -44,9 +44,9 @@ fn grade_issue(grade: Option<grading_computation::ComputedTermGrade>) -> Option<
         None => Some(
             "No computable grade; required weighted assessment evidence is unavailable.".into(),
         ),
-        Some(grade) if !grade.complete => Some(
-            "Provisional grade; some eligible assessment scores are not recorded.".into(),
-        ),
+        Some(grade) if !grade.complete => {
+            Some("Provisional grade; some eligible assessment scores are not recorded.".into())
+        }
         Some(_) => None,
     }
 }
@@ -115,11 +115,9 @@ pub fn preview_report_card_authorized(
         starts_on,
         ends_on,
         weight_policy_id: detail.weight_policy_id,
-        checked_at: conn.query_row(
-            "SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
-            [],
-            |row| row.get(0),
-        )?,
+        checked_at: conn.query_row("SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", [], |row| {
+            row.get(0)
+        })?,
         learner_count: learners.len(),
         missing_grade_count: learners.iter().filter(|row| row.grade.is_none()).count(),
         provisional_grade_count: learners
@@ -140,7 +138,9 @@ pub fn preview_report_card_authorized(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{grading, learner, school, section, subject, teaching_assignment, user};
+    use crate::repository::{
+        grading, learner, school, section, subject, teaching_assignment, user,
+    };
     use std::path::Path;
 
     #[test]
@@ -167,7 +167,8 @@ mod tests {
     fn preview_is_read_only_period_scoped_and_assignment_authorized() {
         let conn = crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
         let school = school::create(&conn, "Synthetic School").unwrap();
-        let sec = section::create(&conn, &school.id, "2026-2027", "7", "Synthetic Section").unwrap();
+        let sec =
+            section::create(&conn, &school.id, "2026-2027", "7", "Synthetic Section").unwrap();
         let sub = subject::create(&conn, &school.id, "Synthetic Subject").unwrap();
         let teacher = user::create_user(&conn, "teacher", "password", "Synthetic Teacher").unwrap();
         user::add_school_membership(&conn, &teacher.id, &school.id).unwrap();
@@ -222,15 +223,21 @@ mod tests {
             Err(AppError::Unauthorized)
         ));
         role::grant(&conn, &other.id, &school.id, role::SCHOOL_HEAD).unwrap();
-        assert!(preview_report_card_authorized(&conn, &other.id, &school.id, &record.id)
-            .unwrap()
-            .is_some());
+        assert!(
+            preview_report_card_authorized(&conn, &other.id, &school.id, &record.id)
+                .unwrap()
+                .is_some()
+        );
         let foreign = school::create(&conn, "Other School").unwrap();
-        assert!(preview_report_card_authorized(&conn, &teacher.id, &foreign.id, &record.id)
-            .unwrap()
-            .is_none());
-        assert!(preview_report_card_authorized(&conn, &teacher.id, &school.id, "missing")
-            .unwrap()
-            .is_none());
+        assert!(
+            preview_report_card_authorized(&conn, &teacher.id, &foreign.id, &record.id)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            preview_report_card_authorized(&conn, &teacher.id, &school.id, "missing")
+                .unwrap()
+                .is_none()
+        );
     }
 }
