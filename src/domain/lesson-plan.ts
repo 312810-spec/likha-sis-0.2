@@ -9,6 +9,8 @@ export interface LessonSourceReference {
   scope?: { schoolYear: string; subjectId: string };
   /** Exact local source-file identity; never an official-approval assertion. */
   artifactId?: string;
+  /** Teacher-declared inclusive window; not a verified official term calendar. */
+  applicableDates?: { startsOn: string; endsOn: string };
 }
 
 /** Exact locally stored source bytes and their integrity fingerprint. */

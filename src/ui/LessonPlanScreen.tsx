@@ -590,6 +590,71 @@ function LessonPlanWorkspace({
                 service={lessonPlanService}
               />
             )}
+            <label>
+              <input
+                type="checkbox"
+                checked={!!sourceReference?.applicableDates}
+                disabled={saving || (editingPlanId !== null && !amendingSource)}
+                onChange={(event) =>
+                  changeWorkspace((current) => ({
+                    ...current,
+                    active: {
+                      ...current.active,
+                      sourceReference: {
+                        title: "",
+                        version: "",
+                        citation: "",
+                        curriculumName: "",
+                        term: "",
+                        ...current.active.sourceReference,
+                        applicableDates: event.target.checked
+                          ? { startsOn: "", endsOn: "" }
+                          : undefined,
+                      },
+                    },
+                  }))
+                }
+              />
+              Declare an inclusive source date window
+            </label>
+            <p className="muted">
+              Dates are teacher-declared, not an official term calendar. Leave undeclared when
+              unknown.
+            </p>
+            {sourceReference?.applicableDates &&
+              (
+                [
+                  ["startsOn", "Source applies from"],
+                  ["endsOn", "Source applies through"],
+                ] as const
+              ).map(([key, label]) => (
+                <div className="field" key={key}>
+                  <label htmlFor={`source-date-${key}`}>{label}</label>
+                  <input
+                    id={`source-date-${key}`}
+                    type="date"
+                    value={sourceReference.applicableDates?.[key] ?? ""}
+                    disabled={saving || (editingPlanId !== null && !amendingSource)}
+                    onChange={(event) =>
+                      changeWorkspace((current) => ({
+                        ...current,
+                        active: {
+                          ...current.active,
+                          sourceReference: {
+                            ...current.active.sourceReference!,
+                            applicableDates: {
+                              startsOn: "",
+                              endsOn: "",
+                              ...current.active.sourceReference?.applicableDates,
+                              [key]: event.target.value,
+                            },
+                          },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              ))}
             {(
               [
                 ["title", "Source title"],

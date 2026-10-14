@@ -67,7 +67,7 @@ export class LessonPlanApplicationService {
       throw new ValidationError("Plan date is required.");
     }
     const trimmedFields = validateAndTrimFields(fields);
-    const source = sourceReference ? trimSource(sourceReference) : undefined;
+    const source = sourceReference ? trimSource(sourceReference, trimmedDate) : undefined;
     return source
       ? this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields, source)
       : this.lessonPlans.create(trimmedAssignmentId, trimmedDate, trimmedFields);
@@ -185,7 +185,10 @@ function fieldLabel(key: string): string {
   }
 }
 
-function trimSource(source: LessonSourceReference): LessonSourceReference | undefined {
+function trimSource(
+  source: LessonSourceReference,
+  planDate?: string,
+): LessonSourceReference | undefined {
   const trimmed = {
     title: source.title.trim(),
     version: source.version.trim(),
@@ -193,7 +196,12 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
     curriculumName: source.curriculumName.trim(),
     term: source.term.trim(),
   };
-  if (!source.scope && Object.values(trimmed).every((value) => value.length === 0))
+  if (
+    !source.scope &&
+    !source.applicableDates &&
+    !source.artifactId &&
+    Object.values(trimmed).every((value) => value.length === 0)
+  )
     return undefined;
   for (const [label, value] of Object.entries(trimmed)) {
     if (!value || value.length > MAX_LONG_FIELD_LENGTH) {
@@ -206,7 +214,26 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
   if (source.artifactId !== undefined && !artifactId) {
     throw new ValidationError("Attached source artifact identifier is required.");
   }
-  if (!source.scope) return { ...trimmed, ...(artifactId ? { artifactId } : {}) };
+  const applicableDates = source.applicableDates
+    ? {
+        startsOn: source.applicableDates.startsOn.trim(),
+        endsOn: source.applicableDates.endsOn.trim(),
+      }
+    : undefined;
+  if (applicableDates) {
+    const { startsOn, endsOn } = applicableDates;
+    if (!isCalendarDate(startsOn) || !isCalendarDate(endsOn) || startsOn > endsOn) {
+      throw new ValidationError("Source date window requires real ordered dates.");
+    }
+    if (planDate && (!isCalendarDate(planDate) || planDate < startsOn || planDate > endsOn)) {
+      throw new ValidationError("Lesson date is outside the declared source date window.");
+    }
+  }
+  const extra = {
+    ...(artifactId ? { artifactId } : {}),
+    ...(applicableDates ? { applicableDates } : {}),
+  };
+  if (!source.scope) return { ...trimmed, ...extra };
   const scope = {
     schoolYear: source.scope.schoolYear.trim(),
     subjectId: source.scope.subjectId.trim(),
@@ -216,5 +243,15 @@ function trimSource(source: LessonSourceReference): LessonSourceReference | unde
       "Source subject and school year are required when scope is declared.",
     );
   }
-  return { ...trimmed, scope, ...(artifactId ? { artifactId } : {}) };
+  return { ...trimmed, scope, ...extra };
+}
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8));
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year > 0 && month >= 1 && month <= 12 && day > 0 && day <= days[month - 1]!;
 }

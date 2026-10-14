@@ -118,6 +118,33 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("checks inclusive declared source dates and rejects invalid or out-of-window drafts", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const source = {
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic",
+      term: "Synthetic term",
+      applicableDates: { startsOn: " 2026-09-07 ", endsOn: "2026-09-08" },
+    };
+    await service.create("ta-1", "2026-09-07", VALID_FIELDS, source);
+    await service.create("ta-1", "2026-09-08", VALID_FIELDS, source);
+    expect(repo.createCalls[0]?.sourceReference?.applicableDates?.startsOn).toBe("2026-09-07");
+    for (const date of ["2026-09-06", "2026-09-09", "2026-02-30"]) {
+      await expect(service.create("ta-1", date, VALID_FIELDS, source)).rejects.toThrow(/outside/);
+    }
+    for (const startsOn of ["2026-02-29", "1900-02-29", "2026-09-09", ""]) {
+      await expect(
+        service.create("ta-1", "2026-09-07", VALID_FIELDS, {
+          ...source,
+          applicableDates: { startsOn, endsOn: "2026-09-08" },
+        }),
+      ).rejects.toThrow(/real ordered/);
+    }
+    expect(repo.createCalls).toHaveLength(2);
+  });
   it("ingests a teacher-selected source and preserves cancellation", async () => {
     const repo = new FakeLessonPlanRepository();
     let selected: string | null = "/tmp/source.pdf";
