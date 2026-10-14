@@ -2627,6 +2627,46 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M11: actual user-confirmed preparation review, never inferred approval/issue.
+        CREATE TABLE report_card_preparation_reviews (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id),
+            class_record_id TEXT NOT NULL REFERENCES class_records(id),
+            draft_id TEXT NOT NULL REFERENCES report_card_drafts(id),
+            request_id TEXT NOT NULL,
+            stage TEXT NOT NULL DEFAULT 'review' CHECK (stage = 'review'),
+            snapshot_sha256 TEXT NOT NULL,
+            source_sha256 TEXT NOT NULL,
+            source_version TEXT NOT NULL,
+            notes TEXT NOT NULL CHECK (length(notes) <= 2000),
+            reviewed_by_user_id TEXT NOT NULL REFERENCES users(id),
+            reviewed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (school_id, request_id)
+        );
+        CREATE INDEX idx_preparation_reviews_record_created
+            ON report_card_preparation_reviews(school_id, class_record_id, reviewed_at DESC, id DESC);
+        CREATE TRIGGER preparation_review_no_update BEFORE UPDATE ON report_card_preparation_reviews
+        BEGIN
+            SELECT RAISE(ABORT, 'Preparation reviews are immutable');
+        END;
+        CREATE TRIGGER preparation_review_no_delete BEFORE DELETE ON report_card_preparation_reviews
+        BEGIN
+            SELECT RAISE(ABORT, 'Preparation reviews are retained evidence');
+        END;
+        CREATE TRIGGER preparation_review_evidence_scope BEFORE INSERT ON report_card_preparation_reviews
+        WHEN NOT EXISTS (
+            SELECT 1 FROM report_card_drafts d JOIN report_card_draft_source_locks s ON s.draft_id = d.id
+            WHERE d.id = NEW.draft_id AND d.school_id = NEW.school_id AND s.school_id = NEW.school_id
+            AND d.class_record_id = NEW.class_record_id AND d.snapshot_sha256 = NEW.snapshot_sha256
+            AND s.source_sha256 = NEW.source_sha256 AND s.source_version = NEW.source_version
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'Preparation review must bind its draft and source evidence');
+        END;
+        "#,
+        ),
     ])
 }
 

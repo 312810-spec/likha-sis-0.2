@@ -1,5 +1,22 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 native preparation-review evidence
+
+PR129 passed Quality/Security at `39837c076e2c84969497bd097a563b0d5753e458`
+and merged as `bbe47574b8a193e5058e6e7a00c0f3c03a19d4b1`. Active branch:
+`ctos/m11-preparation-review-20261015`; read
+`docs/ctos/checkpoints/m11-preparation-review-2026-10-15.md` next.
+Explicit confirmed review writes require current scoped authority and exact draft
+and source fingerprints, revalidated in the write transaction. Events retain
+native actor/time and immutable notes; identical requests return the original
+event, altered reused identities fail. Review history reauthorizes each read.
+This records preparation review only, even for incomplete evidence; no grade
+approval, issuance, professional acceptance or official-source verification.
+Require exact-head native Quality/Security before merge. Next implement explicit
+review UI, then issue-time revalidation, append-only amendments and cross-form
+reconciliation. External source/device/professional acceptance remains parked;
+M10/M11 incomplete. No deployment.
+
 ## Current active slice — M11 readiness input evidence viewing
 
 PR128 passed Quality/Security at `03f221281258ef6ed80317872011216737456aaf`
