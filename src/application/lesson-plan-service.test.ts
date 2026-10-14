@@ -9,6 +9,7 @@ import type {
 } from "../domain/lesson-plan";
 import type { LessonPlanRepository } from "../domain/ports/lesson-plan-repository";
 import { LessonPlanApplicationService } from "./lesson-plan-service";
+import type { LessonDraftReviewInput } from "../domain/lesson-suggestion";
 
 const VALID_FIELDS: LessonPlanFields = {
   learningCompetency: "Add and subtract fractions with unlike denominators",
@@ -57,6 +58,7 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     planDate: string;
     fields: LessonPlanFields;
     sourceReference?: LessonSourceReference;
+    reviewedDraft?: LessonDraftReviewInput;
   }> = [];
   updateCalls: Array<{
     id: string;
@@ -79,12 +81,14 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
     planDate: string,
     fields: LessonPlanFields,
     sourceReference?: LessonSourceReference,
+    reviewedDraft?: LessonDraftReviewInput,
   ): Promise<LessonPlan | null> {
     this.createCalls.push({
       teachingAssignmentId,
       planDate,
       fields,
       ...(sourceReference ? { sourceReference } : {}),
+      ...(reviewedDraft ? { reviewedDraft } : {}),
     });
     return this.createResult;
   }
@@ -118,6 +122,38 @@ class FakeLessonPlanRepository implements LessonPlanRepository {
 }
 
 describe("LessonPlanApplicationService", () => {
+  it("passes only confirmed bounded suggestions and never supplies review actor or time", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const suggestion = {
+      learningObjectives: " Synthetic objective ",
+      connectionToPreviousLearning: "",
+      learningExperiences: "Synthetic activity",
+      assessment: "Synthetic assessment",
+      waysForward: "",
+    };
+    await expect(
+      service.create("ta-1", "2026-09-07", VALID_FIELDS, undefined, {
+        suggestion,
+        teacherConfirmed: false,
+      }),
+    ).rejects.toThrow(ValidationError);
+    await expect(
+      service.create("ta-1", "2026-09-07", VALID_FIELDS, undefined, {
+        suggestion: { ...suggestion, learningCompetency: "Forbidden" } as typeof suggestion,
+        teacherConfirmed: true,
+      }),
+    ).rejects.toThrow(ValidationError);
+    expect(repo.createCalls).toHaveLength(0);
+    await service.create("ta-1", "2026-09-07", VALID_FIELDS, undefined, {
+      suggestion,
+      teacherConfirmed: true,
+    });
+    expect(repo.createCalls[0]?.reviewedDraft).toEqual({
+      suggestion: { ...suggestion, learningObjectives: "Synthetic objective" },
+      teacherConfirmed: true,
+    });
+  });
   it("checks inclusive declared source dates and rejects invalid or out-of-window drafts", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);

@@ -19,6 +19,12 @@ const KEYS = [
   "waysForward",
 ] as const;
 
+/** Explicit teacher assertion at save; actor and timestamp are native-derived. */
+export interface LessonDraftReviewInput {
+  suggestion: LessonSuggestion;
+  teacherConfirmed: boolean;
+}
+
 /** Parse only bounded plain text. Never evaluate content or accept official facts. */
 export function parseLessonSuggestion(raw: string): LessonSuggestion {
   if (!raw.trim() || raw.length > 24000) {

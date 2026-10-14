@@ -5,6 +5,7 @@ import type {
   LessonSourceAmendment,
   LessonSourceReference,
 } from "../lesson-plan";
+import type { LessonDraftReviewInput } from "../lesson-suggestion";
 
 /**
  * Port for the structured lesson-plan builder (Creation Studio sub-scope
@@ -21,6 +22,7 @@ export interface LessonPlanRepository {
     planDate: string,
     fields: LessonPlanFields,
     sourceReference?: LessonSourceReference,
+    reviewedDraft?: LessonDraftReviewInput,
   ): Promise<LessonPlan | null>;
   update(
     id: string,

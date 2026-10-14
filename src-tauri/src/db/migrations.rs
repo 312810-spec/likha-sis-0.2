@@ -2547,6 +2547,20 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(
+            r#"
+        -- M10: preserve the last teacher-confirmed external suggestion at creation.
+        -- Earlier lessons remain unknown; never infer reviews from their text.
+        ALTER TABLE lesson_plans ADD COLUMN external_draft_review_json TEXT
+            CHECK (external_draft_review_json IS NULL OR json_valid(external_draft_review_json));
+        CREATE TRIGGER lesson_external_draft_review_immutable
+        BEFORE UPDATE OF external_draft_review_json ON lesson_plans
+        WHEN NEW.external_draft_review_json IS NOT OLD.external_draft_review_json
+        BEGIN
+            SELECT RAISE(ABORT, 'Lesson external draft review is immutable');
+        END;
+        "#,
+        ),
     ])
 }
 
@@ -2554,6 +2568,51 @@ pub fn migrations() -> Migrations<'static> {
 mod tests {
     use super::*;
     use rusqlite::Connection;
+
+    #[test]
+    fn migration_53_preserves_earlier_lesson_text_without_inventing_review() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 52).unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO schools (id, name) VALUES ('school', 'Synthetic School');
+            INSERT INTO users (id, username, password_hash, display_name)
+            VALUES ('teacher', 'synthetic.teacher', 'unused', 'Synthetic Teacher');
+            INSERT INTO user_school_memberships (user_id, school_id)
+            VALUES ('teacher', 'school');
+            INSERT INTO sections (id, school_id, school_year, grade_level, name)
+            VALUES ('section', 'school', '2026-2027', '7', 'Synthetic Section');
+            INSERT INTO subjects (id, school_id, name)
+            VALUES ('subject', 'school', 'Synthetic Subject');
+            INSERT INTO teaching_assignments
+                (id, school_id, teacher_user_id, section_id, subject_id)
+            VALUES ('assignment', 'school', 'teacher', 'section', 'subject');
+            INSERT INTO lesson_plans
+                (id, school_id, teaching_assignment_id, plan_date, learning_competency,
+                 learning_objectives, learning_experiences, assessment, created_by_user_id)
+            VALUES ('earlier', 'school', 'assignment', '2026-09-07', 'Synthetic target',
+                    'Synthetic objective', 'Synthetic activity', 'Synthetic assessment', 'teacher');
+            "#,
+        )
+        .unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let (activity, review): (String, Option<String>) = conn
+            .query_row(
+                "SELECT learning_experiences, external_draft_review_json FROM lesson_plans WHERE id = 'earlier'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(activity, "Synthetic activity");
+        assert_eq!(review, None);
+        assert!(conn
+            .execute(
+                "UPDATE lesson_plans SET external_draft_review_json = '{}' WHERE id = 'earlier'",
+                []
+            )
+            .is_err());
+    }
 
     #[test]
     fn migration_52_preserves_earlier_occurrences_without_backfilling_lesson_origin() {

@@ -1,15 +1,16 @@
 # Current task — CTOS v3
 
-## Current active slice — declared source grade applicability
+## Current active slice — external planning-draft review provenance
 
-PR119 passed Quality/Security at `fbae7411d9f5b8b83e0be7e32c3d2cbb122521c5`
-and merged as `ebb13de145a08da60746fba4348675538969c22a`. Active branch:
-`ctos/m10-source-grade-scope-20261014`; read
-`docs/ctos/checkpoints/m10-source-grade-scope-2026-10-14.md` next. Optional
-teacher-declared grade is checked against captured historical context, not the
-assignment's current grade. No official cohort policy is inferred. Require exact-source
-gates before merge. Next: durable external-draft review lineage, then remaining
-unblocked controlling milestones; approved curriculum/cohort rules remain external.
+PR120 passed Quality/Security at `701f1d7f0e8f30276a9b5f2ed2d36e69f8d336be`
+and merged as `31530f93ca3ee8677f43ef5178fd9677d11f93c5`. Active branch:
+`ctos/m10-draft-lineage-20261014`; read
+`docs/ctos/checkpoints/m10-draft-lineage-2026-10-14.md` next. Preserve the last
+applied confirmed suggestion at creation, separately from final lesson fields,
+with native actor/time and immutable JSON. This is teacher-asserted review, not
+verified AI origin or approved curriculum. Require exact-source gates before merge.
+Next: inspect remaining M10 integrations, park provider/official curriculum acceptance
+and continue independently useful M11 work in controlling order. Do not call M10 complete.
 Official sources, installed devices and professional acceptance remain pending.
 No deployment.
 
