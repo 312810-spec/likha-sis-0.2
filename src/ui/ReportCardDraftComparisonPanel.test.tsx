@@ -50,7 +50,12 @@ function setup(compareReportCardDraft = vi.fn().mockResolvedValue(COMPARISON)) {
   const service = new ExportApplicationService(
     { exportClassRecordReportCard } as unknown as ExportRepository,
     undefined,
-    { captureReportCardDraft, listRecentReportCardDrafts: vi.fn(), compareReportCardDraft },
+    {
+      captureReportCardDraft,
+      listRecentReportCardDrafts: vi.fn(),
+      compareReportCardDraft,
+      checkReportCardDraftSource: vi.fn(),
+    },
   );
   const props = { service, draft: DRAFT, revision: 0, disabled: false };
   const view = (changes: Partial<typeof props> = {}) => (
