@@ -87,10 +87,25 @@ pub fn check_report_card_draft_source_authorized(
     draft_id: &str,
 ) -> AppResult<Option<ReportCardDraftSourceCheck>> {
     let tx = conn.unchecked_transaction()?;
-    if authorized_record(&tx, actor_user_id, school_id, class_record_id)?.is_none() {
+    let check = check_report_card_draft_source_in_snapshot(
+        &tx, actor_user_id, school_id, class_record_id, draft_id,
+    )?;
+    tx.commit()?;
+    Ok(check)
+}
+
+/// Shared within an already-open snapshot for atomic native review checks.
+pub(crate) fn check_report_card_draft_source_in_snapshot(
+    conn: &Connection,
+    actor_user_id: &str,
+    school_id: &str,
+    class_record_id: &str,
+    draft_id: &str,
+) -> AppResult<Option<ReportCardDraftSourceCheck>> {
+    if authorized_record(conn, actor_user_id, school_id, class_record_id)?.is_none() {
         return Ok(None);
     }
-    let stored = tx
+    let stored = conn
         .query_row(
             "SELECT id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id, created_at \
              FROM report_card_drafts WHERE id = ?1 AND school_id = ?2 AND class_record_id = ?3",
@@ -102,7 +117,7 @@ pub fn check_report_card_draft_source_authorized(
         return Ok(None);
     };
     let draft = decode_draft(stored)?;
-    let source: Option<(String, String, String)> = tx
+    let source: Option<(String, String, String)> = conn
         .query_row(
             "SELECT source_version, source_json, source_sha256 FROM report_card_draft_source_locks \
              WHERE draft_id = ?1 AND school_id = ?2",
@@ -140,11 +155,11 @@ pub fn check_report_card_draft_source_authorized(
         check.stored_source_sha256 = Some(hash.clone());
         if version == report_source_lock::VERSION {
             let Some(current) =
-                preview_report_card_authorized(&tx, actor_user_id, school_id, class_record_id)?
+                preview_report_card_authorized(conn, actor_user_id, school_id, class_record_id)?
             else {
                 return Ok(None);
             };
-            let current_json = report_source_lock::capture_json(&tx, school_id, &current)?;
+            let current_json = report_source_lock::capture_json(conn, school_id, &current)?;
             let current_hash = report_source_lock::hash(&current_json);
             check.source_status = if current_hash == hash {
                 "matches"
@@ -154,7 +169,6 @@ pub fn check_report_card_draft_source_authorized(
             check.current_source_sha256 = Some(current_hash);
         }
     }
-    tx.commit()?;
     Ok(Some(check))
 }
 
@@ -354,7 +368,7 @@ fn grade_issue(grade: Option<grading_computation::ComputedTermGrade>) -> Option<
 }
 
 /// Shared read/capture authorization; never authorize from serialized draft claims.
-fn authorized_record(
+pub(crate) fn authorized_record(
     conn: &Connection,
     actor_user_id: &str,
     school_id: &str,

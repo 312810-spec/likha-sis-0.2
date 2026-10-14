@@ -19,6 +19,7 @@ pub mod learner_support;
 pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;
+pub mod report_preparation_review;
 pub mod report_readiness;
 pub(crate) mod report_source_lock;
 pub mod role;

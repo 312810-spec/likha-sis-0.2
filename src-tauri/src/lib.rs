@@ -140,6 +140,8 @@ pub fn run() {
             commands::export::list_recent_report_card_drafts,
             commands::export::compare_report_card_draft,
             commands::export::check_report_card_draft_source,
+            commands::export::record_report_card_preparation_review,
+            commands::export::list_recent_report_card_preparation_reviews,
             commands::export::export_class_record_summary,
             commands::export::export_learner_roster,
             commands::grading::list_grading_policies,
