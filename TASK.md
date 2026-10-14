@@ -1,5 +1,19 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 retained/current projection comparison
+
+PR125 passed Quality/Security at `bf2b2fcd76abafdf0cfa446baf97f9b2c548e71c`
+and merged as `26925df1662770213a681c242d4f01f32fbdece0`. Active branch:
+`ctos/m11-draft-freshness-20261014`; read
+`docs/ctos/checkpoints/m11-draft-comparison-2026-10-14.md` next. Native read-only
+comparison reauthorizes the exact draft and verifies its stored hash, then compares
+current projected evidence excluding only checkedAt. It is explicitly NOT a
+raw-source lock, professional review or issuance clearance. No source-input lock
+has been implemented; identical projected grades can mask changed raw scores.
+Require exact-head native/Security gates before merge. Next wire comparison UI,
+then complete full source-input locking and review/issue/amendment semantics and
+cross-form reconciliation. External acceptance still parked; no deployment.
+
 ## Current active slice — M11 teacher-facing retained drafts
 
 PR124 passed Quality/Security at `aad6bbaec035b4ed00149f6e52803d79c76ef02b`

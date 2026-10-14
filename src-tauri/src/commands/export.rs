@@ -107,6 +107,25 @@ pub fn list_recent_report_card_drafts(
     )
 }
 
+/// Read-only retained/current projection comparison, not source locking or approval.
+#[tauri::command]
+pub fn compare_report_card_draft(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+    draft_id: String,
+) -> AppResult<Option<crate::repository::report_readiness::ReportCardDraftComparison>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    crate::repository::report_readiness::compare_report_card_draft_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+        draft_id.trim(),
+    )
+}
+
 /// Writes a section-level, DepEd-SF2-inspired monthly attendance export to
 /// `<Documents>/LIKHA-SIS/` (falling back to the app data directory if the
 /// Documents directory cannot be resolved). `school_id` is derived from the
