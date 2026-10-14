@@ -356,7 +356,9 @@ mod tests {
         });
         let mut current = old.clone();
         current["checkedAt"] = serde_json::json!("new-time");
-        assert!(changed_projection_fields(&old, &current).unwrap().is_empty());
+        assert!(changed_projection_fields(&old, &current)
+            .unwrap()
+            .is_empty());
         current["sectionName"] = serde_json::json!("changed");
         current["learners"] = serde_json::json!([{"learnerId": "new"}]);
         current["missingLrnCount"] = serde_json::json!(1);
@@ -542,16 +544,14 @@ mod tests {
         )
         .unwrap()
         .is_none());
-        assert!(compare_report_card_draft_authorized(
-            &conn,
-            &other.id,
-            &school.id,
-            &record.id,
-            &draft.id,
-        )
-        .unwrap()
-        .unwrap()
-        .projection_matches);
+        assert!(
+            compare_report_card_draft_authorized(
+                &conn, &other.id, &school.id, &record.id, &draft.id,
+            )
+            .unwrap()
+            .unwrap()
+            .projection_matches
+        );
         conn.execute(
             "UPDATE sections SET name = 'Changed Section' WHERE id = ?1",
             params![sec.id],

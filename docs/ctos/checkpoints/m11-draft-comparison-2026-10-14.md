@@ -53,6 +53,12 @@ No new schema, migration, algorithm version, review event or immutable issue sta
 
 ## Continue
 
+At head `150a2d1baf40788c39daa8855e227febf1980d34`, Security `38573890903`
+and Windows native package/tests passed. Quality `38573891224` failed at Ubuntu
+job `115885942436` on two test-only `cargo fmt --check` differences. Applied the
+exact formatter layout without a behavior change. Applicable native/Security gates
+must pass at the repaired head before merge; no failed gate bypassed.
+
 Publish with expected-head lease and verify exact remote/local trees. Inspect failed
 CI excerpts and apply minimum repairs; merge only at applicable green verified head.
 Wire explicit comparison viewing next, then full raw-source locking and native
