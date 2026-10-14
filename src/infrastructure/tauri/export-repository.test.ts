@@ -16,6 +16,16 @@ vi.mock("@tauri-apps/api/core", () => ({
 const mockInvoke = vi.mocked(invoke);
 
 describe("TauriExportRepository", () => {
+  it("compares a draft using only record and draft identities", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+    await expect(
+      new TauriExportRepository().compareReportCardDraft("record", "draft"),
+    ).resolves.toBeNull();
+    expect(mockInvoke).toHaveBeenLastCalledWith("compare_report_card_draft", {
+      classRecordId: "record",
+      draftId: "draft",
+    });
+  });
   it("captures and reads native drafts using record identity only", async () => {
     const repository = new TauriExportRepository();
     mockInvoke.mockResolvedValueOnce(null).mockResolvedValueOnce([]);

@@ -55,6 +55,7 @@ function setup(
   const service = new ExportApplicationService(exports as unknown as ExportRepository, undefined, {
     captureReportCardDraft,
     listRecentReportCardDrafts,
+    compareReportCardDraft: vi.fn(),
   });
   const props = { service, classRecordId: "cr-1", revision: 0, disabled: false };
   const view = (changes: Partial<typeof props> = {}) => (

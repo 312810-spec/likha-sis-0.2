@@ -12,6 +12,17 @@ export interface ReportCardDraft {
   createdAt: string;
 }
 
+/** Read-only projection comparison, explicitly not raw-source freshness or approval. */
+export interface ReportCardDraftComparison {
+  draftId: string;
+  classRecordId: string;
+  storedSnapshotSha256: string;
+  projectionMatches: boolean;
+  changedFields: string[];
+  current: ReportCardReadiness;
+  comparisonScope: "reporting_projection_only_not_source_lock_or_approval";
+}
+
 /** Point-in-time preparation evidence, not issuance or official-form approval. */
 export interface ReportCardReadiness {
   classRecordId: string;

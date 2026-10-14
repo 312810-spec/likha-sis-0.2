@@ -11,7 +11,11 @@ import type {
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { ReportReadinessRepository } from "../domain/ports/report-readiness-repository";
-import type { ReportCardDraft, ReportCardReadiness } from "../domain/report-readiness";
+import type {
+  ReportCardDraft,
+  ReportCardDraftComparison,
+  ReportCardReadiness,
+} from "../domain/report-readiness";
 import type { ReportDraftRepository } from "../domain/ports/report-draft-repository";
 
 /**
@@ -36,6 +40,17 @@ export class ExportApplicationService {
     if (!id) throw new ValidationError("Class record is required.");
     if (!this.drafts) throw new ValidationError("Reporting drafts are unavailable.");
     return this.drafts.captureReportCardDraft(id);
+  }
+
+  compareReportCardDraft(
+    classRecordId: string,
+    draftId: string,
+  ): Promise<ReportCardDraftComparison | null> {
+    const record = classRecordId.trim();
+    const draft = draftId.trim();
+    if (!record || !draft) throw new ValidationError("Class record and draft are required.");
+    if (!this.drafts) throw new ValidationError("Reporting draft comparison is unavailable.");
+    return this.drafts.compareReportCardDraft(record, draft);
   }
 
   listRecentReportCardDrafts(classRecordId: string): Promise<ReportCardDraft[]> {

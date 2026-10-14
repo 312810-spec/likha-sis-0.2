@@ -1,5 +1,19 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 comparison viewing
+
+PR126 passed Quality/Security at `754773336d2c696ddedcbe3616bb816f9cfddfbc`
+and merged as `f238142642aac214340d384b792086957e03dff5`. Active branch:
+`ctos/m11-draft-comparison-ui-20261014`; read
+`docs/ctos/checkpoints/m11-draft-comparison-ui-2026-10-14.md` next. Teachers can
+explicitly compare a retained draft with current projected evidence; identity/hash,
+scope/fidelity and result consistency checked, stale results dropped. This performs
+no writes or review/approval. Require applicable exact-head Quality/Security gates
+before merge. Next: full source-input locking and atomic native review/issue
+semantics, append-only amendments and cross-form reconciliation. Projection matches
+must never substitute for source freshness or professional approval. Official
+sources, installed-device and professional acceptance remain pending. No deployment.
+
 ## Current active slice — M11 retained/current projection comparison
 
 PR125 passed Quality/Security at `bf2b2fcd76abafdf0cfa446baf97f9b2c548e71c`
