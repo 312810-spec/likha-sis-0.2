@@ -1,16 +1,17 @@
 # Current task — CTOS v3
 
-## Current active slice — external planning-draft review provenance
+## Current active slice — M11 report-card readiness read model
 
-PR120 passed Quality/Security at `701f1d7f0e8f30276a9b5f2ed2d36e69f8d336be`
-and merged as `31530f93ca3ee8677f43ef5178fd9677d11f93c5`. Active branch:
-`ctos/m10-draft-lineage-20261014`; read
-`docs/ctos/checkpoints/m10-draft-lineage-2026-10-14.md` next. Preserve the last
-applied confirmed suggestion at creation, separately from final lesson fields,
-with native actor/time and immutable JSON. This is teacher-asserted review, not
-verified AI origin or approved curriculum. Require exact-source gates before merge.
-Next: inspect remaining M10 integrations, park provider/official curriculum acceptance
-and continue independently useful M11 work in controlling order. Do not call M10 complete.
+PR121 passed Quality/Security at `79a4d35b33ac0dd66d633103e0405259cfd890f7`
+and merged as `e1f808f4cfe70c625a7790fb76700eeba345699a`. Active branch:
+`ctos/m11-readiness-20261014`; read
+`docs/ctos/checkpoints/m11-readiness-2026-10-14.md` next. Native preparation preview
+uses the complete period roster, distinguishes missing/provisional grades and
+missing LRNs, reuses CSV omissions, and gates by teacher assignment/School Head.
+No files or records are written. Require exact-source native/Security gates before merge.
+Next: wire the teacher-facing preview through service/port/adapter, then implement
+reviewed issued-snapshot/amendment lifecycle and cross-form reconciliation. Do not
+claim M10/M11 complete; source/provider/professional M10 acceptance remains parked.
 Official sources, installed devices and professional acceptance remain pending.
 No deployment.
 

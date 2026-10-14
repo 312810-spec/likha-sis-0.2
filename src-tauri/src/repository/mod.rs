@@ -19,6 +19,7 @@ pub mod learner_support;
 pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;
+pub mod report_readiness;
 pub mod role;
 pub mod schedule_meeting;
 pub mod schedule_plan;

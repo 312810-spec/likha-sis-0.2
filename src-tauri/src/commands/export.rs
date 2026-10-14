@@ -57,6 +57,23 @@ pub struct Sf2ExportResult {
     pub disclosure: FieldDisclosure,
 }
 
+/// Read-only preparation preview; never writes a file or issues an official report.
+#[tauri::command]
+pub fn preview_class_record_report_card(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+) -> AppResult<Option<crate::repository::report_readiness::ReportCardReadiness>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    crate::repository::report_readiness::preview_report_card_authorized(
+        &conn,
+        &user_id,
+        &school_id,
+        class_record_id.trim(),
+    )
+}
+
 /// Writes a section-level, DepEd-SF2-inspired monthly attendance export to
 /// `<Documents>/LIKHA-SIS/` (falling back to the app data directory if the
 /// Documents directory cannot be resolved). `school_id` is derived from the

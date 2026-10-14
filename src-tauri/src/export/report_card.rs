@@ -48,7 +48,7 @@ pub struct ReportCardExport {
     pub disclosure: FieldDisclosure,
 }
 
-fn disclosure() -> FieldDisclosure {
+pub fn disclosure() -> FieldDisclosure {
     FieldDisclosure {
         populated_fields: vec![
             "School Name".to_string(),

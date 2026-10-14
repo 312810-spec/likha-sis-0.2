@@ -6,7 +6,7 @@
 
 ## Current execution state
 
-- Current continuation: PR120 merged as 31530f93ca3ee8677f43ef5178fd9677d11f93c5 after exact-head Quality/Security PASS at 701f1d7f0e8f30276a9b5f2ed2d36e69f8d336be (Quality 38510739285; Security 38510739234). Active branch ctos/m10-draft-lineage-20261014 preserves the last applied teacher-confirmed external suggestion at creation with native actor/time and immutable storage. See docs/ctos/checkpoints/m10-draft-lineage-2026-10-14.md. Frontend verified; exact-source native/browser/security CI required. M10 remains incomplete; no provider or official approval claims.
+- Current continuation: PR121 merged as e1f808f4cfe70c625a7790fb76700eeba345699a after exact-head Quality/Security PASS at 79a4d35b33ac0dd66d633103e0405259cfd890f7 (Quality 38522119767; Security 38522119790), including native Ubuntu and Windows checks. Active branch ctos/m11-readiness-20261014 adds a read-only, assignment-authorized full-period report-card preparation read model. See docs/ctos/checkpoints/m11-readiness-2026-10-14.md. Native CI pending; teacher-facing preview/lifecycle not yet implemented. M10 remains incomplete with source/provider/professional acceptance parked; M11 is partial and no issuance or official fidelity is claimed.
 
 - Latest continuation: PR115 passed Quality/Security at ffd647800f57aaa09d39b86ee0ea372aa236f0e7 and merged as 30cfd9df08072d83c331b5ab000e0ba74a71f50b. Active branch is ctos/m10-classroom-lesson-origin-20261014; captured immutable lesson identity/context/effective source is implemented, frontend verified, native CI pending. See docs/ctos/checkpoints/m10-classroom-lesson-origin-2026-10-14.md. Older continuation entries below are historical.
 
