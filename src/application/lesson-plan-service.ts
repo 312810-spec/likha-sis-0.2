@@ -237,10 +237,13 @@ function trimSource(
   const scope = {
     schoolYear: source.scope.schoolYear.trim(),
     subjectId: source.scope.subjectId.trim(),
+    ...(source.scope.gradeLevel !== undefined
+      ? { gradeLevel: source.scope.gradeLevel.trim() }
+      : {}),
   };
   if (Object.values(scope).some((value) => !value || value.length > MAX_LONG_FIELD_LENGTH)) {
     throw new ValidationError(
-      "Source subject and school year are required when scope is declared.",
+      "Declared source scope fields must be nonblank and at most 4000 characters.",
     );
   }
   return { ...trimmed, scope, ...extra };

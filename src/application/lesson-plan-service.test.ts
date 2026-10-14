@@ -202,6 +202,31 @@ describe("LessonPlanApplicationService", () => {
     expect(() => service.listSourceAmendments("lp-1", " ")).toThrow(ValidationError);
     await expect(service.listSourceAmendments(" lp-1 ", " ta-1 ")).resolves.toEqual([]);
   });
+  it("normalizes optional grade scope and rejects blank or oversized grades before writing", async () => {
+    const repo = new FakeLessonPlanRepository();
+    const service = new LessonPlanApplicationService(repo);
+    const source = {
+      title: "Synthetic BOW",
+      version: "v1",
+      citation: "fixture:bow",
+      curriculumName: "Synthetic curriculum",
+      term: "Term A",
+      scope: { schoolYear: "2026-2027", subjectId: "sub-1", gradeLevel: " 7 " },
+    };
+    await service.create("ta-1", "2026-09-07", VALID_FIELDS, source);
+    expect(repo.createCalls[0]?.sourceReference?.scope?.gradeLevel).toBe("7");
+    for (const gradeLevel of [" ", "x".repeat(4001)]) {
+      const invalid = { ...source, scope: { ...source.scope, gradeLevel } };
+      await expect(service.create("ta-1", "2026-09-07", VALID_FIELDS, invalid)).rejects.toThrow(
+        ValidationError,
+      );
+      await expect(service.amendSource("lp-1", "ta-1", invalid, "Correction")).rejects.toThrow(
+        ValidationError,
+      );
+    }
+    expect(repo.createCalls).toHaveLength(1);
+  });
+
   it("preserves a declared scope and rejects incomplete scope without writing", async () => {
     const repo = new FakeLessonPlanRepository();
     const service = new LessonPlanApplicationService(repo);
