@@ -1,5 +1,24 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 teacher preparation-review controls
+
+PR130 passed Quality/Security at `0164ceb34d0fb2563b2236a3f08c0336400128d4`
+and merged as `205cac2ecb7c029727ffe110f6859a46088d4256`. Active branch:
+`ctos/m11-preparation-review-ui-20261015`; read
+`docs/ctos/checkpoints/m11-preparation-review-ui-2026-10-15.md` next.
+Each retained draft offers an explicit input check, bounded notes, preparation-only
+confirmation and retained review history. Actual native write revalidates current
+authority and fingerprints. Confirmation resets on notes/context/revision changes;
+unsaved notes survive revision changes within the mounted draft. Uncertain writes
+are never automatically retried and remain blocked in that mounted draft view;
+history resolves only the exact request/fingerprints/notes. Latest-50 absence is not
+proof of no write. Review is not approval, professional acceptance or issuance.
+Require current-head applicable Quality/Security before merge. Native code is
+unchanged from verified PR130. Next implement issue-time revalidation, immutable
+issuance/amendments and cross-form reconciliation; continue remaining milestones.
+Official-source, installed-device and professional acceptance remain parked;
+M10/M11 incomplete. No deployment.
+
 ## Current active slice — M11 native preparation-review evidence
 
 PR129 passed Quality/Security at `39837c076e2c84969497bd097a563b0d5753e458`

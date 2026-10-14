@@ -120,6 +120,62 @@ class FakeExportRepository implements ExportRepository {
 }
 
 describe("ExportApplicationService", () => {
+  it("validates and whitelists explicit preparation-review inputs without caller authority", async () => {
+    const recordReportCardPreparationReview = vi.fn().mockResolvedValue(null);
+    const listRecentReportCardPreparationReviews = vi.fn().mockResolvedValue([]);
+    const service = new ExportApplicationService(new FakeExportRepository(), undefined, undefined, {
+      recordReportCardPreparationReview,
+      listRecentReportCardPreparationReviews,
+    });
+    const request = {
+      draftId: " draft ",
+      requestId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+      expectedSnapshotSha256: "a".repeat(64),
+      expectedSourceSha256: "b".repeat(64),
+      teacherConfirmed: true,
+      notes: " Synthetic ",
+      schoolId: "forged",
+      reviewedByUserId: "forged",
+    };
+    await expect(
+      service.recordReportCardPreparationReview(" record ", request),
+    ).resolves.toBeNull();
+    expect(recordReportCardPreparationReview).toHaveBeenCalledWith("record", {
+      draftId: "draft",
+      requestId: request.requestId.toLowerCase(),
+      expectedSnapshotSha256: request.expectedSnapshotSha256,
+      expectedSourceSha256: request.expectedSourceSha256,
+      teacherConfirmed: true,
+      notes: "Synthetic",
+    });
+    await expect(service.listRecentReportCardPreparationReviews(" record ")).resolves.toEqual([]);
+    expect(listRecentReportCardPreparationReviews).toHaveBeenCalledWith("record");
+    for (const patch of [
+      { teacherConfirmed: false },
+      { draftId: " " },
+      { requestId: "invalid" },
+      { expectedSnapshotSha256: "bad" },
+      { expectedSourceSha256: "bad" },
+      { notes: "x".repeat(2001) },
+    ])
+      expect(() =>
+        service.recordReportCardPreparationReview("record", { ...request, ...patch }),
+      ).toThrow(ValidationError);
+    expect(() => service.recordReportCardPreparationReview(" ", request)).toThrow(ValidationError);
+    expect(() => service.listRecentReportCardPreparationReviews(" ")).toThrow(ValidationError);
+    expect(() =>
+      new ExportApplicationService(new FakeExportRepository()).recordReportCardPreparationReview(
+        "record",
+        request,
+      ),
+    ).toThrow(ValidationError);
+    expect(() =>
+      new ExportApplicationService(
+        new FakeExportRepository(),
+      ).listRecentReportCardPreparationReviews("record"),
+    ).toThrow(ValidationError);
+    expect(recordReportCardPreparationReview).toHaveBeenCalledTimes(1);
+  });
   it("checks readiness inputs using trimmed identities and no client fingerprint or authority", async () => {
     const checkReportCardDraftSource = vi.fn().mockResolvedValue(null);
     const service = new ExportApplicationService(new FakeExportRepository(), undefined, {

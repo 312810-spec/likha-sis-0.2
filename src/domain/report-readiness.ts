@@ -1,6 +1,29 @@
 import type { FieldDisclosure } from "./export";
 import type { ComputedTermGrade } from "./learner-score";
 
+/** Preparation review only, never grade approval, issuance or source verification. */
+export interface ReportPreparationReviewRequest {
+  draftId: string;
+  requestId: string;
+  expectedSnapshotSha256: string;
+  expectedSourceSha256: string;
+  teacherConfirmed: boolean;
+  notes: string;
+}
+export interface ReportPreparationReview {
+  id: string;
+  classRecordId: string;
+  draftId: string;
+  requestId: string;
+  stage: "review";
+  snapshotSha256: string;
+  sourceSha256: string;
+  sourceVersion: string;
+  notes: string;
+  reviewedByUserId: string;
+  reviewedAt: string;
+}
+
 /** Read-time local readiness evidence only; never review/issuance permission. */
 export interface ReportCardDraftSourceCheck {
   draftId: string;

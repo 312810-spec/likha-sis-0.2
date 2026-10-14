@@ -16,6 +16,29 @@ vi.mock("@tauri-apps/api/core", () => ({
 const mockInvoke = vi.mocked(invoke);
 
 describe("TauriExportRepository", () => {
+  it("records confirmed preparation review and loads retained history through native commands", async () => {
+    const repository = new TauriExportRepository();
+    const request = {
+      draftId: "draft",
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      expectedSnapshotSha256: "a".repeat(64),
+      expectedSourceSha256: "b".repeat(64),
+      teacherConfirmed: true,
+      notes: "Synthetic",
+    };
+    mockInvoke.mockResolvedValueOnce(null).mockResolvedValueOnce([]);
+    await expect(
+      repository.recordReportCardPreparationReview("record", request),
+    ).resolves.toBeNull();
+    expect(mockInvoke).toHaveBeenLastCalledWith("record_report_card_preparation_review", {
+      classRecordId: "record",
+      request,
+    });
+    await expect(repository.listRecentReportCardPreparationReviews("record")).resolves.toEqual([]);
+    expect(mockInvoke).toHaveBeenLastCalledWith("list_recent_report_card_preparation_reviews", {
+      classRecordId: "record",
+    });
+  });
   it("requests a source check using identities only, never raw source or authority", async () => {
     mockInvoke.mockResolvedValueOnce(null);
     await expect(

@@ -17,13 +17,36 @@ import type {
   ReportCardDraftComparison,
   ReportCardDraftSourceCheck,
   ReportCardReadiness,
+  ReportPreparationReview,
+  ReportPreparationReviewRequest,
 } from "../../domain/report-readiness";
 import type { ReportDraftRepository } from "../../domain/ports/report-draft-repository";
+import type { ReportPreparationReviewRepository } from "../../domain/ports/report-preparation-review-repository";
 
 /** Tauri/SQLite implementation of {@link ExportRepository}. */
 export class TauriExportRepository
-  implements ExportRepository, ReportReadinessRepository, ReportDraftRepository
+  implements
+    ExportRepository,
+    ReportReadinessRepository,
+    ReportDraftRepository,
+    ReportPreparationReviewRepository
 {
+  recordReportCardPreparationReview(
+    classRecordId: string,
+    request: ReportPreparationReviewRequest,
+  ): Promise<ReportPreparationReview | null> {
+    return invoke<ReportPreparationReview | null>("record_report_card_preparation_review", {
+      classRecordId,
+      request,
+    });
+  }
+  listRecentReportCardPreparationReviews(
+    classRecordId: string,
+  ): Promise<ReportPreparationReview[]> {
+    return invoke<ReportPreparationReview[]>("list_recent_report_card_preparation_reviews", {
+      classRecordId,
+    });
+  }
   checkReportCardDraftSource(
     classRecordId: string,
     draftId: string,

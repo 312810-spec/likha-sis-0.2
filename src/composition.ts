@@ -98,6 +98,7 @@ export const exportService = new ExportApplicationService(
   exportRepository,
   exportRepository,
   exportRepository,
+  exportRepository,
 );
 export const formGenerationService = new FormGenerationApplicationService(
   new TauriFormGenerationRepository(),

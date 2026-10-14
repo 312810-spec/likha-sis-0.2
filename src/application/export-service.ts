@@ -16,8 +16,11 @@ import type {
   ReportCardDraftComparison,
   ReportCardDraftSourceCheck,
   ReportCardReadiness,
+  ReportPreparationReview,
+  ReportPreparationReviewRequest,
 } from "../domain/report-readiness";
 import type { ReportDraftRepository } from "../domain/ports/report-draft-repository";
+import type { ReportPreparationReviewRepository } from "../domain/ports/report-preparation-review-repository";
 
 /**
  * Orchestrates official-form export use cases. UI code depends on this,
@@ -34,7 +37,46 @@ export class ExportApplicationService {
     private readonly exports: ExportRepository,
     private readonly readiness?: ReportReadinessRepository,
     private readonly drafts?: ReportDraftRepository,
+    private readonly reviews?: ReportPreparationReviewRepository,
   ) {}
+
+  recordReportCardPreparationReview(
+    classRecordId: string,
+    request: ReportPreparationReviewRequest,
+  ): Promise<ReportPreparationReview | null> {
+    const id = classRecordId.trim();
+    const draftId = request.draftId.trim();
+    const requestId = request.requestId.trim().toLowerCase();
+    if (!id || !draftId || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(requestId))
+      throw new ValidationError("Class record, draft and review request identity are required.");
+    if (
+      !request.teacherConfirmed ||
+      !/^[0-9a-f]{64}$/.test(request.expectedSnapshotSha256) ||
+      !/^[0-9a-f]{64}$/.test(request.expectedSourceSha256) ||
+      [...request.notes.trim()].length > 2000
+    )
+      throw new ValidationError(
+        "Confirm preparation review with valid evidence and bounded notes.",
+      );
+    if (!this.reviews) throw new ValidationError("Preparation reviews are unavailable.");
+    return this.reviews.recordReportCardPreparationReview(id, {
+      draftId,
+      requestId,
+      expectedSnapshotSha256: request.expectedSnapshotSha256,
+      expectedSourceSha256: request.expectedSourceSha256,
+      teacherConfirmed: true,
+      notes: request.notes.trim(),
+    });
+  }
+
+  listRecentReportCardPreparationReviews(
+    classRecordId: string,
+  ): Promise<ReportPreparationReview[]> {
+    const id = classRecordId.trim();
+    if (!id) throw new ValidationError("Class record is required.");
+    if (!this.reviews) throw new ValidationError("Preparation reviews are unavailable.");
+    return this.reviews.listRecentReportCardPreparationReviews(id);
+  }
 
   captureReportCardDraft(classRecordId: string): Promise<ReportCardDraft | null> {
     const id = classRecordId.trim();
