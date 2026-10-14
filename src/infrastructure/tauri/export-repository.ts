@@ -12,10 +12,19 @@ import type {
 } from "../../domain/export";
 import type { ExportRepository } from "../../domain/ports/export-repository";
 import type { ReportReadinessRepository } from "../../domain/ports/report-readiness-repository";
-import type { ReportCardReadiness } from "../../domain/report-readiness";
+import type { ReportCardDraft, ReportCardReadiness } from "../../domain/report-readiness";
+import type { ReportDraftRepository } from "../../domain/ports/report-draft-repository";
 
 /** Tauri/SQLite implementation of {@link ExportRepository}. */
-export class TauriExportRepository implements ExportRepository, ReportReadinessRepository {
+export class TauriExportRepository
+  implements ExportRepository, ReportReadinessRepository, ReportDraftRepository
+{
+  captureReportCardDraft(classRecordId: string): Promise<ReportCardDraft | null> {
+    return invoke<ReportCardDraft | null>("capture_report_card_draft", { classRecordId });
+  }
+  listRecentReportCardDrafts(classRecordId: string): Promise<ReportCardDraft[]> {
+    return invoke<ReportCardDraft[]>("list_recent_report_card_drafts", { classRecordId });
+  }
   previewReportCard(classRecordId: string): Promise<ReportCardReadiness | null> {
     return invoke<ReportCardReadiness | null>("preview_class_record_report_card", {
       classRecordId,

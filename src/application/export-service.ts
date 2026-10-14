@@ -11,7 +11,8 @@ import type {
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { ReportReadinessRepository } from "../domain/ports/report-readiness-repository";
-import type { ReportCardReadiness } from "../domain/report-readiness";
+import type { ReportCardDraft, ReportCardReadiness } from "../domain/report-readiness";
+import type { ReportDraftRepository } from "../domain/ports/report-draft-repository";
 
 /**
  * Orchestrates official-form export use cases. UI code depends on this,
@@ -27,7 +28,22 @@ export class ExportApplicationService {
   constructor(
     private readonly exports: ExportRepository,
     private readonly readiness?: ReportReadinessRepository,
+    private readonly drafts?: ReportDraftRepository,
   ) {}
+
+  captureReportCardDraft(classRecordId: string): Promise<ReportCardDraft | null> {
+    const id = classRecordId.trim();
+    if (!id) throw new ValidationError("Class record is required.");
+    if (!this.drafts) throw new ValidationError("Reporting drafts are unavailable.");
+    return this.drafts.captureReportCardDraft(id);
+  }
+
+  listRecentReportCardDrafts(classRecordId: string): Promise<ReportCardDraft[]> {
+    const id = classRecordId.trim();
+    if (!id) throw new ValidationError("Class record is required.");
+    if (!this.drafts) throw new ValidationError("Reporting drafts are unavailable.");
+    return this.drafts.listRecentReportCardDrafts(id);
+  }
 
   previewReportCard(classRecordId: string): Promise<ReportCardReadiness | null> {
     const id = classRecordId.trim();

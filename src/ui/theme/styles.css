@@ -358,6 +358,10 @@ label {
   font-weight: 600;
   color: var(--color-danger);
 }
+.report-draft-evidence {
+  overflow-wrap: anywhere;
+}
+
 .error-boundary-detail {
   margin: 0;
   font-family: var(--font-numeric);

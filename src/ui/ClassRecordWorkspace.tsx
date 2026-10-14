@@ -26,6 +26,7 @@ import { StatusChip } from "./components/StatusChip";
 import { useSessionDraft } from "./useSessionDraft";
 import { useTeacherMode } from "./theme/useTeacherMode";
 import { ReportCardReadinessPanel } from "./ReportCardReadinessPanel";
+import { ReportCardDraftPanel } from "./ReportCardDraftPanel";
 
 interface ClassRecordWorkspaceProps {
   classRecordId: string;
@@ -1437,6 +1438,13 @@ export function ClassRecordWorkspace({
 
           <ReportCardReadinessPanel
             key={classRecordId}
+            service={exportService}
+            classRecordId={classRecordId}
+            revision={reportingRevision}
+            disabled={!itemsReady || savingLearnerIds.size > 0}
+          />
+          <ReportCardDraftPanel
+            key={`drafts-${classRecordId}`}
             service={exportService}
             classRecordId={classRecordId}
             revision={reportingRevision}
