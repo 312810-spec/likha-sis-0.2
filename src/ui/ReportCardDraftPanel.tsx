@@ -4,6 +4,7 @@ import type { ReportCardDraft } from "../domain/report-readiness";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import { ReportCardDraftComparisonPanel } from "./ReportCardDraftComparisonPanel";
 
 interface Props {
   service: ExportApplicationService;
@@ -218,6 +219,12 @@ export function ReportCardDraftPanel(props: Props) {
               </li>
             ))}
           </ul>
+          <ReportCardDraftComparisonPanel
+            service={service}
+            draft={draft}
+            revision={revision}
+            disabled={disabled || busy}
+          />
         </details>
       ))}
     </section>
