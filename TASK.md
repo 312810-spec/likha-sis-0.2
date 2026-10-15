@@ -1,5 +1,17 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 configured annual-period coverage
+
+PR134 merged as `9961a7c59a2f37a9b24f9f3f90086a36c0ac55ae` after current-head
+Quality/Security passed. Read
+`docs/ctos/checkpoints/m11-configured-period-coverage-2026-10-15.md` next.
+New shared SF5/SF6/SF10 guard requires exact nonempty configured period coverage
+and a single canonical subject identity. Duplicate transfer or same-name subject
+ambiguity stays unavailable/PENDING. Native regressions await exact-head CI;
+configured coverage is not official completeness or issuance authorization.
+Next: source-aware annual reconciliation, issuance/amendments. M10/M11 and
+external acceptance remain incomplete; no deployment.
+
 ## Current active slice — M11 final-projection completeness repair
 
 PR133 passed Quality/Security at `82c139e0b1ec0a3cb4c7d4cdedfe9741e321b9ea`
