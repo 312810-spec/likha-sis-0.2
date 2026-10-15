@@ -509,7 +509,7 @@ pub fn export_learner_roster(
 ///
 /// Gated by `auth::authorize_adviser_of_section` so that only the assigned
 /// class adviser for the section (or a School Head in the same school) can
-/// generate the section's official SF5 report.
+/// prepare the section's SF5-inspired export.
 #[tauri::command]
 pub fn export_section_eosy_sf5(
     app: AppHandle,
@@ -520,29 +520,16 @@ pub fn export_section_eosy_sf5(
 ) -> AppResult<Option<Sf5ExportResult>> {
     let conn = lock_db(&db);
 
-    // Session-derived only, never client-supplied -- used here purely to
-    // compute a correct `as_of_date` fallback before the real authorization
-    // check below (which independently re-derives and re-verifies
-    // school_id/section ownership; this lookup grants nothing on its own).
-    // A prior version of this query passed an empty-string school_id here,
-    // which `grading::list_by_school_year`'s exact-match `WHERE` clause can
-    // never match -- `periods` was silently always empty, so `as_of_date`
-    // silently always took the year-boundary fallback below instead of the
-    // real last grading period's end date.
+    // Configured dates determine both roster scope and adviser applicability.
+    // Missing configuration or lookup failure must never invent either boundary.
     let session_school_id = sessions.require_active_school_scope(&conn)?;
-    let periods =
-        grading::list_by_school_year(&conn, &session_school_id, &school_year).unwrap_or_default();
-    let as_of_date = if let Some(last_period) = periods.last() {
-        last_period.ends_on.clone()
-    } else {
-        // Fallback to year boundary if no periods exist
-        let end_year = school_year
-            .split('-')
-            .nth(1)
-            .and_then(|y| y.parse::<i32>().ok())
-            .unwrap_or(2027);
-        format!("{end_year}-06-30")
-    };
+    let school_periods = grading::list_by_school_year(&conn, &session_school_id, &school_year)?;
+    let (start_date, end_date) = grading::configured_date_bounds(
+        school_periods
+            .iter()
+            .map(|period| (period.starts_on.as_str(), period.ends_on.as_str())),
+    )?;
+    let as_of_date = end_date.to_string();
 
     let (_user_id, school_id) =
         match auth::authorize_adviser_of_section(&conn, &sessions, &section_id, &as_of_date) {
@@ -560,25 +547,8 @@ pub fn export_section_eosy_sf5(
         return Ok(None);
     };
 
-    let school_periods = grading::list_by_school_year(&conn, &school_id, &school_year)?;
-    let start_date = school_periods
-        .first()
-        .map(|p| p.starts_on.clone())
-        .unwrap_or_else(|| {
-            let start_year = school_year
-                .split('-')
-                .next()
-                .and_then(|y| y.parse::<i32>().ok())
-                .unwrap_or(2026);
-            format!("{start_year}-06-01")
-        });
-    let end_date = school_periods
-        .last()
-        .map(|p| p.ends_on.clone())
-        .unwrap_or_else(|| as_of_date.clone());
-
     let adviser =
-        section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &end_date)?;
+        section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, end_date)?;
     let adviser_name = if let Some(adv) = adviser {
         user::find_by_id(&conn, &adv.teacher_user_id)?.map(|u| u.display_name)
     } else {
@@ -589,8 +559,8 @@ pub fn export_section_eosy_sf5(
         &conn,
         &school_id,
         &section_id,
-        &start_date,
-        &end_date,
+        start_date,
+        end_date,
     )?;
 
     let class_records = class_record::list_by_section_in_school(&conn, &school_id, &section_id)?;
@@ -715,25 +685,18 @@ pub fn export_school_eosy_sf6(
     };
 
     let school_periods = grading::list_by_school_year(&conn, &school_id, &school_year)?;
-    let start_date = school_periods
-        .first()
-        .map(|p| p.starts_on.clone())
-        .unwrap_or_else(|| "2000-01-01".to_string());
-    let end_date = school_periods
-        .last()
-        .map(|p| p.ends_on.clone())
-        .unwrap_or_else(|| "2099-12-31".to_string());
+    let (start_date, end_date) = grading::configured_date_bounds(
+        school_periods
+            .iter()
+            .map(|period| (period.starts_on.as_str(), period.ends_on.as_str())),
+    )?;
 
     let sections = section::list_by_school(&conn, &school_id)?;
     let mut section_summaries = Vec::with_capacity(sections.len());
 
     for sec in sections {
         let roster = section_membership::roster_for_section_over_range(
-            &conn,
-            &school_id,
-            &sec.id,
-            &start_date,
-            &end_date,
+            &conn, &school_id, &sec.id, start_date, end_date,
         )?;
         let class_records = class_record::list_by_section_in_school(&conn, &school_id, &sec.id)?;
         let filtered_records: Vec<_> = class_records

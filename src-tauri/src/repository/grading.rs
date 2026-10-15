@@ -46,6 +46,123 @@ pub struct GradingPeriod {
     pub created_at: String,
 }
 
+/// Exact configured calendar envelope, independent of policy sequence ordering.
+/// Missing/invalid dates cannot establish annual roster or adviser applicability.
+pub(crate) fn configured_date_bounds<'a>(
+    periods: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> AppResult<(&'a str, &'a str)> {
+    let mut bounds: Option<(&str, &str)> = None;
+    for (start, end) in periods {
+        if !is_canonical_calendar_date(start) || !is_canonical_calendar_date(end) || start > end {
+            return Err(crate::error::AppError::Validation(
+                "Annual reporting requires valid configured grading-period dates".into(),
+            ));
+        }
+        bounds = Some(match bounds {
+            Some((first, last)) => (first.min(start), last.max(end)),
+            None => (start, end),
+        });
+    }
+    bounds.ok_or_else(|| {
+        crate::error::AppError::Validation(
+            "Configure grading periods before preparing annual reports".into(),
+        )
+    })
+}
+
+/// Gregorian YYYY-MM-DD only; parsing is dependency-free and rejects non-ASCII
+/// text before slicing. A lexical comparison is safe after this check.
+fn is_canonical_calendar_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| index != 4 && index != 7 && !byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let year: u32 = value[..4].parse().unwrap_or(0);
+    let month: u32 = value[5..7].parse().unwrap_or(0);
+    let day: u32 = value[8..].parse().unwrap_or(0);
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
+}
+
+#[cfg(test)]
+mod annual_calendar_tests {
+    use super::configured_date_bounds;
+
+    #[test]
+    fn annual_bounds_require_real_configured_dates() {
+        assert!(configured_date_bounds([]).is_err());
+        for invalid in [
+            ("2026-02-30", "2026-03-01"),
+            ("2026-06-01", "2026-05-31"),
+            ("", "2026-06-01"),
+            ("2026-6-1", "2026-06-30"),
+        ] {
+            assert!(configured_date_bounds([invalid]).is_err());
+        }
+        assert!(
+            configured_date_bounds([("2026-06-01", "2026-08-31"), ("invalid", "2027-03-31"),])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn annual_dates_validate_leap_centuries_and_canonical_shape() {
+        for valid in ["2000-02-29", "2028-02-29", "2026-04-30", "2026-12-31"] {
+            assert!(configured_date_bounds([(valid, valid)]).is_ok(), "{valid}");
+        }
+        for invalid in [
+            "1900-02-29",
+            "2100-02-29",
+            "2026-02-29",
+            "2026-04-31",
+            "2026-00-01",
+            "2026-13-01",
+            "2026-01-00",
+            "2026-01-32",
+            "2026-01-01 ",
+            "2026-01-01T00:00:00",
+            "２０２６-01-01",
+            "202é-01-01",
+        ] {
+            assert!(
+                configured_date_bounds([(invalid, invalid)]).is_err(),
+                "{invalid}"
+            );
+        }
+    }
+
+    #[test]
+    fn annual_bounds_use_calendar_envelope_not_policy_sequence() {
+        assert_eq!(
+            configured_date_bounds([
+                ("2027-01-01", "2027-03-31"),
+                ("2026-06-01", "2026-08-31"),
+                ("2026-09-01", "2026-12-31"),
+            ])
+            .unwrap(),
+            ("2026-06-01", "2027-03-31")
+        );
+        assert_eq!(
+            configured_date_bounds([("2026-06-01", "2026-06-01")]).unwrap(),
+            ("2026-06-01", "2026-06-01")
+        );
+    }
+}
+
 /// Reference data, not school-scoped — every school sees the same set of
 /// DepEd-sourced policies. Ordered by `is_default DESC` so the current
 /// default policy is always first.
