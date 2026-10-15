@@ -569,12 +569,8 @@ pub fn export_section_eosy_sf5(
         .filter(|cr| cr.school_year == school_year)
         .collect();
 
-    let mut distinct_subjects: Vec<String> = filtered_records
-        .iter()
-        .map(|cr| cr.subject_name.clone())
-        .collect();
-    distinct_subjects.sort();
-    distinct_subjects.dedup();
+    let distinct_subjects =
+        class_record::annual_report_subject_names(&conn, &school_id, &section_id, &school_year)?;
 
     let mut learner_rows = Vec::with_capacity(roster.len());
     for member in roster {
@@ -704,12 +700,8 @@ pub fn export_school_eosy_sf6(
             .filter(|cr| cr.school_year == school_year)
             .collect();
 
-        let mut distinct_subjects: Vec<String> = filtered_records
-            .iter()
-            .map(|cr| cr.subject_name.clone())
-            .collect();
-        distinct_subjects.sort();
-        distinct_subjects.dedup();
+        let distinct_subjects =
+            class_record::annual_report_subject_names(&conn, &school_id, &sec.id, &school_year)?;
 
         let mut learner_rows = Vec::with_capacity(roster.len());
         for member in roster {
@@ -1044,10 +1036,15 @@ pub fn export_learner_permanent_record_sf10(
             );
         }
 
-        let mut distinct_subjects: Vec<String> = filtered_records
-            .iter()
-            .map(|cr| cr.subject_name.clone())
-            .collect();
+        let mut distinct_subjects = Vec::new();
+        for section_id in &group.section_ids {
+            distinct_subjects.extend(class_record::annual_report_subject_names(
+                &conn,
+                &school_id,
+                section_id,
+                &group.school_year,
+            )?);
+        }
         distinct_subjects.sort();
         distinct_subjects.dedup();
 

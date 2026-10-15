@@ -298,6 +298,32 @@ pub fn resolved_weight_policy_id_in_school(
     })
 }
 
+/// Configured work is a minimum completeness check, not an official curriculum.
+/// Keep record-only subjects after reassignment and include assigned subjects
+/// even before their first class record exists. All references must resolve in
+/// the requested school, section and year; unrelated school subjects are excluded.
+pub(crate) fn annual_report_subject_names(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    school_year: &str,
+) -> AppResult<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT sub.name FROM subjects sub \
+         JOIN sections sec ON sec.id = ?2 AND sec.school_id = ?1 \
+         WHERE sub.school_id = ?1 AND sec.school_year = ?3 AND (\
+           EXISTS (SELECT 1 FROM class_records cr \
+                   WHERE cr.school_id = ?1 AND cr.section_id = sec.id \
+                     AND cr.subject_id = sub.id) OR \
+           EXISTS (SELECT 1 FROM teaching_assignments ta \
+                   WHERE ta.school_id = ?1 AND ta.section_id = sec.id \
+                     AND ta.subject_id = sub.id)) \
+         ORDER BY sub.name",
+    )?;
+    let rows = stmt.query_map((school_id, section_id, school_year), |row| row.get(0))?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 /// Shared by `list_by_school` and `find_detail_by_id_in_school` — the
 /// only difference between the two is an extra `AND cr.id = ?2`, appended
 /// by the latter. `?1` is always `school_id`. Weight-policy name/id are
@@ -471,6 +497,80 @@ mod tests {
             .unwrap()
             .unwrap();
         (s.id, sec.id, sub.id, period.id)
+    }
+
+    #[test]
+    fn annual_report_keeps_unrecorded_assigned_subjects_pending() {
+        use crate::export::sf5::{PromotionStatus, Sf5LearnerRow, Sf5SubjectGrade};
+        use crate::repository::teaching_assignment;
+
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let teacher = user::create_user(&conn, "annual.teacher", "password", "Teacher").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &school_id).unwrap();
+        let tle = subject::create(&conn, &school_id, "TLE").unwrap();
+        teaching_assignment::create(&conn, &school_id, &teacher.id, &section_id, &tle.id)
+            .unwrap()
+            .unwrap();
+        // A subject in the school's catalogue is not automatically required.
+        subject::create(&conn, &school_id, "Unassigned subject").unwrap();
+        let names =
+            annual_report_subject_names(&conn, &school_id, &section_id, "2026-2027").unwrap();
+        assert_eq!(names, vec!["Mathematics", "TLE"]);
+        let grades: Vec<_> = names
+            .into_iter()
+            .map(|name| Sf5SubjectGrade {
+                final_grade: (name == "Mathematics").then_some(88),
+                subject_name: name,
+            })
+            .collect();
+        assert_eq!(
+            Sf5LearnerRow::compute_status(&grades),
+            (None, PromotionStatus::Pending)
+        );
+        // Removing the current assignment cannot erase an existing record.
+        conn.execute("DELETE FROM teaching_assignments", []).unwrap();
+        assert_eq!(
+            annual_report_subject_names(&conn, &school_id, &section_id, "2026-2027").unwrap(),
+            vec!["Mathematics"]
+        );
+    }
+
+    #[test]
+    fn annual_report_subjects_reject_foreign_section_and_wrong_year() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let other = school::create(&conn, "Other School").unwrap();
+        for (scope, year) in [
+            (other.id.as_str(), "2026-2027"),
+            (school_id.as_str(), "2027-2028"),
+        ] {
+            assert!(annual_report_subject_names(&conn, scope, &section_id, year)
+                .unwrap()
+                .is_empty());
+        }
     }
 
     #[test]

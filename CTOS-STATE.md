@@ -6,6 +6,8 @@
 
 ## Current execution state
 
+- Current slice: M11 assigned-subject coverage on `ctos/m11-assigned-subject-coverage-20261016`, based on PR136 repair `8f3d4a3923a91be5ba90757fe5e990870389d6df`. SF5/SF6/SF10 include assigned subjects before records exist; missing work remains PENDING. Actual SQL checks passed; native regressions/format/Clippy require exact-head CI. See `docs/ctos/checkpoints/m11-assigned-subject-coverage-2026-10-16.md`. M10/M11 and external acceptance incomplete; no deployment.
+
 - Latest: PR135 merged as 7aa4790d22dd97a88a2a8f9ef22ac4f3816f95ff. Active annual-calendar-scope repair removes guessed SF5/SF6 roster windows and swallowed calendar query errors. See docs/ctos/checkpoints/m11-annual-calendar-scope-2026-10-15.md. Native CI pending; M10/M11 and external acceptance incomplete. No deployment.
 
 - Latest continuation: PR134 merged as 9961a7c59a2f37a9b24f9f3f90086a36c0ac55ae after Quality 38671136623 / Security 38671136580 PASS at b9331b04a2d08bd84ba04fffedaa53978a7db9cd. Active branch ctos/m11-configured-period-coverage-20261015 requires exact nonempty configured annual-period coverage and unambiguous canonical subject identity across SF5/SF6/SF10. See docs/ctos/checkpoints/m11-configured-period-coverage-2026-10-15.md. Native CI pending; required-subject/policy reconciliation and issuance/amendments remain. M10/M11 incomplete; no deployment.

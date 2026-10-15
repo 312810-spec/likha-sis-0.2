@@ -1,5 +1,15 @@
 # Current task — CTOS v3
 
+## Current slice — M11 assigned-subject coverage
+
+Read `docs/ctos/checkpoints/m11-assigned-subject-coverage-2026-10-16.md`.
+PR136 calendar build repair is pushed; require its exact-head Quality/Security.
+The next slice includes configured assignments in annual SF5/SF6/SF10 subject
+lists so an assigned subject without records cannot disappear from completeness.
+SQL checks passed; native tests/format/Clippy await CI. Then continue versioned
+required-subject/policy reconciliation and immutable issuance/amendments.
+M10/M11 and external acceptance remain incomplete. No deployment.
+
 ## Current active slice — M11 annual calendar scope
 
 PR135 is merged as `7aa4790d22dd97a88a2a8f9ef22ac4f3816f95ff`.
