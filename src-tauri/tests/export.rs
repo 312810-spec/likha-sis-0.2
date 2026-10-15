@@ -815,7 +815,8 @@ fn export_sf6_as_current_session(
     sessions: &SessionManager,
     school_year: &str,
 ) -> app_lib::error::AppResult<Option<Sf6Export>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id =
+        auth::authorize_capability(conn, sessions, auth::Capability::ExportSchoolReports)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -968,6 +969,7 @@ fn sf6_export_school_wide_consolidation_and_isolation() {
     // User in School Alpha
     let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
     user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    role::grant(&conn, &head.id, &s1.id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
 
@@ -991,7 +993,8 @@ fn export_sf4_as_current_session(
     year: i32,
     month: u32,
 ) -> Result<Option<Sf4Export>, AppError> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id =
+        auth::authorize_capability(conn, sessions, auth::Capability::ExportSchoolReports)?;
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
     };
@@ -1191,6 +1194,7 @@ fn sf4_export_school_wide_consolidation_and_isolation() {
 
     let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
     user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    role::grant(&conn, &head.id, &s1.id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
 

@@ -674,7 +674,8 @@ pub fn export_school_eosy_sf6(
     school_year: String,
 ) -> AppResult<Option<Sf6ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -809,7 +810,8 @@ pub fn export_school_monthly_attendance_sf4(
     month: u32,
 ) -> AppResult<Option<Sf4ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -955,7 +957,7 @@ pub fn export_school_monthly_attendance_sf4(
 /// Gated by `Capability::ManageLearners` -- the same Registrar-or-School-
 /// Head gate `create_learner`/`update_learner` already use -- because a
 /// single learner's whole multi-year grade history is more concentrated
-/// PII than a school-wide aggregate summary (SF6, session-only-gated) or
+/// PII than a school-wide aggregate summary (SF6, school-report-capability-gated) or
 /// a section-scoped roster (SF5, adviser-of-section-gated); an ordinary
 /// teacher with no administrative role has no reason to pull one
 /// learner's entire academic history at once. `learner_id` is
