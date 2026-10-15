@@ -18,6 +18,7 @@ import type {
   ReportCardReadiness,
   ReportPreparationReview,
   ReportPreparationReviewRequest,
+  ReportPreparationReviewSourceCheck,
 } from "../domain/report-readiness";
 import type { ReportDraftRepository } from "../domain/ports/report-draft-repository";
 import type { ReportPreparationReviewRepository } from "../domain/ports/report-preparation-review-repository";
@@ -39,6 +40,17 @@ export class ExportApplicationService {
     private readonly drafts?: ReportDraftRepository,
     private readonly reviews?: ReportPreparationReviewRepository,
   ) {}
+
+  checkReportCardPreparationReviewSource(
+    classRecordId: string,
+    reviewId: string,
+  ): Promise<ReportPreparationReviewSourceCheck | null> {
+    const record = classRecordId.trim();
+    const review = reviewId.trim();
+    if (!record || !review) throw new ValidationError("Class record and review are required.");
+    if (!this.reviews) throw new ValidationError("Preparation review checks are unavailable.");
+    return this.reviews.checkReportCardPreparationReviewSource(record, review);
+  }
 
   recordReportCardPreparationReview(
     classRecordId: string,

@@ -120,12 +120,37 @@ class FakeExportRepository implements ExportRepository {
 }
 
 describe("ExportApplicationService", () => {
+  it("reads retained-review source evidence using trimmed identities only and refuses unavailable/empty inputs", async () => {
+    const checkReportCardPreparationReviewSource = vi.fn().mockResolvedValue(null);
+    const service = new ExportApplicationService(new FakeExportRepository(), undefined, undefined, {
+      checkReportCardPreparationReviewSource,
+      recordReportCardPreparationReview: vi.fn(),
+      listRecentReportCardPreparationReviews: vi.fn(),
+    });
+    await expect(
+      service.checkReportCardPreparationReviewSource(" record ", " review "),
+    ).resolves.toBeNull();
+    expect(checkReportCardPreparationReviewSource).toHaveBeenCalledWith("record", "review");
+    expect(() => service.checkReportCardPreparationReviewSource(" ", "review")).toThrow(
+      ValidationError,
+    );
+    expect(() => service.checkReportCardPreparationReviewSource("record", " ")).toThrow(
+      ValidationError,
+    );
+    expect(() =>
+      new ExportApplicationService(
+        new FakeExportRepository(),
+      ).checkReportCardPreparationReviewSource("record", "review"),
+    ).toThrow(ValidationError);
+    expect(checkReportCardPreparationReviewSource).toHaveBeenCalledTimes(1);
+  });
   it("validates and whitelists explicit preparation-review inputs without caller authority", async () => {
     const recordReportCardPreparationReview = vi.fn().mockResolvedValue(null);
     const listRecentReportCardPreparationReviews = vi.fn().mockResolvedValue([]);
     const service = new ExportApplicationService(new FakeExportRepository(), undefined, undefined, {
       recordReportCardPreparationReview,
       listRecentReportCardPreparationReviews,
+      checkReportCardPreparationReviewSource: vi.fn(),
     });
     const request = {
       draftId: " draft ",

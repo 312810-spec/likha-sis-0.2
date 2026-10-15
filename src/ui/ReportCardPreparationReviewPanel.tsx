@@ -8,6 +8,7 @@ import type {
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import { ReportCardReviewSourcePanel } from "./ReportCardReviewSourcePanel";
 
 interface Props {
   service: ExportApplicationService;
@@ -333,6 +334,12 @@ export function ReportCardPreparationReviewPanel(props: Props) {
               <p className="muted">
                 Historical review only; not current freshness, approval or issuance permission.
               </p>
+              <ReportCardReviewSourcePanel
+                service={service}
+                review={review}
+                revision={revision}
+                disabled={disabled || busy}
+              />
             </details>
           ))}
         </>

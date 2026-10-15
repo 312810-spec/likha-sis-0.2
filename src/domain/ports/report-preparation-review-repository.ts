@@ -1,6 +1,14 @@
-import type { ReportPreparationReview, ReportPreparationReviewRequest } from "../report-readiness";
+import type {
+  ReportPreparationReview,
+  ReportPreparationReviewRequest,
+  ReportPreparationReviewSourceCheck,
+} from "../report-readiness";
 
 export interface ReportPreparationReviewRepository {
+  checkReportCardPreparationReviewSource(
+    classRecordId: string,
+    reviewId: string,
+  ): Promise<ReportPreparationReviewSourceCheck | null>;
   recordReportCardPreparationReview(
     classRecordId: string,
     request: ReportPreparationReviewRequest,
