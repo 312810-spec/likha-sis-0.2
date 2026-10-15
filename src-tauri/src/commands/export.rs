@@ -1134,4 +1134,3 @@ pub fn export_learner_permanent_record_sf10(
         disclosure: export.disclosure,
     }))
 }
-

@@ -575,4 +575,3 @@ mod tests {
         assert!(periods.is_empty());
     }
 }
-
