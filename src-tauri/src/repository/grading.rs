@@ -46,6 +46,74 @@ pub struct GradingPeriod {
     pub created_at: String,
 }
 
+/// Exact configured calendar envelope, independent of policy sequence ordering.
+/// Missing/invalid dates cannot establish annual roster or adviser applicability.
+pub(crate) fn configured_date_bounds<'a>(
+    periods: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> AppResult<(&'a str, &'a str)> {
+    let mut bounds: Option<(&str, &str)> = None;
+    for (start, end) in periods {
+        let valid_date = |value: &str| {
+            chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .is_ok_and(|date| date.format("%Y-%m-%d").to_string() == value)
+        };
+        if !valid_date(start) || !valid_date(end) || start > end {
+            return Err(crate::error::AppError::Validation(
+                "Annual reporting requires valid configured grading-period dates".into(),
+            ));
+        }
+        bounds = Some(match bounds {
+            Some((first, last)) => (first.min(start), last.max(end)),
+            None => (start, end),
+        });
+    }
+    bounds.ok_or_else(|| {
+        crate::error::AppError::Validation(
+            "Configure grading periods before preparing annual reports".into(),
+        )
+    })
+}
+
+#[cfg(test)]
+mod annual_calendar_tests {
+    use super::configured_date_bounds;
+
+    #[test]
+    fn annual_bounds_require_real_configured_dates() {
+        assert!(configured_date_bounds([]).is_err());
+        for invalid in [
+            ("2026-02-30", "2026-03-01"),
+            ("2026-06-01", "2026-05-31"),
+            ("", "2026-06-01"),
+            ("2026-6-1", "2026-06-30"),
+        ] {
+            assert!(configured_date_bounds([invalid]).is_err());
+        }
+        assert!(configured_date_bounds([
+            ("2026-06-01", "2026-08-31"),
+            ("invalid", "2027-03-31"),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn annual_bounds_use_calendar_envelope_not_policy_sequence() {
+        assert_eq!(
+            configured_date_bounds([
+                ("2027-01-01", "2027-03-31"),
+                ("2026-06-01", "2026-08-31"),
+                ("2026-09-01", "2026-12-31"),
+            ])
+            .unwrap(),
+            ("2026-06-01", "2027-03-31")
+        );
+        assert_eq!(
+            configured_date_bounds([("2026-06-01", "2026-06-01")]).unwrap(),
+            ("2026-06-01", "2026-06-01")
+        );
+    }
+}
+
 /// Reference data, not school-scoped — every school sees the same set of
 /// DepEd-sourced policies. Ordered by `is_default DESC` so the current
 /// default policy is always first.

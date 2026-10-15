@@ -1,5 +1,14 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 annual calendar scope
+
+PR135 is merged as `7aa4790d22dd97a88a2a8f9ef22ac4f3816f95ff`.
+Read `docs/ctos/checkpoints/m11-annual-calendar-scope-2026-10-15.md`.
+SF5/SF6 now require real configured calendar bounds instead of guessed roster
+windows; lookup errors propagate. Native tests/format/Clippy await exact-head CI.
+Next: source-aware annual reconciliation and issuance/amendments. M10/M11 and
+external acceptance remain incomplete. No deployment.
+
 ## Current active slice — M11 configured annual-period coverage
 
 PR134 merged as `9961a7c59a2f37a9b24f9f3f90086a36c0ac55ae` after current-head

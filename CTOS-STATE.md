@@ -6,6 +6,8 @@
 
 ## Current execution state
 
+- Latest: PR135 merged as 7aa4790d22dd97a88a2a8f9ef22ac4f3816f95ff. Active annual-calendar-scope repair removes guessed SF5/SF6 roster windows and swallowed calendar query errors. See docs/ctos/checkpoints/m11-annual-calendar-scope-2026-10-15.md. Native CI pending; M10/M11 and external acceptance incomplete. No deployment.
+
 - Latest continuation: PR134 merged as 9961a7c59a2f37a9b24f9f3f90086a36c0ac55ae after Quality 38671136623 / Security 38671136580 PASS at b9331b04a2d08bd84ba04fffedaa53978a7db9cd. Active branch ctos/m11-configured-period-coverage-20261015 requires exact nonempty configured annual-period coverage and unambiguous canonical subject identity across SF5/SF6/SF10. See docs/ctos/checkpoints/m11-configured-period-coverage-2026-10-15.md. Native CI pending; required-subject/policy reconciliation and issuance/amendments remain. M10/M11 incomplete; no deployment.
 
 - Current continuation: PR133 merged as ec4fbe25bc36e35212d99f1b0ef75d68e56040a7 after exact-head Quality/Security PASS at 82c139e0b1ec0a3cb4c7d4cdedfe9741e321b9ea (Quality 38664400098; Security 38664400124). Active branch ctos/m11-final-projection-completeness-20261015 repairs SF5/SF6/SF10 final-average projections that previously included provisional term grades. All three use a shared complete-supplied-record eligibility guard; missing/provisional remains unavailable/PENDING without zero fill. See docs/ctos/checkpoints/m11-final-projection-completeness-2026-10-15.md. Native CI pending. This does not prove required-period coverage, official finality, issuance, full reconciliation or external acceptance. M10/M11 incomplete; no deployment.
