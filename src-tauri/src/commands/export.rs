@@ -635,7 +635,10 @@ pub fn export_section_eosy_sf5(
                 let final_grade = if sf5::has_configured_period_coverage(
                     school_periods.iter().map(|period| period.id.as_str()),
                     subj_records.iter().map(|record| {
-                        (record.grading_period_id.as_str(), record.subject_id.as_str())
+                        (
+                            record.grading_period_id.as_str(),
+                            record.subject_id.as_str(),
+                        )
                     }),
                 ) {
                     sf5::average_complete_recorded_terms(term_grades)
@@ -775,7 +778,10 @@ pub fn export_school_eosy_sf6(
                     let final_grade = if sf5::has_configured_period_coverage(
                         school_periods.iter().map(|period| period.id.as_str()),
                         subj_records.iter().map(|record| {
-                            (record.grading_period_id.as_str(), record.subject_id.as_str())
+                            (
+                                record.grading_period_id.as_str(),
+                                record.subject_id.as_str(),
+                            )
                         }),
                     ) {
                         sf5::average_complete_recorded_terms(term_grades)
@@ -1063,8 +1069,7 @@ pub fn export_learner_permanent_record_sf10(
 
     let mut year_rows = Vec::with_capacity(year_groups.len());
     for group in &year_groups {
-        let school_periods =
-            grading::list_by_school_year(&conn, &school_id, &group.school_year)?;
+        let school_periods = grading::list_by_school_year(&conn, &school_id, &group.school_year)?;
         let mut filtered_records = Vec::new();
         for section_id in &group.section_ids {
             let class_records =
@@ -1103,7 +1108,10 @@ pub fn export_learner_permanent_record_sf10(
             let final_grade = if sf5::has_configured_period_coverage(
                 school_periods.iter().map(|period| period.id.as_str()),
                 subj_records.iter().map(|record| {
-                    (record.grading_period_id.as_str(), record.subject_id.as_str())
+                    (
+                        record.grading_period_id.as_str(),
+                        record.subject_id.as_str(),
+                    )
                 }),
             ) {
                 sf5::average_complete_recorded_terms(term_grades)

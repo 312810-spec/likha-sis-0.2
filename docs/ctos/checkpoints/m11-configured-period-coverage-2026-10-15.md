@@ -40,3 +40,15 @@ historical records. Readiness fingerprints remain preparation evidence only.
 M10/M11 and external device/source/professional acceptance remain incomplete.
 No deployment. Publish exact tree, require current-head Quality/Security, then
 continue source-aware annual reconciliation and issuance/amendments.
+
+## Formatter repair
+
+Initial published head `dec1726d45f18963c2398cde24bd6e9c9621079a`, tree
+`d154053b8ee9bcf2e853b412cb9cc086d613be82`, equals the local committed tree.
+Quality 38680322167 Ubuntu job 116243185858 stopped at four formatter hunks.
+Obtained official Rust 1.99 rustc/rustfmt archives and verified both SHA-256
+values against the official stable manifest before execution. The formatter now
+runs locally with its matching compiler library; both affected Rust files pass
+`rustfmt --edition 2021 --check`. Exact formatter output matches CI differences;
+no behavior changes. Cargo/full native compilation still requires CI.
+Repaired head must pass fresh Quality/Security before merge.
