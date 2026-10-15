@@ -1,5 +1,22 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 native retained-review freshness
+
+PR131 passed Quality/Security at `2c18c34143faf81bb1e6fda5fcda03bf25eff4b6`
+and merged as `224f37ef22517d55134c5afd6a7f3d722bfd7e64`. Active branch:
+`ctos/m11-review-freshness-20261015`; read
+`docs/ctos/checkpoints/m11-review-freshness-2026-10-15.md` next.
+Native read-only review source check reauthorizes current access, fetches the exact
+school/record/review and verifies its parent/source fingerprint bindings before
+reporting current input state in one transaction. Missing review remains distinct
+from unauthorized or corrupt evidence. Returned scope is explicitly read-time
+preparation evidence, never issue authorization; official fidelity stays unverified.
+No raw source JSON or review notes are returned by this check, no data is mutated.
+Require exact-head native Quality/Security before merge; no native tests claimed
+locally without Cargo. Next expose review freshness, then implement issuance-time
+validation, immutable issuance/amendments and reconciliation in M11. External
+official-source/device/professional acceptance remains parked. No deployment.
+
 ## Current active slice — M11 teacher preparation-review controls
 
 PR130 passed Quality/Security at `0164ceb34d0fb2563b2236a3f08c0336400128d4`

@@ -59,6 +59,91 @@ const SELECT_REVIEW: &str = "SELECT id, class_record_id, draft_id, request_id, s
     source_sha256, source_version, notes, reviewed_by_user_id, reviewed_at \
     FROM report_card_preparation_reviews";
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparationReviewSourceCheck {
+    pub review_id: String,
+    pub draft_id: String,
+    pub class_record_id: String,
+    pub snapshot_sha256: String,
+    pub source_version: String,
+    pub stored_source_sha256: String,
+    pub current_source_sha256: Option<String>,
+    pub source_status: &'static str,
+    pub checked_at: String,
+    pub evidence_scope: &'static str,
+    pub official_fidelity: &'static str,
+}
+
+/// Read-time review binding and input freshness, never issue authorization.
+/// Authorization, stored integrity and current inputs share one read snapshot.
+pub fn check_source_authorized(
+    conn: &Connection,
+    actor_user_id: &str,
+    school_id: &str,
+    class_record_id: &str,
+    review_id: &str,
+) -> AppResult<Option<PreparationReviewSourceCheck>> {
+    let tx = conn.unchecked_transaction()?;
+    if report_readiness::authorized_record(&tx, actor_user_id, school_id, class_record_id)?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    let sql = format!("{SELECT_REVIEW} WHERE id = ?1 AND school_id = ?2 AND class_record_id = ?3");
+    let review = tx
+        .query_row(
+            &sql,
+            params![review_id, school_id, class_record_id],
+            row_review,
+        )
+        .optional()?;
+    let Some(review) = review else {
+        return Ok(None);
+    };
+    let Some(check) = report_readiness::check_report_card_draft_source_in_snapshot(
+        &tx,
+        actor_user_id,
+        school_id,
+        class_record_id,
+        &review.draft_id,
+    )?
+    else {
+        return Err(AppError::Validation(
+            "Retained review draft is unavailable".into(),
+        ));
+    };
+    let snapshot_hash: String = tx.query_row(
+        "SELECT snapshot_sha256 FROM report_card_drafts WHERE id = ?1 AND school_id = ?2 AND class_record_id = ?3",
+        params![review.draft_id, school_id, class_record_id], |row| row.get(0),
+    )?;
+    if review.snapshot_sha256 != snapshot_hash
+        || check.source_version.as_deref() != Some(review.source_version.as_str())
+        || check.stored_source_sha256.as_deref() != Some(review.source_sha256.as_str())
+    {
+        return Err(AppError::Validation(
+            "Retained review evidence binding is invalid".into(),
+        ));
+    }
+    let result = PreparationReviewSourceCheck {
+        review_id: review.id,
+        draft_id: review.draft_id,
+        class_record_id: review.class_record_id,
+        snapshot_sha256: review.snapshot_sha256,
+        source_version: review.source_version,
+        stored_source_sha256: review.source_sha256,
+        current_source_sha256: check.current_source_sha256,
+        source_status: check.source_status,
+        checked_at: tx.query_row("SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", [], |row| {
+            row.get(0)
+        })?,
+        evidence_scope: "read_time_preparation_evidence_not_issue_authorization",
+        official_fidelity: "not_verified",
+    };
+    tx.commit()?;
+    Ok(Some(result))
+}
+
 /// Confirmation and exact expected identities bind the caller's reviewed evidence.
 /// Repeated identical requests return the original event; reused payloads are refused.
 pub fn record_authorized(
@@ -221,6 +306,131 @@ mod tests {
             notes: "  Synthetic incomplete evidence reviewed; not approval.  ".into(),
         };
         (conn, school.id, actor.id, record.id, request)
+    }
+
+    #[test]
+    fn retained_review_check_is_read_only_and_detects_changed_inputs_without_rewriting_history() {
+        let (conn, school, actor, record, request) = fixture();
+        let review = record_authorized(&conn, &actor, &school, &record, &request)
+            .unwrap()
+            .unwrap();
+        let changes = conn.total_changes();
+        let check = check_source_authorized(&conn, &actor, &school, &record, &review.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(check.review_id, review.id);
+        assert_eq!(check.draft_id, review.draft_id);
+        assert_eq!(check.snapshot_sha256, review.snapshot_sha256);
+        assert_eq!(check.stored_source_sha256, review.source_sha256);
+        assert_eq!(
+            check.current_source_sha256.as_deref(),
+            Some(review.source_sha256.as_str())
+        );
+        assert_eq!(check.source_status, "matches");
+        assert_eq!(check.official_fidelity, "not_verified");
+        assert_eq!(
+            check.evidence_scope,
+            "read_time_preparation_evidence_not_issue_authorization"
+        );
+        assert!(!check.checked_at.is_empty());
+        assert_eq!(conn.total_changes(), changes);
+        conn.execute(
+            "UPDATE sections SET name = 'Changed since review' WHERE school_id = ?1",
+            params![school],
+        )
+        .unwrap();
+        let changes = conn.total_changes();
+        let changed = check_source_authorized(&conn, &actor, &school, &record, &review.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(changed.source_status, "changed");
+        assert_ne!(
+            changed.current_source_sha256.as_deref(),
+            Some(review.source_sha256.as_str())
+        );
+        assert_eq!(changed.stored_source_sha256, review.source_sha256);
+        assert_eq!(conn.total_changes(), changes);
+        assert_eq!(
+            list_recent_authorized(&conn, &actor, &school, &record).unwrap()[0].notes,
+            review.notes
+        );
+    }
+
+    #[test]
+    fn retained_review_check_reauthorizes_and_is_exact_school_record_review_scoped() {
+        let (conn, school, actor, record, request) = fixture();
+        let review = record_authorized(&conn, &actor, &school, &record, &request)
+            .unwrap()
+            .unwrap();
+        let foreign = school::create(&conn, "Synthetic Foreign").unwrap();
+        assert!(
+            check_source_authorized(&conn, &actor, &foreign.id, &record, &review.id)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            check_source_authorized(&conn, &actor, &school, "missing-record", &review.id)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            check_source_authorized(&conn, &actor, &school, &record, "missing-review")
+                .unwrap()
+                .is_none()
+        );
+        let other =
+            user::create_user(&conn, "other-review-reader", "password", "Synthetic Other").unwrap();
+        user::add_school_membership(&conn, &other.id, &school).unwrap();
+        assert!(matches!(
+            check_source_authorized(&conn, &other.id, &school, &record, &review.id),
+            Err(AppError::Unauthorized)
+        ));
+        conn.execute(
+            "DELETE FROM teaching_assignments WHERE teacher_user_id = ?1",
+            params![actor],
+        )
+        .unwrap();
+        assert!(matches!(
+            check_source_authorized(&conn, &actor, &school, &record, &review.id),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn retained_review_check_refuses_corrupt_binding_even_when_draft_source_matches() {
+        let (conn, school, actor, record, request) = fixture();
+        let review = record_authorized(&conn, &actor, &school, &record, &request)
+            .unwrap()
+            .unwrap();
+        // Synthetic adversarial DB fixture only, never a production gate bypass.
+        conn.execute_batch("DROP TRIGGER preparation_review_no_update;")
+            .unwrap();
+        for column in ["snapshot_sha256", "source_sha256", "source_version"] {
+            let original: String = conn
+                .query_row(
+                    &format!("SELECT {column} FROM report_card_preparation_reviews WHERE id = ?1"),
+                    params![review.id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            conn.execute(&format!("UPDATE report_card_preparation_reviews SET {column} = 'synthetic-corruption' WHERE id = ?1"), params![review.id]).unwrap();
+            assert!(matches!(
+                check_source_authorized(&conn, &actor, &school, &record, &review.id),
+                Err(AppError::Validation(_))
+            ));
+            conn.execute(
+                &format!("UPDATE report_card_preparation_reviews SET {column} = ?2 WHERE id = ?1"),
+                params![review.id, original],
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            check_source_authorized(&conn, &actor, &school, &record, &review.id)
+                .unwrap()
+                .unwrap()
+                .source_status,
+            "matches"
+        );
     }
 
     #[test]
