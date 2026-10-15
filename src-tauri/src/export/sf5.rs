@@ -13,7 +13,26 @@ use serde::Serialize;
 
 use crate::export::csv;
 use crate::export::{FieldDisclosure, OmittedField};
+use crate::repository::grading_computation::ComputedTermGrade;
 use crate::repository::school::School;
+
+/// Average only complete supplied records; never promote provisional data to final.
+/// This does not prove that all required periods exist or grant professional approval.
+pub(crate) fn average_complete_recorded_terms(
+    grades: impl IntoIterator<Item = Option<ComputedTermGrade>>,
+) -> Option<u32> {
+    let mut sum = 0.0;
+    let mut count = 0_u32;
+    for grade in grades {
+        let grade = grade?;
+        if !grade.complete {
+            return None;
+        }
+        sum += f64::from(grade.term_grade);
+        count += 1;
+    }
+    (count > 0).then(|| (sum / f64::from(count)).round() as u32)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -500,6 +519,63 @@ pub fn build_sf5_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn recorded_term(term_grade: u32, complete: bool) -> Option<ComputedTermGrade> {
+        Some(ComputedTermGrade {
+            initial_grade: f64::from(term_grade),
+            term_grade,
+            was_transmuted: false,
+            was_floored: false,
+            complete,
+        })
+    }
+
+    #[test]
+    fn complete_recorded_term_average_preserves_rounding_and_real_zero() {
+        assert_eq!(average_complete_recorded_terms([]), None);
+        assert_eq!(average_complete_recorded_terms([recorded_term(0, true)]), Some(0));
+        assert_eq!(
+            average_complete_recorded_terms([recorded_term(80, true), recorded_term(81, true)]),
+            Some(81)
+        );
+        assert_eq!(
+            average_complete_recorded_terms([recorded_term(80, true), recorded_term(90, true)]),
+            Some(85)
+        );
+    }
+
+    #[test]
+    fn provisional_or_missing_recorded_terms_never_become_final_averages() {
+        let complete = recorded_term(90, true);
+        let provisional = recorded_term(95, false);
+        for terms in [
+            vec![provisional],
+            vec![None],
+            vec![complete, provisional],
+            vec![provisional, complete],
+            vec![complete, None],
+            vec![None, complete],
+        ] {
+            assert_eq!(average_complete_recorded_terms(terms), None);
+        }
+    }
+
+    #[test]
+    fn provisional_subject_keeps_existing_promotion_projection_pending_without_average() {
+        let subject_grades = vec![
+            Sf5SubjectGrade {
+                subject_name: "Synthetic complete".into(),
+                final_grade: average_complete_recorded_terms([recorded_term(90, true)]),
+            },
+            Sf5SubjectGrade {
+                subject_name: "Synthetic provisional".into(),
+                final_grade: average_complete_recorded_terms([recorded_term(95, false)]),
+            },
+        ];
+        let (average, status) = Sf5LearnerRow::compute_status(&subject_grades);
+        assert_eq!(average, None);
+        assert_eq!(status, PromotionStatus::Pending);
+    }
 
     fn sample_school() -> School {
         School {

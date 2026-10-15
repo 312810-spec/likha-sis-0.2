@@ -1,5 +1,24 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 final-projection completeness repair
+
+PR133 passed Quality/Security at `82c139e0b1ec0a3cb4c7d4cdedfe9741e321b9ea`
+and merged as `ec4fbe25bc36e35212d99f1b0ef75d68e56040a7`. Active branch:
+`ctos/m11-final-projection-completeness-20261015`; read
+`docs/ctos/checkpoints/m11-final-projection-completeness-2026-10-15.md` next.
+Inspection found SF5/SF6/SF10 aggregation accepting `Some(grade)` even when
+`grade.complete` was false, contrary to the local grading contract. All three now
+use one eligibility/average helper that returns unavailable for any missing or
+provisional supplied term, preserving existing PENDING/no-average semantics.
+Complete supplied terms preserve rounding; empty/missing is not zero-filled.
+This is a cross-form projection consistency repair, not proof that every required
+period exists or any grade is professionally approved. No grading policy, schema,
+authorization, raw score or official-source status changed. Require exact-head
+native Quality/Security before merge. Next finish required-period/source-aware
+reconciliation and issuance/amendment implementation; existing readiness fingerprints
+must not be reused as annual-form or issue authorization. External official-source,
+device and professional acceptance remains parked; M10/M11 incomplete. No deployment.
+
 ## Current active slice — M11 retained-review freshness viewing
 
 PR132 passed Quality/Security at `03e7bcfa22436854c3255d9034ec67293b683edb`
