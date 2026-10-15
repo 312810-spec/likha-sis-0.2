@@ -105,6 +105,21 @@ pub fn list_by_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Secti
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Annual reports must not include sections from other years, even when an old
+/// membership has no recorded leaving date. School/year are exact query scope.
+pub(crate) fn list_by_school_year(
+    conn: &Connection,
+    school_id: &str,
+    school_year: &str,
+) -> AppResult<Vec<Section>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, school_id, school_year, grade_level, name, created_at \
+         FROM sections WHERE school_id = ?1 AND school_year = ?2 ORDER BY grade_level, name",
+    )?;
+    let rows = stmt.query_map((school_id, school_year), row_to_section)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 fn row_to_section(row: &rusqlite::Row) -> rusqlite::Result<Section> {
     Ok(Section {
         id: row.get(0)?,
@@ -156,6 +171,23 @@ mod tests {
         let found = find_by_id_in_school(&conn, &school_b.id, &section.id).unwrap();
 
         assert_eq!(found, None);
+    }
+
+    #[test]
+    fn annual_section_list_excludes_other_years_and_schools() {
+        let conn = open_test_db();
+        let school_a = school::create(&conn, "School A").unwrap();
+        let school_b = school::create(&conn, "School B").unwrap();
+        create(&conn, &school_a.id, "2025-2026", "7", "Old").unwrap();
+        let current = create(&conn, &school_a.id, "2026-2027", "7", "Current").unwrap();
+        create(&conn, &school_b.id, "2026-2027", "7", "Foreign").unwrap();
+        assert_eq!(
+            list_by_school_year(&conn, &school_a.id, "2026-2027").unwrap(),
+            vec![current]
+        );
+        assert!(list_by_school_year(&conn, &school_a.id, "2027-2028")
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
