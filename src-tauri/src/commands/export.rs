@@ -687,7 +687,7 @@ pub fn export_school_eosy_sf6(
             .map(|period| (period.starts_on.as_str(), period.ends_on.as_str())),
     )?;
 
-    let sections = section::list_by_school(&conn, &school_id)?;
+    let sections = section::list_by_school_year(&conn, &school_id, &school_year)?;
     let mut section_summaries = Vec::with_capacity(sections.len());
 
     for sec in sections {

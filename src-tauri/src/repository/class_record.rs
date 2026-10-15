@@ -540,7 +540,8 @@ mod tests {
             (None, PromotionStatus::Pending)
         );
         // Removing the current assignment cannot erase an existing record.
-        conn.execute("DELETE FROM teaching_assignments", []).unwrap();
+        conn.execute("DELETE FROM teaching_assignments", [])
+            .unwrap();
         assert_eq!(
             annual_report_subject_names(&conn, &school_id, &section_id, "2026-2027").unwrap(),
             vec!["Mathematics"]
