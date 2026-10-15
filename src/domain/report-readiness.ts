@@ -1,6 +1,21 @@
 import type { FieldDisclosure } from "./export";
 import type { ComputedTermGrade } from "./learner-score";
 
+/** Read-time bound-review evidence only; never issue authorization. */
+export interface ReportPreparationReviewSourceCheck {
+  reviewId: string;
+  draftId: string;
+  classRecordId: string;
+  snapshotSha256: string;
+  sourceVersion: string;
+  storedSourceSha256: string;
+  currentSourceSha256: string | null;
+  sourceStatus: "matches" | "changed" | "unsupported_version";
+  checkedAt: string;
+  evidenceScope: "read_time_preparation_evidence_not_issue_authorization";
+  officialFidelity: "not_verified";
+}
+
 /** Preparation review only, never grade approval, issuance or source verification. */
 export interface ReportPreparationReviewRequest {
   draftId: string;

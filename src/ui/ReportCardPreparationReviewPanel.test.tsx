@@ -58,7 +58,11 @@ function setup() {
       listRecentReportCardDrafts: vi.fn(),
       compareReportCardDraft: vi.fn(),
     },
-    { recordReportCardPreparationReview, listRecentReportCardPreparationReviews },
+    {
+      recordReportCardPreparationReview,
+      listRecentReportCardPreparationReviews,
+      checkReportCardPreparationReviewSource: vi.fn(),
+    },
   );
   const props = { service, draft, revision: 0, disabled: false };
   const view = (changes: Partial<typeof props> = {}) => (

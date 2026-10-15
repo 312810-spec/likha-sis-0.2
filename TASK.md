@@ -1,5 +1,24 @@
 # Current task — CTOS v3
 
+## Current active slice — M11 retained-review freshness viewing
+
+PR132 passed Quality/Security at `03e7bcfa22436854c3255d9034ec67293b683edb`
+and merged as `981204d11d528bdee7c1d8a17aa6504c1bd0625b`. Active branch:
+`ctos/m11-review-freshness-ui-20261015`; read
+`docs/ctos/checkpoints/m11-review-freshness-ui-2026-10-15.md` next.
+Retained preparation-review details now offer an explicit native input check.
+Matches, changed, unsupported, missing and failed evidence remain distinct;
+review/draft/record hashes, source protocol, timestamp, non-issuance scope and
+unverified fidelity must match the expected contract before display. Results
+invalidate on service/review/revision/disabled changes and stale async replies
+are discarded. No raw source JSON, write, approval or issuance action introduced.
+Local quality 158 files / 1,565 tests, build and preview isolation PASS. Require
+current-head applicable Quality/Security before merge; native unchanged from
+verified PR132. Next implement issuance-time source/authority validation, immutable
+issued snapshots, append-only amendments and cross-form reconciliation in M11.
+Official-source, installed-device and professional acceptance remains parked;
+M10/M11 incomplete. No deployment.
+
 ## Current active slice — M11 native retained-review freshness
 
 PR131 passed Quality/Security at `2c18c34143faf81bb1e6fda5fcda03bf25eff4b6`

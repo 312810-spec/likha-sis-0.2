@@ -19,6 +19,7 @@ import type {
   ReportCardReadiness,
   ReportPreparationReview,
   ReportPreparationReviewRequest,
+  ReportPreparationReviewSourceCheck,
 } from "../../domain/report-readiness";
 import type { ReportDraftRepository } from "../../domain/ports/report-draft-repository";
 import type { ReportPreparationReviewRepository } from "../../domain/ports/report-preparation-review-repository";
@@ -31,6 +32,15 @@ export class TauriExportRepository
     ReportDraftRepository,
     ReportPreparationReviewRepository
 {
+  checkReportCardPreparationReviewSource(
+    classRecordId: string,
+    reviewId: string,
+  ): Promise<ReportPreparationReviewSourceCheck | null> {
+    return invoke<ReportPreparationReviewSourceCheck | null>(
+      "check_report_card_preparation_review_source",
+      { classRecordId, reviewId },
+    );
+  }
   recordReportCardPreparationReview(
     classRecordId: string,
     request: ReportPreparationReviewRequest,
