@@ -42,3 +42,14 @@ Next: inspect this PR's exact-head CI, repair failures and merge only after the
 applicable gates pass. Then continue versioned subject/policy applicability and
 immutable issue/amend reconciliation. M10/M11 and external acceptance remain
 incomplete; no deployment. Preserve the compact continuation structure.
+
+## Local continuation: formatting repair
+
+Reviewed PR139 head `5bcac1f4d8652259f5a2003b4136f3f5a2c29823` against main.
+Quality run 38812885009 passed Windows but Ubuntu stopped at rustfmt differences
+in the export commands and authorization tests. Security checks passed on that
+head. Applied exactly the formatting requested by local Rust 1.99.0; local
+`cargo fmt --check` now passes. No behavior changes in this continuation.
+Focused native authorization/export tests are running on the Windows checkout;
+their result is not yet established. Fresh CI must validate the repaired head
+before merge. No installed-device, UI, file-write or release acceptance claim.

@@ -674,8 +674,7 @@ pub fn export_school_eosy_sf6(
     school_year: String,
 ) -> AppResult<Option<Sf6ExportResult>> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -810,8 +809,7 @@ pub fn export_school_monthly_attendance_sf4(
     month: u32,
 ) -> AppResult<Option<Sf4ExportResult>> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ExportSchoolReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);

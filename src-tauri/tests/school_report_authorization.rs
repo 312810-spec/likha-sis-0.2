@@ -38,8 +38,7 @@ fn school_report_export_denies_plain_members_teachers_and_advisers() {
     role::grant(&conn, &actor_id, &school_id, role::TEACHER).unwrap();
     denied(&conn, &sessions);
     let section = section::create(&conn, &school_id, "2026-2027", "10", "Synthetic").unwrap();
-    section_advisory::assign(&conn, &school_id, &section.id, &actor_id, "2026-06-01")
-        .unwrap();
+    section_advisory::assign(&conn, &school_id, &section.id, &actor_id, "2026-06-01").unwrap();
     denied(&conn, &sessions);
 }
 
@@ -69,7 +68,10 @@ fn school_report_roles_are_scoped_and_rechecked_after_revocation() {
 #[test]
 fn actual_school_report_commands_authorize_before_reading_report_inputs() {
     let source = include_str!("../src/commands/export.rs");
-    for name in ["export_school_eosy_sf6", "export_school_monthly_attendance_sf4"] {
+    for name in [
+        "export_school_eosy_sf6",
+        "export_school_monthly_attendance_sf4",
+    ] {
         let marker = format!("pub fn {name}(");
         let body = source
             .split_once(&marker)
