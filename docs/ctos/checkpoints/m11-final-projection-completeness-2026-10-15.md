@@ -51,6 +51,15 @@ its own dependencies. No source backfill or approval metadata invented.
 
 ## Next
 
+PR134 initial head `0f15eb4f9ba395922aa74c194e25e92605abd0ca`, tree
+`12a238bf51880c953d8d428d565e75b6643a7943`, matched local source. Security
+38665548604 and Quality Windows job 116196613256 succeeded. Quality run
+38665548529 Ubuntu job 116196613079 failed at `cargo fmt --check` before tests:
+one `sf5.rs` test assertion wrapping hunk. Applied that exact formatter hunk and
+verified whitespace/trailing-comma-only equivalence. No eligibility, arithmetic,
+call-site or authority change. Fresh applicable exact-head Quality/Security is
+required; a passing Windows job never overrides the failed aggregate gate.
+
 Publish exact local/remote tree identity and require current-head Quality/Security
 before merge. Continue required-period/source-aware reconciliation, issuance-time
 authority/source checks, immutable issuance and append-only amendments. M10/M11

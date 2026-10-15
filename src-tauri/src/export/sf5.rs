@@ -533,7 +533,10 @@ mod tests {
     #[test]
     fn complete_recorded_term_average_preserves_rounding_and_real_zero() {
         assert_eq!(average_complete_recorded_terms([]), None);
-        assert_eq!(average_complete_recorded_terms([recorded_term(0, true)]), Some(0));
+        assert_eq!(
+            average_complete_recorded_terms([recorded_term(0, true)]),
+            Some(0)
+        );
         assert_eq!(
             average_complete_recorded_terms([recorded_term(80, true), recorded_term(81, true)]),
             Some(81)
