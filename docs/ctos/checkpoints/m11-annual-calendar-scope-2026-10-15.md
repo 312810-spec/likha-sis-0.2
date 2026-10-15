@@ -38,3 +38,16 @@ Publish this coherent repair, require exact-head Quality/Security and inspect an
 failing logs. Then continue source-aware annual reconciliation, required-subject
 applicability, immutable issuance and append-only amendments. M10/M11 incomplete.
 Git transport failed at the runtime proxy; GitHub connector remains available.
+
+## Continuation repair — 2026-10-16 (Asia/Manila)
+
+PR136 head `2587a855f1684a9cf5e5a7464bbc011092eacd4e` failed Quality
+38745733056: Ubuntu stopped at rustfmt differences; Windows compilation found
+undeclared `chrono` in the new calendar validator (E0433). Security passed.
+Replaced that call with a dependency-free canonical Gregorian date validator,
+added leap-century, invalid-day/month, whitespace and Unicode regression cases,
+and applied the formatter differences from the Ubuntu log. No manifest/lockfile
+change, schema mutation or official calendar defaults. Native compilation,
+regressions, formatter and Clippy still require fresh exact-head CI; no local
+Rust toolchain is installed. Do not merge on the earlier failed results.
+

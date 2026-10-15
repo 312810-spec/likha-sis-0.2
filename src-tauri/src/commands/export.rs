@@ -696,11 +696,7 @@ pub fn export_school_eosy_sf6(
 
     for sec in sections {
         let roster = section_membership::roster_for_section_over_range(
-            &conn,
-            &school_id,
-            &sec.id,
-            start_date,
-            end_date,
+            &conn, &school_id, &sec.id, start_date, end_date,
         )?;
         let class_records = class_record::list_by_section_in_school(&conn, &school_id, &sec.id)?;
         let filtered_records: Vec<_> = class_records
@@ -1138,3 +1134,4 @@ pub fn export_learner_permanent_record_sf10(
         disclosure: export.disclosure,
     }))
 }
+
