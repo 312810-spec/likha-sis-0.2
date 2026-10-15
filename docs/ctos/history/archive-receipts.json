@@ -1,0 +1,14 @@
+[
+  {
+    "source": "CTOS-STATE.md",
+    "archive": "docs/ctos/history/CTOS-STATE-through-2026-10-16.txt",
+    "bytes": 30217,
+    "sha256": "4517769a96bf231c5b15f39313d0293c357fccd54044cf48831a485ad5d96810"
+  },
+  {
+    "source": "TASK.md",
+    "archive": "docs/ctos/history/TASK-through-2026-10-16.txt",
+    "bytes": 36010,
+    "sha256": "e24b16c7dafeef3a4c3129186ea64b6b326468071c018d0a1127ae8b6d161036"
+  }
+]
