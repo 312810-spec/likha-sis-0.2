@@ -9,8 +9,8 @@ PR136 repairs configured annual calendars and the previous native build failure.
 PR137 includes assigned-but-unrecorded subjects in SF5/SF6/SF10 and scopes SF6 sections
 by school year. Exact heads, verification and limits are in `CTOS-STATE.md`.
 
-Ubuntu native Quality and Security passed; confirm exact-head Windows completion before merge.
-Continue under the established implementation/push/merge authorization. No deployment is implied.
+PR136 and PR137 passed exact-head Ubuntu/Windows Quality and Security and are merged.
+Continue under the established implementation/push/merge authorization. No deployment was performed.
 
 ## Next unblocked work
 

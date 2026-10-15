@@ -7,9 +7,11 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 PR136 calendar repair: `8f3d4a3923a91be5ba90757fe5e990870389d6df`.
 PR137 assigned-subject/year scope: `2380f0c298f32ada353ed313e46fe11d34950b14`.
-Ubuntu native Quality passed at both heads (1,494 and 1,497 tests respectively),
-including rustfmt and Clippy with warnings denied. Security passed. Windows
-build/test completion must be confirmed before merge. No deployment.
+Both heads passed Ubuntu native Quality (1,494 / 1,497 tests), rustfmt, Clippy,
+Windows build/tests (1,503 / 1,506 tests) and Security with zero test failures.
+PR136 merged as `774fdd6ba3363e319d88783f3bb76318b123ae49`; PR137 merged as
+`c53f05f0a8bacf63f920ad09970c5a120e9c5ee1`. Quality runs: 38768358186 / 38768994643.
+Latest Windows test-installer artifact: 11991713118. No deployment.
 
 Exact receipts and limits: `docs/ctos/checkpoints/m11-assigned-subject-coverage-2026-10-16.md`
 and `docs/ctos/checkpoints/m11-annual-calendar-scope-2026-10-15.md`.
@@ -28,8 +30,7 @@ Refresh live main, open PRs and Git status on resume; this document cannot prove
 
 ## Next execution
 
-First finish exact-head CI/merges for PR136/137 if still open. Then inspect school-wide SF4/SF6
-export authorization against current role boundaries (source currently uses session scope), before
+PR136/137 are merged. Inspect school-wide SF4/SF6 export authorization against current role boundaries (source currently uses session scope), before
 expanding versioned required-subject/policy reconciliation and issue/amend transitions.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 
