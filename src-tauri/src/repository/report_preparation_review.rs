@@ -92,7 +92,11 @@ pub fn check_source_authorized(
     }
     let sql = format!("{SELECT_REVIEW} WHERE id = ?1 AND school_id = ?2 AND class_record_id = ?3");
     let review = tx
-        .query_row(&sql, params![review_id, school_id, class_record_id], row_review)
+        .query_row(
+            &sql,
+            params![review_id, school_id, class_record_id],
+            row_review,
+        )
         .optional()?;
     let Some(review) = review else {
         return Ok(None);
@@ -318,22 +322,38 @@ mod tests {
         assert_eq!(check.draft_id, review.draft_id);
         assert_eq!(check.snapshot_sha256, review.snapshot_sha256);
         assert_eq!(check.stored_source_sha256, review.source_sha256);
-        assert_eq!(check.current_source_sha256.as_deref(), Some(review.source_sha256.as_str()));
+        assert_eq!(
+            check.current_source_sha256.as_deref(),
+            Some(review.source_sha256.as_str())
+        );
         assert_eq!(check.source_status, "matches");
         assert_eq!(check.official_fidelity, "not_verified");
-        assert_eq!(check.evidence_scope, "read_time_preparation_evidence_not_issue_authorization");
+        assert_eq!(
+            check.evidence_scope,
+            "read_time_preparation_evidence_not_issue_authorization"
+        );
         assert!(!check.checked_at.is_empty());
         assert_eq!(conn.total_changes(), changes);
-        conn.execute("UPDATE sections SET name = 'Changed since review' WHERE school_id = ?1", params![school]).unwrap();
+        conn.execute(
+            "UPDATE sections SET name = 'Changed since review' WHERE school_id = ?1",
+            params![school],
+        )
+        .unwrap();
         let changes = conn.total_changes();
         let changed = check_source_authorized(&conn, &actor, &school, &record, &review.id)
             .unwrap()
             .unwrap();
         assert_eq!(changed.source_status, "changed");
-        assert_ne!(changed.current_source_sha256.as_deref(), Some(review.source_sha256.as_str()));
+        assert_ne!(
+            changed.current_source_sha256.as_deref(),
+            Some(review.source_sha256.as_str())
+        );
         assert_eq!(changed.stored_source_sha256, review.source_sha256);
         assert_eq!(conn.total_changes(), changes);
-        assert_eq!(list_recent_authorized(&conn, &actor, &school, &record).unwrap()[0].notes, review.notes);
+        assert_eq!(
+            list_recent_authorized(&conn, &actor, &school, &record).unwrap()[0].notes,
+            review.notes
+        );
     }
 
     #[test]
@@ -343,14 +363,37 @@ mod tests {
             .unwrap()
             .unwrap();
         let foreign = school::create(&conn, "Synthetic Foreign").unwrap();
-        assert!(check_source_authorized(&conn, &actor, &foreign.id, &record, &review.id).unwrap().is_none());
-        assert!(check_source_authorized(&conn, &actor, &school, "missing-record", &review.id).unwrap().is_none());
-        assert!(check_source_authorized(&conn, &actor, &school, &record, "missing-review").unwrap().is_none());
-        let other = user::create_user(&conn, "other-review-reader", "password", "Synthetic Other").unwrap();
+        assert!(
+            check_source_authorized(&conn, &actor, &foreign.id, &record, &review.id)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            check_source_authorized(&conn, &actor, &school, "missing-record", &review.id)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            check_source_authorized(&conn, &actor, &school, &record, "missing-review")
+                .unwrap()
+                .is_none()
+        );
+        let other =
+            user::create_user(&conn, "other-review-reader", "password", "Synthetic Other").unwrap();
         user::add_school_membership(&conn, &other.id, &school).unwrap();
-        assert!(matches!(check_source_authorized(&conn, &other.id, &school, &record, &review.id), Err(AppError::Unauthorized)));
-        conn.execute("DELETE FROM teaching_assignments WHERE teacher_user_id = ?1", params![actor]).unwrap();
-        assert!(matches!(check_source_authorized(&conn, &actor, &school, &record, &review.id), Err(AppError::Unauthorized)));
+        assert!(matches!(
+            check_source_authorized(&conn, &other.id, &school, &record, &review.id),
+            Err(AppError::Unauthorized)
+        ));
+        conn.execute(
+            "DELETE FROM teaching_assignments WHERE teacher_user_id = ?1",
+            params![actor],
+        )
+        .unwrap();
+        assert!(matches!(
+            check_source_authorized(&conn, &actor, &school, &record, &review.id),
+            Err(AppError::Unauthorized)
+        ));
     }
 
     #[test]
@@ -360,14 +403,34 @@ mod tests {
             .unwrap()
             .unwrap();
         // Synthetic adversarial DB fixture only, never a production gate bypass.
-        conn.execute_batch("DROP TRIGGER preparation_review_no_update;").unwrap();
+        conn.execute_batch("DROP TRIGGER preparation_review_no_update;")
+            .unwrap();
         for column in ["snapshot_sha256", "source_sha256", "source_version"] {
-            let original: String = conn.query_row(&format!("SELECT {column} FROM report_card_preparation_reviews WHERE id = ?1"), params![review.id], |row| row.get(0)).unwrap();
+            let original: String = conn
+                .query_row(
+                    &format!("SELECT {column} FROM report_card_preparation_reviews WHERE id = ?1"),
+                    params![review.id],
+                    |row| row.get(0),
+                )
+                .unwrap();
             conn.execute(&format!("UPDATE report_card_preparation_reviews SET {column} = 'synthetic-corruption' WHERE id = ?1"), params![review.id]).unwrap();
-            assert!(matches!(check_source_authorized(&conn, &actor, &school, &record, &review.id), Err(AppError::Validation(_))));
-            conn.execute(&format!("UPDATE report_card_preparation_reviews SET {column} = ?2 WHERE id = ?1"), params![review.id, original]).unwrap();
+            assert!(matches!(
+                check_source_authorized(&conn, &actor, &school, &record, &review.id),
+                Err(AppError::Validation(_))
+            ));
+            conn.execute(
+                &format!("UPDATE report_card_preparation_reviews SET {column} = ?2 WHERE id = ?1"),
+                params![review.id, original],
+            )
+            .unwrap();
         }
-        assert_eq!(check_source_authorized(&conn, &actor, &school, &record, &review.id).unwrap().unwrap().source_status, "matches");
+        assert_eq!(
+            check_source_authorized(&conn, &actor, &school, &record, &review.id)
+                .unwrap()
+                .unwrap()
+                .source_status,
+            "matches"
+        );
     }
 
     #[test]

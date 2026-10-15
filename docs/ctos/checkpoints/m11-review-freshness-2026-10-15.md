@@ -42,6 +42,15 @@ Branch: `ctos/m11-review-freshness-20261015`.
 
 ## Next
 
+PR132 initial head `a90d7286d90d4e8f9d82415729f2a41e58d789ce`, tree
+`d90d793832e2fbe0bfa9506672fd09eb4cfdf837`, matched local source. Security
+38648706033 and Quality Windows job 116141936719 succeeded. Quality run
+38648706094 Ubuntu job 116141936846 failed at `cargo fmt --check` before tests.
+Applied the five exact formatter hunks in `report_preparation_review.rs`, verified
+whitespace/trailing-comma-only equivalence. Grading, authorization, SQL and source
+fingerprint inputs remain unchanged. Require fresh applicable exact-head gates;
+the initial failing Quality run is not merge evidence.
+
 Publish exact local/remote source identity and require applicable Quality/Security.
 Expose explicit retained-review source evidence, then issuance-time revalidation,
 immutable issued snapshots, append-only amendments and cross-form reconciliation.
