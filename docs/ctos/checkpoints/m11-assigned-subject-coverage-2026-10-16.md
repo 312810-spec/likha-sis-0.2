@@ -48,3 +48,16 @@ printer and teacher acceptance remain untested. No deployment.
 Require exact-head Quality/Security, repair failures, then merge under the existing
 authorization. Continue versioned required-subject/policy reconciliation and
 issuance/amendments. M10/M11 remain incomplete; do not mass-merge old branches.
+
+## Final exact-head evidence
+
+Head `2380f0c298f32ada353ed313e46fe11d34950b14` passed Quality 38768994643:
+Ubuntu rustfmt, 1,497 tests and Clippy with warnings denied; Windows build,
+1,506 tests and installer upload (artifact 11991713118). All tests had zero
+failures. Security gitleaks/cargo-deny/osv-scanner passed at the same head.
+PR137 merged as `c53f05f0a8bacf63f920ad09970c5a120e9c5ee1`; PR136 base repair
+merged as `774fdd6ba3363e319d88783f3bb76318b123ae49` after its own exact-head gates.
+The six new native calendar/subject/year regression tests passed. These receipts
+do not establish installed-device, official-fidelity or professional acceptance.
+Next: audit school-wide SF4/SF6 export authority, then versioned applicability
+and immutable issue/amend reconciliation. No deployment.

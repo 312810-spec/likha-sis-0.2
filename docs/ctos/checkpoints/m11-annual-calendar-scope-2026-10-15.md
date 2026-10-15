@@ -50,4 +50,3 @@ and applied the formatter differences from the Ubuntu log. No manifest/lockfile
 change, schema mutation or official calendar defaults. Native compilation,
 regressions, formatter and Clippy still require fresh exact-head CI; no local
 Rust toolchain is installed. Do not merge on the earlier failed results.
-
