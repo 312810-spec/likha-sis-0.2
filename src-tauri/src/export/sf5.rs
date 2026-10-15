@@ -34,6 +34,37 @@ pub(crate) fn average_complete_recorded_terms(
     (count > 0).then(|| (sum / f64::from(count)).round() as u32)
 }
 
+/// Require exactly one record for every configured school-year period and one
+/// canonical subject identity. Duplicate transfer records and same-name subjects
+/// are ambiguous; do not silently average them. This checks configured coverage,
+/// not whether the school configured every officially required period/subject.
+pub(crate) fn has_configured_period_coverage<'a>(
+    expected_periods: impl IntoIterator<Item = &'a str>,
+    records: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> bool {
+    let mut expected = std::collections::HashSet::new();
+    for period in expected_periods {
+        if !expected.insert(period) {
+            return false;
+        }
+    }
+    if expected.is_empty() {
+        return false;
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut subject = None;
+    for (period, subject_id) in records {
+        if !expected.contains(period) || !seen.insert(period) {
+            return false;
+        }
+        if subject.is_some_and(|id| id != subject_id) {
+            return false;
+        }
+        subject = Some(subject_id);
+    }
+    seen == expected
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PromotionStatus {
@@ -519,6 +550,41 @@ pub fn build_sf5_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configured_period_coverage_requires_exact_nonempty_period_set() {
+        let expected = ["p1", "p2", "p3"];
+        assert!(has_configured_period_coverage(
+            expected,
+            [("p3", "math"), ("p1", "math"), ("p2", "math")]
+        ));
+        assert!(!has_configured_period_coverage([], []));
+        assert!(!has_configured_period_coverage(expected, []));
+        assert!(!has_configured_period_coverage(
+            expected,
+            [("p1", "math"), ("p2", "math")]
+        ));
+        assert!(!has_configured_period_coverage(
+            ["p1"],
+            [("p1", "math"), ("foreign", "math")]
+        ));
+        assert!(!has_configured_period_coverage(
+            ["p1", "p1"],
+            [("p1", "math")]
+        ));
+    }
+
+    #[test]
+    fn configured_period_coverage_rejects_transfer_duplicates_and_subject_collisions() {
+        assert!(!has_configured_period_coverage(
+            ["p1", "p2"],
+            [("p1", "math"), ("p1", "math")]
+        ));
+        assert!(!has_configured_period_coverage(
+            ["p1", "p2"],
+            [("p1", "math-a"), ("p2", "math-b")]
+        ));
+    }
 
     fn recorded_term(term_grade: u32, complete: bool) -> Option<ComputedTermGrade> {
         Some(ComputedTermGrade {
