@@ -622,10 +622,7 @@ pub fn export_section_eosy_sf5(
                     final_grade: None,
                 });
             } else {
-                let mut sum = 0.0;
-                let mut count = 0;
-                let mut all_scored = true;
-
+                let mut term_grades = Vec::with_capacity(subj_records.len());
                 for cr in subj_records {
                     let computed = grading_computation::compute_term_grade(
                         &conn,
@@ -633,22 +630,9 @@ pub fn export_section_eosy_sf5(
                         &cr.id,
                         &member.learner_id,
                     )?;
-                    match computed {
-                        Some(grade) => {
-                            sum += grade.term_grade as f64;
-                            count += 1;
-                        }
-                        None => {
-                            all_scored = false;
-                        }
-                    }
+                    term_grades.push(computed);
                 }
-
-                let final_grade = if all_scored && count > 0 {
-                    Some((sum / count as f64).round() as u32)
-                } else {
-                    None
-                };
+                let final_grade = sf5::average_complete_recorded_terms(term_grades);
 
                 subject_grades.push(Sf5SubjectGrade {
                     subject_name: subj.clone(),
@@ -768,9 +752,7 @@ pub fn export_school_eosy_sf6(
                         final_grade: None,
                     });
                 } else {
-                    let mut sum = 0.0;
-                    let mut count = 0;
-                    let mut all_scored = true;
+                    let mut term_grades = Vec::with_capacity(subj_records.len());
 
                     for cr in subj_records {
                         let computed = grading_computation::compute_term_grade(
@@ -779,22 +761,9 @@ pub fn export_school_eosy_sf6(
                             &cr.id,
                             &member.learner_id,
                         )?;
-                        match computed {
-                            Some(grade) => {
-                                sum += grade.term_grade as f64;
-                                count += 1;
-                            }
-                            None => {
-                                all_scored = false;
-                            }
-                        }
+                        term_grades.push(computed);
                     }
-
-                    let final_grade = if all_scored && count > 0 {
-                        Some((sum / count as f64).round() as u32)
-                    } else {
-                        None
-                    };
+                    let final_grade = sf5::average_complete_recorded_terms(term_grades);
 
                     subject_grades.push(Sf5SubjectGrade {
                         subject_name: subj.clone(),
@@ -1101,9 +1070,7 @@ pub fn export_learner_permanent_record_sf10(
                 .filter(|cr| cr.subject_name == *subj)
                 .collect();
 
-            let mut sum = 0.0;
-            let mut count = 0;
-            let mut all_scored = true;
+            let mut term_grades = Vec::with_capacity(subj_records.len());
             for cr in subj_records {
                 let computed = grading_computation::compute_term_grade(
                     &conn,
@@ -1111,22 +1078,9 @@ pub fn export_learner_permanent_record_sf10(
                     &cr.id,
                     &learner_id,
                 )?;
-                match computed {
-                    Some(grade) => {
-                        sum += grade.term_grade as f64;
-                        count += 1;
-                    }
-                    None => {
-                        all_scored = false;
-                    }
-                }
+                term_grades.push(computed);
             }
-
-            let final_grade = if all_scored && count > 0 {
-                Some((sum / count as f64).round() as u32)
-            } else {
-                None
-            };
+            let final_grade = sf5::average_complete_recorded_terms(term_grades);
             subject_grades.push(Sf5SubjectGrade {
                 subject_name: subj.clone(),
                 final_grade,
