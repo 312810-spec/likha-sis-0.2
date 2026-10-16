@@ -90,3 +90,19 @@ PR142 remains unmerged. Next dependency action: verify compatible maintained
 upstream reader releases or separately design/review/test a reader migration.
 This parks the security-gated closure/release claim, not unrelated applicability
 design. No dependency waiver, vendoring, forced upgrade or new runtime tooling.
+
+## Manual continuation — 2026-10-17
+
+The dependency blocker above is historical. PR143 provides an explicit narrowly
+patched ZIP 9 reader compatibility fork with deterministic source inventory; it
+is not upstream-declared compatibility. Its original native/frontend/provenance
+checks passed. Three secret-scanner findings were checked: two inventory values
+match the exact referenced source bytes' SHA-256; the third is typography prose.
+Only exact immutable finding fingerprints were added. Fresh exact-head gates and
+merge receipts remain required. PR142 is reconciled on that dependency tree;
+retarget main after PR143 merges. No application code changes in this handoff.
+
+The user explicitly skipped automation. Continue manually and leave scheduled
+tasks unchanged. Canonical applicability is the next independent implementation
+contract; official requirements and final device/professional acceptance remain
+external. No deployment.

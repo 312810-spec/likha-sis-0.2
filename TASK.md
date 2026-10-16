@@ -1,6 +1,6 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-16 (Asia/Manila).
+Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
 ## Active continuation
@@ -14,15 +14,15 @@ Continue under the established implementation/push/merge authorization. No deplo
 
 ## Next unblocked work
 
-Active documentation branch: `ctos/m11-reporting-verification-20261016`.
-PR142 Quality passed but cargo-deny failed after upstream yanked `zip 8.6.0`.
-Current stable spreadsheet readers require ZIP 8 and no unyanked 8.x replacement
-exists. Verify compatible maintained upstream releases or a separately reviewed
-reader migration; keep the deny policy and leave PR142 unmerged meanwhile.
-Continue independent canonical required-subject applicability design. Its checkpoint records PR103 salvage
-risks and synthetic acceptance cases; do not directly adopt the old offering code.
-Hourly automation is still paused because all five task slots are occupied;
-resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
+Manual continuation: automation was explicitly skipped by the user on 2026-10-17.
+Leave all scheduled tasks unchanged. Finish PR143 dependency-security verification,
+then merge the reconciled PR142 documentation after exact-head gates pass.
+Three scanner false positives were verified and fixed without broad exclusions.
+The dependency repair is an explicit local compatibility fork; official support
+and installed-device acceptance are not implied.
+Next feature: canonical versioned required-subject applicability with synthetic
+scope, concurrent-successor, withdrawal and historical-pin tests. Its checkpoint
+records PR103 salvage risks; do not adopt old offering code directly.
 
 Continue M11
 versioned subject/policy applicability, immutable issuance/amendments and cross-form reconciliation.

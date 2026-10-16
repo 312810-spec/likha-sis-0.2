@@ -1,6 +1,6 @@
 # CTOS State
 
-Updated: 2026-10-16 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
+Updated: 2026-10-17 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V3-ADAPTER.md`.
 
 ## Current source and verification
@@ -13,11 +13,11 @@ Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 browser
 recovery checks passed. Independent bounded source review found no blocking issue.
 Exact receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
 Earlier PR136/137/139 receipts remain in their checkpoints. No deployment.
-New registry state: PR142 cargo-deny fails because `zip 8.6.0` was yanked on
-2026-10-16. Current stable calamine/umya require ZIP 8; registry has no unyanked
-8.x replacement. Source gate receipts above predate that registry change.
-PR142 documentation checkpoint is pushed but unmerged; do not weaken deny policy
-or claim current dependency-security acceptance. See the checkpoint's blocker.
+Dependency continuation: PR143 `fix/spreadsheet-zip9-compat-20261016` replaces
+withdrawn ZIP 8 using explicit reproducible reader compatibility snapshots and ZIP 9.
+Native/frontend/provenance checks passed at its original head; three exact scanner
+false positives were independently verified and repaired on 2026-10-17.
+Fresh exact-head CI is pending. Keep cargo-deny and secret-scanning rules intact.
 Refresh live main, open PRs and Git status on resume; this document cannot prove a clean checkout.
 
 ## Program status
@@ -36,16 +36,15 @@ Refresh live main, open PRs and Git status on resume; this document cannot prove
 SF4/SF6 enforce administrative reporting capability. Draft source v2 captures
 the applicable curriculum reference without rewriting older evidence. Annual
 SF5/SF6/SF10 keep mixed or unpinned policy context pending.
-Documentation branch: `ctos/m11-reporting-verification-20261016`; source guards
-are merged. Recheck live branch/PR status on resume.
-Hourly continuation remains paused: resumption hit the five-active-task limit.
-A task slot must be freed; no unrelated task was changed.
-
-Resolve the ZIP compatibility blocker with maintained compatible upstream releases
-or a separately verified reader migration before PR142/security-gated closure.
-Continue independent canonical required-subject applicability design meanwhile; adapt only
-the safe PR103 offering concepts, with atomic versions and exact scoped reads.
-Continue issue/amend transitions and cross-form reconciliation afterward.
+Manual continuation only: the user explicitly skipped automation on 2026-10-17.
+Leave scheduled tasks unchanged; do not ask to free a slot or resume the old task.
+Documentation branch: `ctos/m11-reporting-verification-20261016`.
+Finish PR143's unchanged-head Quality/Security, then integrate/retarget PR142
+against the dependency repair and merge only after its documentation/security gates.
+Next independent feature: canonical versioned required-subject applicability,
+followed by immutable issue/amend transitions and cross-form reconciliation.
+Use atomic versions and exact school/year/grade/cohort/period scope. PR103 is
+reference only, not a direct offering-code adoption or mass-merge candidate.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 
 Preserve current school hub and canonical data; historical issued records must remain unchanged.

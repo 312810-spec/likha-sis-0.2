@@ -1,0 +1,8 @@
+# Exact historical false positive: typography note naming IBM Plex Mono.
+# Retain the default rule and all other commits/files/lines.
+210d09b7841c49e133600cdd1e11494585beb45c:docs/adr/0075-visual-timetable-and-theme-tokens.md:generic-api-key:55
+# Exact font-description match and source-file SHA-256 inventory matches.
+# Verified against the referenced source bytes; no directory/rule exclusions.
+1ad99cfe2503115c1b82dc998854eea9268202e9:docs/ctos/checkpoints/spreadsheet-zip9-compat-2026-10-16.md:generic-api-key:67
+1ad99cfe2503115c1b82dc998854eea9268202e9:src-tauri/vendor/provenance.json:generic-api-key:87
+1ad99cfe2503115c1b82dc998854eea9268202e9:src-tauri/vendor/provenance.json:generic-api-key:326
