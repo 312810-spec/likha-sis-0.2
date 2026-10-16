@@ -30,8 +30,16 @@ Refresh live main, open PRs and Git status on resume; this document cannot prove
 
 ## Next execution
 
-PR136/137 are merged. Inspect school-wide SF4/SF6 export authorization against current role boundaries (source currently uses session scope), before
-expanding versioned required-subject/policy reconciliation and issue/amend transitions.
+Active slice: `ctos/m11-school-report-authority-20261016` from main
+`d3c517da536e68094fc48171af94e0aeb6518f22`. SF4/SF6 require administrative
+reporting capability. PR139 Windows/Security passed on `5bcac1f`; Ubuntu failed
+rustfmt only. Local formatting repaired and checked; fresh native CI pending. See
+`docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
+Hourly continuation remains paused: resumption hit the five-active-task limit.
+A task slot must be freed; no unrelated task was changed.
+
+PR136/137 are merged. Finish PR139 verification before expanding versioned
+required-subject/policy reconciliation and issue/amend transitions.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 
 Preserve current school hub and canonical data; historical issued records must remain unchanged.

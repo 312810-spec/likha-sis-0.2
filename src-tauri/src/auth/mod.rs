@@ -401,6 +401,10 @@ pub enum Capability {
     /// authorization proof for this milestone -- see
     /// `docs/adr/0036-rbac-foundation.md`.
     ManageLearners,
+    /// Prepare school-wide attendance/promotion summaries. Uses the existing
+    /// Registrar/School Head school-data boundary; ordinary teaching or advisory
+    /// assignments grant no access to other sections' reporting data.
+    ExportSchoolReports,
     /// Add an existing user account as a member of a school (and grant
     /// them a role -- currently always the least-privilege Teacher role,
     /// see `commands::user::add_user_to_school`). School Head only --
@@ -448,6 +452,7 @@ impl Capability {
     fn allowed_roles(self) -> &'static [&'static str] {
         match self {
             Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::ExportSchoolReports => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],

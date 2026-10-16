@@ -14,7 +14,13 @@ Continue under the established implementation/push/merge authorization. No deplo
 
 ## Next unblocked work
 
-Audit school-wide SF4/SF6 export authorization at the trusted boundary. Then continue M11
+Inspect exact-head CI for `ctos/m11-school-report-authority-20261016`, repair
+failures and merge after applicable gates pass. Read its authority checkpoint.
+Hourly automation is still paused because all five task slots are occupied;
+resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
+
+PR139's Ubuntu failure was rustfmt only; local repair passes formatting.
+Require fresh native Quality/Security before merge. Then continue M11
 versioned subject/policy applicability, immutable issuance/amendments and cross-form reconciliation.
 Use current official sources; missing external evidence parks only its dependent claim.
 M10–M17 remain open as described by `CTOS.md` and the state file. Do not repeat completed work.
