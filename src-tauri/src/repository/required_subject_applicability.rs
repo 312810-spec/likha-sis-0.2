@@ -205,9 +205,11 @@ pub fn select_authorized(
     let tx = conn.unchecked_transaction()?;
     let (year, grade) = require_context(&tx, actor, school, context, false)?;
     let mut result = selection(history(&tx, school, context)?);
-    if result.confirmed.as_ref().is_some_and(|version| {
-        version.school_year != year || version.grade_level != grade
-    }) {
+    if result
+        .confirmed
+        .as_ref()
+        .is_some_and(|version| version.school_year != year || version.grade_level != grade)
+    {
         result.confirmed = None;
         result.status = "context_changed";
     }

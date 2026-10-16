@@ -247,9 +247,14 @@ fn stale_roots_and_successors_cannot_fork_or_rewrite_history() {
     let conn = fixture();
     let mut req = request();
     let root = append(&conn, &req);
-    assert!(conn.execute("DELETE FROM subjects WHERE id='subject'", []).is_err());
     assert!(conn
-        .execute("UPDATE subjects SET school_id='foreign' WHERE id='subject'", [])
+        .execute("DELETE FROM subjects WHERE id='subject'", [])
+        .is_err());
+    assert!(conn
+        .execute(
+            "UPDATE subjects SET school_id='foreign' WHERE id='subject'",
+            []
+        )
         .is_err());
     assert!(append_authorized(&conn, "admin", "s", &req).is_err());
     req.expected_predecessor_id = Some(root.id.clone());
