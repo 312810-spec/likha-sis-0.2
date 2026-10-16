@@ -15,8 +15,11 @@ Continue under the established implementation/push/merge authorization. No deplo
 ## Next unblocked work
 
 Active documentation branch: `ctos/m11-reporting-verification-20261016`.
-After this documentation checkpoint merges, design/test canonical versioned
-required-subject applicability. The verification checkpoint records PR103 salvage
+PR142 Quality passed but cargo-deny failed after upstream yanked `zip 8.6.0`.
+Current stable spreadsheet readers require ZIP 8 and no unyanked 8.x replacement
+exists. Verify compatible maintained upstream releases or a separately reviewed
+reader migration; keep the deny policy and leave PR142 unmerged meanwhile.
+Continue independent canonical required-subject applicability design. Its checkpoint records PR103 salvage
 risks and synthetic acceptance cases; do not directly adopt the old offering code.
 Hourly automation is still paused because all five task slots are occupied;
 resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.

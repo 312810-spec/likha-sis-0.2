@@ -13,6 +13,11 @@ Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 browser
 recovery checks passed. Independent bounded source review found no blocking issue.
 Exact receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
 Earlier PR136/137/139 receipts remain in their checkpoints. No deployment.
+New registry state: PR142 cargo-deny fails because `zip 8.6.0` was yanked on
+2026-10-16. Current stable calamine/umya require ZIP 8; registry has no unyanked
+8.x replacement. Source gate receipts above predate that registry change.
+PR142 documentation checkpoint is pushed but unmerged; do not weaken deny policy
+or claim current dependency-security acceptance. See the checkpoint's blocker.
 Refresh live main, open PRs and Git status on resume; this document cannot prove a clean checkout.
 
 ## Program status
@@ -36,8 +41,9 @@ are merged. Recheck live branch/PR status on resume.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-After this documentation checkpoint merges, design/test canonical versioned
-required-subject applicability; adapt only
+Resolve the ZIP compatibility blocker with maintained compatible upstream releases
+or a separately verified reader migration before PR142/security-gated closure.
+Continue independent canonical required-subject applicability design meanwhile; adapt only
 the safe PR103 offering concepts, with atomic versions and exact scoped reads.
 Continue issue/amend transitions and cross-form reconciliation afterward.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.

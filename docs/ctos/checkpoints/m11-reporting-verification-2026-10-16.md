@@ -64,3 +64,29 @@ The documentation branch contains only CTOS-STATE, TASK and this checkpoint
 relative to merged main; it does not change the verified app source.
 Next: narrow applicability repository design and synthetic conflict/authorization
 tests, using the salvage constraints above. No production release or deployment.
+
+## New upstream dependency blocker after the source gates
+
+PR142 documentation Quality passed, but cargo-deny failed in Security runs
+38846267302 / 38846273522: `zip 8.6.0` was yanked upstream at
+2026-10-16T03:32:33Z. Earlier green Security receipts remain historical evidence,
+not a claim that the current registry state passes. No dependency or policy was changed.
+
+Direct official registry metadata confirmed ZIP's latest stable release is 9.0.3
+and no non-yanked 8.x release remains. Calamine's latest stable 0.36.1 requires
+`zip ^8.6`; umya-spreadsheet 3.1.0 and latest stable 3.1.1 require `zip ^8.6.0`.
+There is no compatible lockfile-only replacement under those constraints.
+No yank reason was supplied in the registry response; do not infer a vulnerability
+or a benign reason. Keep `yanked = "deny"` and do not force an invalid resolution.
+
+Technical upstream evidence, checked 2026-10-16:
+
+- https://crates.io/api/v1/crates/zip/8.6.0
+- https://crates.io/api/v1/crates/zip
+- https://crates.io/api/v1/crates/calamine/0.36.1/dependencies
+- https://crates.io/api/v1/crates/umya-spreadsheet/3.1.1/dependencies
+
+PR142 remains unmerged. Next dependency action: verify compatible maintained
+upstream reader releases or separately design/review/test a reader migration.
+This parks the security-gated closure/release claim, not unrelated applicability
+design. No dependency waiver, vendoring, forced upgrade or new runtime tooling.
