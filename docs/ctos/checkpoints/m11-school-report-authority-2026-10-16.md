@@ -53,3 +53,16 @@ head. Applied exactly the formatting requested by local Rust 1.99.0; local
 Focused native authorization/export tests are running on the Windows checkout;
 their result is not yet established. Fresh CI must validate the repaired head
 before merge. No installed-device, UI, file-write or release acceptance claim.
+
+## Verified merge receipt
+
+Repaired head `b955ddeade3ffe5798b6de65e09f52f8f1744061` passed Quality run
+38824681475 (Ubuntu native tests/rustfmt/Clippy and Windows build/tests/package)
+and Security runs 38824676073 / 38824681586. PR139 merged as
+`d033fb17817059c92b824d7f34717809e7838488` after the head and green gates were
+rechecked. The Desktop checkout fast-forwarded to that merge before follow-up.
+Local Windows checks passed: 26 focused authorization/export tests; full native
+suite 1,510 tests; frontend quality including 1,565 tests; production web build.
+The build emitted its existing large-chunk advisory. Installed-device, actual
+file-write/printing, two-device and official acceptance remain untested.
+No deployment. M11 remains partial.
