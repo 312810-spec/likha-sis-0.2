@@ -9,8 +9,9 @@ PR139–PR143 are merged, including the final PR142 handoff.
 PR144 (`ctos/m11-required-subject-applicability-20261017`) implements the
 section-cohort/concrete-period required-subject registry and optional immutable
 report-draft pins. Read `docs/ctos/checkpoints/m11-required-subject-applicability-2026-10-17.md`.
-Local SQL verification passes. Native formatting/compiler/tests/Clippy and Windows
-package verification are pending CI; do not merge until exact-head applicable gates pass.
+Local SQL verification passes. Candidate `1fb7346` passed Ubuntu Quality: 1,522
+native tests, Rustfmt, Clippy and provenance. Security passes; Windows packaging
+and native tests are pending. Do not merge until exact-head applicable gates pass.
 Finish this slice and preserve its actual receipts before proceeding.
 
 ## Next unblocked work

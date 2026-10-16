@@ -43,10 +43,14 @@ successors, cross-cohort lineage, wrong year, foreign/duplicate subjects, teache
 immutability, overlapping-period isolation, withdrawal/pin retention and concurrent
 root/successor inserts. Foreign-key check returned no violations.
 
-Rust toolchain is unavailable locally. First CI candidate reported rustfmt differences;
-apply the formatter output and rerun, without weakening any gates. Rust tests,
-compiler, Clippy, source provenance and Windows package evidence remain pending
-until recorded from successful final-head CI. JavaScript/UI changed files: none.
+Candidate `1fb734674525abd6d0b3d114eb2e16bbbeeb8629`, tree
+`14f867c5e1aa6a3fbcfca1b8711333792c19d1bb`, passed Ubuntu Quality in
+run 38982145244, job 117245342110: 1,522 native tests, including all nine new
+applicability regressions; Rustfmt, Clippy with warnings denied and 618-file
+spreadsheet source-provenance verification passed. All candidate Security scans
+pass. Windows packaging/native tests remain pending; do not merge PR144 yet.
+First-candidate formatting differences were corrected before this passing run.
+Rust is unavailable locally. JavaScript/UI changed files: none.
 
 ## Remaining work and limits
 
