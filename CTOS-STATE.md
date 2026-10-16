@@ -5,16 +5,14 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current source and verification
 
-PR136 calendar repair: `8f3d4a3923a91be5ba90757fe5e990870389d6df`.
-PR137 assigned-subject/year scope: `2380f0c298f32ada353ed313e46fe11d34950b14`.
-Both heads passed Ubuntu native Quality (1,494 / 1,497 tests), rustfmt, Clippy,
-Windows build/tests (1,503 / 1,506 tests) and Security with zero test failures.
-PR136 merged as `774fdd6ba3363e319d88783f3bb76318b123ae49`; PR137 merged as
-`c53f05f0a8bacf63f920ad09970c5a120e9c5ee1`. Quality runs: 38768358186 / 38768994643.
-Latest Windows test-installer artifact: 11991713118. No deployment.
-
-Exact receipts and limits: `docs/ctos/checkpoints/m11-assigned-subject-coverage-2026-10-16.md`
-and `docs/ctos/checkpoints/m11-annual-calendar-scope-2026-10-15.md`.
+PR140 curriculum source context merged as `9444d9b427a41f1b501c1802c83fdd73a928a99f`.
+PR141 annual pinned-policy context merged as `e5703aa5a03024eaa26e8870b26e1aab83e2142f`.
+Heads `db7f992` / `62e9e45` passed Ubuntu/Windows Quality and Security;
+Quality runs 38842928675 / 38844011698. Windows test-installer artifact: 12023132448.
+Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 browser
+recovery checks passed. Independent bounded source review found no blocking issue.
+Exact receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
+Earlier PR136/137/139 receipts remain in their checkpoints. No deployment.
 Refresh live main, open PRs and Git status on resume; this document cannot prove a clean checkout.
 
 ## Program status
@@ -30,24 +28,16 @@ Refresh live main, open PRs and Git status on resume; this document cannot prove
 
 ## Next execution
 
-PR139 merged as `d033fb17817059c92b824d7f34717809e7838488`; SF4/SF6 now require
-administrative reporting capability. Head `b955dde` passed Ubuntu/Windows Quality
-38824681475 and Security. Local native suite: 1,510 passed; frontend: 1,565 passed.
-Receipt: `docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
-PR140 merged as `9444d9b427a41f1b501c1802c83fdd73a928a99f`; head `db7f992`
-passed Ubuntu/Windows Quality 38842928675 and Security. Source v2 captures the
-applicable curriculum reference without rewriting older retained drafts.
-PR141 head `62e9e45` targets main. Ubuntu/Security and Windows build passed;
-Windows native tests remain pending. It guards pinned annual policy context.
-Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 recovery
-checks passed. Independent bounded source review found no blocking regression.
-Documentation branch: `ctos/m11-reporting-verification-20261016`.
-Receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
+SF4/SF6 enforce administrative reporting capability. Draft source v2 captures
+the applicable curriculum reference without rewriting older evidence. Annual
+SF5/SF6/SF10 keep mixed or unpinned policy context pending.
+Documentation branch: `ctos/m11-reporting-verification-20261016`; source guards
+are merged, documentation-only checkpoint verification remains in progress.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-Finish PR141 and the documentation checkpoint after exact-head gates pass.
-Then design/test canonical versioned required-subject applicability; adapt only
+Finish the documentation checkpoint, then design/test canonical versioned
+required-subject applicability; adapt only
 the safe PR103 offering concepts, with atomic versions and exact scoped reads.
 Continue issue/amend transitions and cross-form reconciliation afterward.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.

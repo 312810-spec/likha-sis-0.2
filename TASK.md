@@ -5,28 +5,23 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Active continuation
 
-PR136 repairs configured annual calendars and the previous native build failure.
-PR137 includes assigned-but-unrecorded subjects in SF5/SF6/SF10 and scopes SF6 sections
-by school year. Exact heads, verification and limits are in `CTOS-STATE.md`.
-
-PR136 and PR137 passed exact-head Ubuntu/Windows Quality and Security and are merged.
+PR139 school-report permissions, PR140 curriculum source context and PR141 annual
+pinned-policy context are merged after their exact-head Quality/Security gates.
+Local native tests (1,518), rustfmt/Clippy, browser smoke and 50 browser recovery
+checks passed. Independent bounded source review found no blocking regression.
+Receipts and limits: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
 Continue under the established implementation/push/merge authorization. No deployment was performed.
 
 ## Next unblocked work
 
-PR139 permission fix is merged with green Quality/Security at head `b955dde`.
-PR140 merged as `9444d9b` after full Quality/Security. PR141 head `62e9e45`
-now targets main; merge only when its remaining Windows native checks pass.
-Local native tests (1,518), rustfmt/Clippy, browser smoke and 50 browser recovery
-checks passed. Independent bounded source review found no blocking regression.
 Active documentation branch: `ctos/m11-reporting-verification-20261016`.
-Finish the integration receipts/checkpoint after PR141 merges, then design/test
-canonical versioned required-subject applicability. Read the reporting-verification
-checkpoint for the PR103 salvage assessment and synthetic acceptance cases.
+Finish its documentation-only checks/merge, then design/test canonical versioned
+required-subject applicability. The verification checkpoint records PR103 salvage
+risks and synthetic acceptance cases; do not directly adopt the old offering code.
 Hourly automation is still paused because all five task slots are occupied;
 resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
 
-Require fresh native Quality/Security before merging the curriculum follow-up. Continue M11
+Continue M11
 versioned subject/policy applicability, immutable issuance/amendments and cross-form reconciliation.
 Use current official sources; missing external evidence parks only its dependent claim.
 M10–M17 remain open as described by `CTOS.md` and the state file. Do not repeat completed work.

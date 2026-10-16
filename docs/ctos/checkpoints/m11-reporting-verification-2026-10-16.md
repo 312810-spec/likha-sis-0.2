@@ -8,9 +8,11 @@ Merged as `9444d9b427a41f1b501c1802c83fdd73a928a99f` after all gates were rechec
 This preserves curriculum source context in v2 draft fingerprints without rewriting
 retained v1 evidence. No deployment.
 
-PR141 head `62e9e45dbdc4e111e09311931d098cdca353891b` now targets main after
-PR140 merged. Ubuntu and Security passed; Windows build passed and native tests
-are still running. Do not merge until the complete required checks pass.
+PR141 head `62e9e45dbdc4e111e09311931d098cdca353891b` passed Ubuntu/Windows
+Quality run 38844011698 and Security runs 38844008463 / 38844011658.
+It was retargeted to main after PR140 merged and merged as
+`e5703aa5a03024eaa26e8870b26e1aab83e2142f` after the exact head and all green
+checks were reverified. Windows test-installer artifact: 12023132448.
 The guard leaves ambiguous annual policy context pending; it does not certify
 official applicability, policy immutability or equivalence.
 
@@ -54,3 +56,11 @@ Do not mass-merge PR103 or invent official offerings/equivalence rules.
 
 M10/M11 remain partial. Issuance/amendments, cross-form reconciliation and the
 external/device acceptance described in CTOS remain open.
+
+## Acceptance and continuation
+
+The two integrated guards passed their scoped automated and independent checks.
+The documentation branch contains only CTOS-STATE, TASK and this checkpoint
+relative to merged main; it does not change the verified app source.
+Next: narrow applicability repository design and synthetic conflict/authorization
+tests, using the salvage constraints above. No production release or deployment.
