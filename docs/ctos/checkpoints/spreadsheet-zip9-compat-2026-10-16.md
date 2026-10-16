@@ -89,3 +89,20 @@ Fresh exact-head Security and applicable documentation checks are required befor
 merge. Prior native evidence applies to unchanged application/dependency bytes;
 it is not installed-device acceptance. User requested manual continuation and
 skipped automation; leave scheduled tasks unchanged.
+
+## Final verification — 2026-10-17
+
+PR143 head `23b306c0c1fbd302ab5854a9e25f638a37b31142` passed exact-head
+Ubuntu/Windows Quality 38976244515 and Security. Native suites: 1,513 Ubuntu
+and 1,522 Windows, zero failures. Frontend: 1,565 passed. Rustfmt, Clippy and
+618-file source-provenance verification passed. Windows test installers uploaded
+as artifact 12080032092. Secret scanning rescanned both relevant commits and
+skipped only the three verified immutable false-positive fingerprints; cargo-deny
+and OSV also passed. PR143 merged as `ca750986bd38f3d74cf1ef632fccfaeb541451b8`.
+
+This resolves the dependency/scanner blocker. It does not establish dedicated new
+XLSB/filename-error fixture coverage, installed-device, printer, official-form or
+professional acceptance. No deployment. Manual continuation is active; all
+scheduled tasks were left unchanged. Continue canonical versioned required-subject
+applicability with exact scope, atomic lineage and unchanged historical pins, then
+issue/amend reconciliation. Preserve the historical evidence above.

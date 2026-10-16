@@ -1,32 +1,30 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-16 (Asia/Manila).
+Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
 ## Active continuation
 
-PR136 repairs configured annual calendars and the previous native build failure.
-PR137 includes assigned-but-unrecorded subjects in SF5/SF6/SF10 and scopes SF6 sections
-by school year. Exact heads, verification and limits are in `CTOS-STATE.md`.
-
-PR136 and PR137 passed exact-head Ubuntu/Windows Quality and Security and are merged.
+PR139 reporting permissions, PR140 curriculum source context, PR141 annual
+pinned-policy context and PR143 ZIP compatibility/security repair are merged.
+Current exact-head CI: 1,513 Ubuntu native / 1,522 Windows native / 1,565 frontend
+tests, formatting, Clippy, provenance and Security passed. See CTOS-STATE and
+`docs/ctos/checkpoints/spreadsheet-zip9-compat-2026-10-16.md` for receipts/limits.
 Continue under the established implementation/push/merge authorization. No deployment was performed.
 
 ## Next unblocked work
 
-PR139 permission fix is merged with green Quality/Security at head `b955dde`.
-PR140 branch: `ctos/m11-reporting-continuation-20261016` from merge `d033fb1`.
-Finish PR140 CI for v2 curriculum source fingerprints and preserve old drafts;
-local native tests (1,513), rustfmt and Clippy pass. Read its checkpoint.
-Active child: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
-PR141 contains the annual pinned-policy guard, currently based on PR140's branch.
-Merge PR140 after its gates pass, retarget PR141 to main, then require its own
-green gates before merge. Five focused tests, 1,518 full native tests, rustfmt and Clippy
-passed locally. Read the annual policy-context checkpoint.
-Hourly automation is still paused because all five task slots are occupied;
-resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
+Manual continuation: automation was explicitly skipped by the user on 2026-10-17.
+Leave all scheduled tasks unchanged. PR143 is verified and merged; finish PR142
+receipt-only documentation checks/merge if still open, then continue the feature contract.
+Three scanner false positives were verified and fixed without broad exclusions.
+The dependency repair is an explicit local compatibility fork; official support
+and installed-device acceptance are not implied.
+Next feature: canonical versioned required-subject applicability with synthetic
+scope, concurrent-successor, withdrawal and historical-pin tests. Its checkpoint
+records PR103 salvage risks; do not adopt old offering code directly.
 
-Require fresh native Quality/Security before merging the curriculum follow-up. Continue M11
+Continue M11
 versioned subject/policy applicability, immutable issuance/amendments and cross-form reconciliation.
 Use current official sources; missing external evidence parks only its dependent claim.
 M10–M17 remain open as described by `CTOS.md` and the state file. Do not repeat completed work.
