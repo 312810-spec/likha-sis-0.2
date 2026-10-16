@@ -298,6 +298,36 @@ pub fn resolved_weight_policy_id_in_school(
     })
 }
 
+/// Annual aggregation cannot silently reconcile different policy versions or
+/// certify a legacy record from today's default. This is a conservative pending
+/// guard, not proof of official applicability or a policy-equivalence rule.
+pub(crate) fn annual_report_has_pinned_policy_context<'a>(
+    conn: &Connection,
+    school_id: &str,
+    record_ids: impl IntoIterator<Item = &'a str>,
+) -> AppResult<bool> {
+    let mut context = None;
+    for id in record_ids {
+        let Some(record) = find_by_id_in_school(conn, school_id, id)? else {
+            return Ok(false);
+        };
+        let (Some(weight), Some(curriculum)) =
+            (record.weight_policy_id, record.curriculum_version_id)
+        else {
+            return Ok(false);
+        };
+        let current = (weight, curriculum);
+        if context
+            .as_ref()
+            .is_some_and(|previous| previous != &current)
+        {
+            return Ok(false);
+        }
+        context = Some(current);
+    }
+    Ok(context.is_some())
+}
+
 /// Configured work is a minimum completeness check, not an official curriculum.
 /// Keep record-only subjects after reassignment and include assigned subjects
 /// even before their first class record exists. All references must resolve in
@@ -546,6 +576,159 @@ mod tests {
             annual_report_subject_names(&conn, &school_id, &section_id, "2026-2027").unwrap(),
             vec!["Mathematics"]
         );
+    }
+
+    fn annual_policy_fixture() -> (Connection, String, ClassRecord, ClassRecord) {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        let second_period = grading::create(
+            &conn,
+            &school_id,
+            "2026-2027",
+            "00000000-0000-7000-8000-000000000012",
+            "2026-09-16",
+            "2026-12-18",
+        )
+        .unwrap()
+        .unwrap();
+        let first = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            Some(K_TO_12_CURRICULUM),
+        )
+        .unwrap()
+        .unwrap();
+        let second = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &second_period.id,
+            K10_POLICY,
+            Some(K_TO_12_CURRICULUM),
+        )
+        .unwrap()
+        .unwrap();
+        (conn, school_id, first, second)
+    }
+
+    #[test]
+    fn annual_policy_context_keeps_matching_pins_after_defaults_change() {
+        let (conn, school_id, first, second) = annual_policy_fixture();
+        let ids = [first.id.as_str(), second.id.as_str()];
+        assert!(annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 0 WHERE is_default = 1",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 1 WHERE id = ?1",
+            [MATATAG_CURRICULUM],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE grading_weight_policies SET is_default = 0 WHERE is_default = 1",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE grading_weight_policies SET is_default = 1 WHERE id = ?1",
+            [EPP_TLE_MAPEH_POLICY],
+        )
+        .unwrap();
+        let changes = conn.total_changes();
+        assert!(annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+        assert_eq!(conn.total_changes(), changes);
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &first.id).unwrap(),
+            Some(first)
+        );
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &second.id).unwrap(),
+            Some(second)
+        );
+    }
+
+    #[test]
+    fn annual_policy_context_rejects_mixed_grading_and_curriculum_versions() {
+        let (conn, school_id, first, second) = annual_policy_fixture();
+        let ids = [first.id.as_str(), second.id.as_str()];
+        conn.execute(
+            "UPDATE class_records SET weight_policy_id = ?1 WHERE id = ?2",
+            (EPP_TLE_MAPEH_POLICY, &second.id),
+        )
+        .unwrap();
+        assert!(!annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+        conn.execute("UPDATE class_records SET weight_policy_id = ?1, curriculum_version_id = ?2 WHERE id = ?3", (K10_POLICY, MATATAG_CURRICULUM, &second.id)).unwrap();
+        assert!(!annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+    }
+
+    #[test]
+    fn annual_policy_context_does_not_certify_legacy_nulls_from_current_defaults() {
+        let (conn, school_id, first, second) = annual_policy_fixture();
+        let ids = [first.id.as_str(), second.id.as_str()];
+        conn.execute(
+            "UPDATE class_records SET weight_policy_id = NULL WHERE id = ?1",
+            [&second.id],
+        )
+        .unwrap();
+        assert!(!annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+        conn.execute("UPDATE class_records SET weight_policy_id = ?1, curriculum_version_id = NULL WHERE id = ?2", (K10_POLICY, &second.id)).unwrap();
+        let changes = conn.total_changes();
+        assert!(!annual_report_has_pinned_policy_context(&conn, &school_id, ids).unwrap());
+        assert_eq!(conn.total_changes(), changes);
+    }
+
+    #[test]
+    fn annual_policy_context_rejects_empty_missing_and_foreign_records() {
+        let (conn, school_id, first, second) = annual_policy_fixture();
+        let foreign = school::create(&conn, "Synthetic other school").unwrap();
+        assert!(!annual_report_has_pinned_policy_context(&conn, &school_id, []).unwrap());
+        assert!(!annual_report_has_pinned_policy_context(
+            &conn,
+            &school_id,
+            [first.id.as_str(), "missing"]
+        )
+        .unwrap());
+        assert!(!annual_report_has_pinned_policy_context(
+            &conn,
+            &foreign.id,
+            [first.id.as_str(), second.id.as_str()]
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn annual_policy_context_guards_all_actual_annual_export_commands() {
+        let source = include_str!("../commands/export.rs");
+        for name in [
+            "export_section_eosy_sf5",
+            "export_school_eosy_sf6",
+            "export_learner_permanent_record_sf10",
+        ] {
+            let marker = format!("pub fn {name}(");
+            let body = source
+                .split_once(&marker)
+                .unwrap()
+                .1
+                .split("#[tauri::command]")
+                .next()
+                .unwrap();
+            let guard = body
+                .find("class_record::annual_report_has_pinned_policy_context")
+                .unwrap();
+            let averaging = body.find("sf5::average_complete_recorded_terms").unwrap();
+            assert!(
+                guard < averaging,
+                "{name} must reconcile pinned context before averaging"
+            );
+            assert!(body.contains("sf5::has_configured_period_coverage"));
+        }
     }
 
     #[test]

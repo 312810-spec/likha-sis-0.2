@@ -34,15 +34,20 @@ PR139 merged as `d033fb17817059c92b824d7f34717809e7838488`; SF4/SF6 now require
 administrative reporting capability. Head `b955dde` passed Ubuntu/Windows Quality
 38824681475 and Security. Local native suite: 1,510 passed; frontend: 1,565 passed.
 Receipt: `docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
-Active branch: `ctos/m11-reporting-continuation-20261016` from that merge.
+PR140 branch: `ctos/m11-reporting-continuation-20261016` from that merge.
 Curriculum draft fingerprints now include applicable reference metadata (v2);
 PR140 focused/full native tests (1,513), rustfmt and Clippy pass locally;
 fresh platform CI pending. See
 `docs/ctos/checkpoints/m11-curriculum-source-context-2026-10-16.md`.
+Active branch: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
+PR141 is draft and targets PR140's branch; retarget main after PR140 merges.
+SF5/SF6/SF10 now guard matching explicitly pinned policy context before annual
+averaging. Five focused regressions, 1,518 full native tests, rustfmt and Clippy
+pass locally. See `docs/ctos/checkpoints/m11-annual-policy-context-2026-10-16.md`.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-Finish curriculum source-context verification, then continue versioned
+Finish PR140 and annual-policy-context verification, then continue versioned
 required-subject/policy reconciliation and issue/amend transitions.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 
