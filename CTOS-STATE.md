@@ -30,15 +30,18 @@ Refresh live main, open PRs and Git status on resume; this document cannot prove
 
 ## Next execution
 
-Active slice: `ctos/m11-school-report-authority-20261016` from main
-`d3c517da536e68094fc48171af94e0aeb6518f22`. SF4/SF6 require administrative
-reporting capability. PR139 Windows/Security passed on `5bcac1f`; Ubuntu failed
-rustfmt only. Local formatting repaired and checked; fresh native CI pending. See
-`docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
+PR139 merged as `d033fb17817059c92b824d7f34717809e7838488`; SF4/SF6 now require
+administrative reporting capability. Head `b955dde` passed Ubuntu/Windows Quality
+38824681475 and Security. Local native suite: 1,510 passed; frontend: 1,565 passed.
+Receipt: `docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
+Active branch: `ctos/m11-reporting-continuation-20261016` from that merge.
+Curriculum draft fingerprints now include applicable reference metadata (v2);
+focused tests pass, full native verification pending. See
+`docs/ctos/checkpoints/m11-curriculum-source-context-2026-10-16.md`.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-PR136/137 are merged. Finish PR139 verification before expanding versioned
+Finish curriculum source-context verification, then continue versioned
 required-subject/policy reconciliation and issue/amend transitions.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 

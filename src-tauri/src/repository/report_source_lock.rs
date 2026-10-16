@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use crate::error::{AppError, AppResult};
 use crate::repository::report_readiness::ReportCardReadiness;
 
-pub(crate) const VERSION: &str = "report-card-readiness-source-v1";
+pub(crate) const VERSION: &str = "report-card-readiness-source-v2";
 
 pub(crate) fn hash(content: &str) -> String {
     Sha256::digest(content.as_bytes())
@@ -116,6 +116,17 @@ pub(crate) fn capture_json(
          FROM grading_weight_policies WHERE id = ?1 ORDER BY id",
         &[&preview.weight_policy_id],
     )?;
+    // Pin only the applicable reference. A default change must not invalidate
+    // a record that already pins its own version; legacy NULL records resolve
+    // the current default explicitly rather than omitting curriculum evidence.
+    let curriculum = rows(
+        conn,
+        "SELECT cv.id, cv.name, cv.source_citation FROM class_records cr \
+         JOIN curriculum_versions cv ON cv.id = COALESCE(cr.curriculum_version_id, \
+         (SELECT id FROM curriculum_versions WHERE is_default = 1)) \
+         WHERE cr.school_id = ?1 AND cr.id = ?2 ORDER BY cv.id",
+        &[&school_id, &record_id],
+    )?;
     let weights = rows(
         conn,
         "SELECT wc.id, ac.id, wc.weight_percent, ac.parent_category_id, ac.name, \
@@ -134,7 +145,8 @@ pub(crate) fn capture_json(
         "version": VERSION, "implementationSha256": implementation_hash(),
         "schoolId": school_id, "classRecordId": record_id, "context": context,
         "memberships": memberships, "items": items, "scores": scores,
-        "policy": policy, "weights": weights, "projection": projection
+        "policy": policy, "curriculum": curriculum,
+        "weights": weights, "projection": projection
     }))
     .map_err(|_| AppError::Validation("Reporting source input could not be serialized".into()))
 }

@@ -475,6 +475,204 @@ mod tests {
     };
     use std::path::Path;
 
+    fn curriculum_draft_fixture() -> (Connection, String, String, String, ReportCardDraft) {
+        let conn = crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Synthetic curriculum school").unwrap();
+        let sec = section::create(&conn, &school.id, "2026-2027", "7", "Synthetic").unwrap();
+        let sub = subject::create(&conn, &school.id, "Synthetic subject").unwrap();
+        let actor =
+            user::create_user(&conn, "curriculum.actor", "password", "Synthetic actor").unwrap();
+        user::add_school_membership(&conn, &actor.id, &school.id).unwrap();
+        teaching_assignment::create(&conn, &school.id, &actor.id, &sec.id, &sub.id).unwrap();
+        let period = grading::create(
+            &conn,
+            &school.id,
+            "2026-2027",
+            "00000000-0000-7000-8000-000000000011",
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        let record = class_record::create(
+            &conn,
+            &school.id,
+            &sec.id,
+            &sub.id,
+            &period.id,
+            "00000000-0000-7000-8000-000000000041",
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let draft = capture_report_card_draft_authorized(&conn, &actor.id, &school.id, &record.id)
+            .unwrap()
+            .unwrap();
+        (conn, school.id, actor.id, record.id, draft)
+    }
+
+    #[test]
+    fn curriculum_reference_changes_require_review_without_rewriting_drafts() {
+        let (conn, school_id, actor_id, record_id, draft) = curriculum_draft_fixture();
+        let before: String = conn
+            .query_row(
+                "SELECT source_json FROM report_card_draft_source_locks WHERE draft_id = ?1",
+                [&draft.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let source: serde_json::Value = serde_json::from_str(&before).unwrap();
+        assert_eq!(source["version"], "report-card-readiness-source-v2");
+        assert_eq!(source["curriculum"].as_array().unwrap().len(), 1);
+        let curriculum_id = source["curriculum"][0][0]["text"].as_str().unwrap();
+        for column in ["name", "source_citation"] {
+            let current =
+                capture_report_card_draft_authorized(&conn, &actor_id, &school_id, &record_id)
+                    .unwrap()
+                    .unwrap();
+            conn.execute(
+                &format!("UPDATE curriculum_versions SET {column} = {column} || ' revised' WHERE id = ?1"),
+                [curriculum_id],
+            ).unwrap();
+            let changes = conn.total_changes();
+            assert!(
+                compare_report_card_draft_authorized(
+                    &conn,
+                    &actor_id,
+                    &school_id,
+                    &record_id,
+                    &current.id,
+                )
+                .unwrap()
+                .unwrap()
+                .projection_matches
+            );
+            assert_eq!(
+                check_report_card_draft_source_authorized(
+                    &conn,
+                    &actor_id,
+                    &school_id,
+                    &record_id,
+                    &current.id,
+                )
+                .unwrap()
+                .unwrap()
+                .source_status,
+                "changed"
+            );
+            assert_eq!(conn.total_changes(), changes);
+        }
+        let retained: String = conn
+            .query_row(
+                "SELECT source_json FROM report_card_draft_source_locks WHERE draft_id = ?1",
+                [&draft.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(retained, before);
+        assert_eq!(
+            list_recent_report_card_drafts_authorized(&conn, &actor_id, &school_id, &record_id)
+                .unwrap()
+                .iter()
+                .find(|stored| stored.id == draft.id)
+                .unwrap()
+                .snapshot,
+            draft.snapshot
+        );
+    }
+
+    #[test]
+    fn pinned_curriculum_ignores_unrelated_defaults_but_legacy_null_detects_them() {
+        let (conn, school_id, actor_id, record_id, draft) = curriculum_draft_fixture();
+        let other: String = conn
+            .query_row(
+                "SELECT id FROM curriculum_versions WHERE is_default = 0 ORDER BY id LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET source_citation = 'Synthetic revision' WHERE id = ?1",
+            [&other],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 0 WHERE is_default = 1",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 1 WHERE id = ?1",
+            [&other],
+        )
+        .unwrap();
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn, &actor_id, &school_id, &record_id, &draft.id,
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "matches"
+        );
+        conn.execute(
+            "UPDATE class_records SET curriculum_version_id = NULL WHERE id = ?1",
+            [&record_id],
+        )
+        .unwrap();
+        let legacy = capture_report_card_draft_authorized(&conn, &actor_id, &school_id, &record_id)
+            .unwrap()
+            .unwrap();
+        conn.execute("UPDATE curriculum_versions SET source_citation = 'Synthetic second revision' WHERE id = ?1", [&other]).unwrap();
+        assert_eq!(
+            check_report_card_draft_source_authorized(
+                &conn, &actor_id, &school_id, &record_id, &legacy.id,
+            )
+            .unwrap()
+            .unwrap()
+            .source_status,
+            "changed"
+        );
+    }
+
+    #[test]
+    fn older_curriculum_source_format_is_retained_without_a_current_match() {
+        let (conn, school_id, actor_id, record_id, draft) = curriculum_draft_fixture();
+        let source_json = serde_json::json!({
+            "version": "report-card-readiness-source-v1",
+            "schoolId": school_id, "classRecordId": record_id,
+        })
+        .to_string();
+        conn.execute(
+            "INSERT INTO report_card_drafts \
+             (id, school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id) \
+             SELECT 'synthetic-v1-draft', school_id, class_record_id, snapshot_json, snapshot_sha256, created_by_user_id \
+             FROM report_card_drafts WHERE id = ?1", [&draft.id],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO report_card_draft_source_locks \
+             (draft_id, school_id, source_version, source_json, source_sha256) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!["synthetic-v1-draft", school_id, "report-card-readiness-source-v1", source_json, report_source_lock::hash(&source_json)],
+        ).unwrap();
+        let changes = conn.total_changes();
+        let check = check_report_card_draft_source_authorized(
+            &conn,
+            &actor_id,
+            &school_id,
+            &record_id,
+            "synthetic-v1-draft",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(check.source_status, "unsupported_version");
+        assert!(check.current_source_sha256.is_none());
+        assert_eq!(
+            check.stored_source_sha256,
+            Some(report_source_lock::hash(&source_json))
+        );
+        assert_eq!(conn.total_changes(), changes);
+    }
+
     #[test]
     fn comparison_excludes_only_clock_and_reports_sorted_projection_changes() {
         let old = serde_json::json!({
