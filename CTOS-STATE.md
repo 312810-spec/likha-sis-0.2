@@ -40,6 +40,7 @@ PR140 focused/full native tests (1,513), rustfmt and Clippy pass locally;
 fresh platform CI pending. See
 `docs/ctos/checkpoints/m11-curriculum-source-context-2026-10-16.md`.
 Active branch: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
+PR141 is draft and targets PR140's branch; retarget main after PR140 merges.
 SF5/SF6/SF10 now guard matching explicitly pinned policy context before annual
 averaging. Five focused regressions, 1,518 full native tests, rustfmt and Clippy
 pass locally. See `docs/ctos/checkpoints/m11-annual-policy-context-2026-10-16.md`.

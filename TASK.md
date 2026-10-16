@@ -19,8 +19,9 @@ PR140 branch: `ctos/m11-reporting-continuation-20261016` from merge `d033fb1`.
 Finish PR140 CI for v2 curriculum source fingerprints and preserve old drafts;
 local native tests (1,513), rustfmt and Clippy pass. Read its checkpoint.
 Active child: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
-Publish the annual pinned-policy guard and merge only after PR140 and the child's
-own gates pass. Five focused tests, 1,518 full native tests, rustfmt and Clippy
+PR141 contains the annual pinned-policy guard, currently based on PR140's branch.
+Merge PR140 after its gates pass, retarget PR141 to main, then require its own
+green gates before merge. Five focused tests, 1,518 full native tests, rustfmt and Clippy
 passed locally. Read the annual policy-context checkpoint.
 Hourly automation is still paused because all five task slots are occupied;
 resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.

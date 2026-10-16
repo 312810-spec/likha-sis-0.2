@@ -30,6 +30,8 @@ checkpoint formatting and Git whitespace checks passed. Full local native suite:
 
 PR140 platform CI remains pending; its security checks passed. Keep this slice
 separate and merge only after its prerequisite and its own applicable gates pass.
+PR141 is open as a draft against PR140's branch. Source implementation commit:
+`6bc8ac5`; retarget main after PR140 merges and verify the final PR head.
 No UI changes or new frontend/browser/installed-device claim. Official policy
 applicability, explicit transition/equivalence evidence, issuance/amendments and
 device acceptance remain open. Legacy ambiguous preparation exports may now be
