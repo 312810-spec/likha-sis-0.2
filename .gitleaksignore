@@ -1,0 +1,3 @@
+# Exact historical false positive: typography note naming IBM Plex Mono.
+# Retain the default rule and all other commits/files/lines.
+210d09b7841c49e133600cdd1e11494585beb45c:docs/adr/0075-visual-timetable-and-theme-tokens.md:generic-api-key:55

@@ -45,7 +45,7 @@ tauri-plugin-dialog = "2.8.1"
 # evidence that DepEd's current School Form distribution format is
 # `.xlsx` (a real in-use `CONSO SF v2025.xlsx` workbook, inspected during
 # M8).
-umya-spreadsheet = "3.1.0"
+umya-spreadsheet = "3.1.1"
 # Already resolved in this workspace's dependency tree (pulled transitively
 # by tauri-codegen at build time) -- promoting it to a direct runtime
 # dependency adds no new crate to compile, just links the same version into
@@ -130,3 +130,10 @@ windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win3
 proptest = "1.11.0"
 tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
+
+# Explicit local compatibility forks; see vendor/README.md and provenance.json.
+# Remove these only after maintained upstream releases support non-yanked ZIP.
+[patch.crates-io]
+calamine = { path = "vendor/calamine-0.36.1" }
+umya-spreadsheet = { path = "vendor/umya-spreadsheet-3.1.1" }
