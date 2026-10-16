@@ -606,7 +606,11 @@ pub fn export_section_eosy_sf5(
                             record.subject_id.as_str(),
                         )
                     }),
-                ) {
+                ) && class_record::annual_report_has_pinned_policy_context(
+                    &conn,
+                    &school_id,
+                    subj_records.iter().map(|record| record.id.as_str()),
+                )? {
                     sf5::average_complete_recorded_terms(term_grades)
                 } else {
                     None
@@ -738,7 +742,11 @@ pub fn export_school_eosy_sf6(
                                 record.subject_id.as_str(),
                             )
                         }),
-                    ) {
+                    ) && class_record::annual_report_has_pinned_policy_context(
+                        &conn,
+                        &school_id,
+                        subj_records.iter().map(|record| record.id.as_str()),
+                    )? {
                         sf5::average_complete_recorded_terms(term_grades)
                     } else {
                         None
@@ -1073,7 +1081,11 @@ pub fn export_learner_permanent_record_sf10(
                         record.subject_id.as_str(),
                     )
                 }),
-            ) {
+            ) && class_record::annual_report_has_pinned_policy_context(
+                &conn,
+                &school_id,
+                subj_records.iter().map(|record| record.id.as_str()),
+            )? {
                 sf5::average_complete_recorded_terms(term_grades)
             } else {
                 None
