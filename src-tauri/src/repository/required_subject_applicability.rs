@@ -203,8 +203,14 @@ pub fn select_authorized(
     context: &ApplicabilityContext,
 ) -> AppResult<ApplicabilitySelection> {
     let tx = conn.unchecked_transaction()?;
-    require_context(&tx, actor, school, context, false)?;
-    let result = selection(history(&tx, school, context)?);
+    let (year, grade) = require_context(&tx, actor, school, context, false)?;
+    let mut result = selection(history(&tx, school, context)?);
+    if result.confirmed.as_ref().is_some_and(|version| {
+        version.school_year != year || version.grade_level != grade
+    }) {
+        result.confirmed = None;
+        result.status = "context_changed";
+    }
     tx.commit()?;
     Ok(result)
 }
@@ -242,24 +248,33 @@ pub fn append_authorized(
         || !bounded(&request.evidence.locator, 2000)
         || !bounded(&request.evidence.revision, 255)
         || request.evidence.sha256.as_ref().is_some_and(|hash| {
-            hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            hash.len() != 64
+                || !hash
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
         })
         || request.subject_ids.len() > 256
         || (request.state != VersionState::Withdrawn && request.subject_ids.is_empty())
         || (request.state == VersionState::Withdrawn && !request.subject_ids.is_empty())
     {
-        return Err(AppError::validation("Valid applicability evidence and explicit review are required"));
+        return Err(AppError::validation(
+            "Valid applicability evidence and explicit review are required",
+        ));
     }
     let versions = history(&tx, school, &request.context)?;
     let head = versions.first();
     if head.map(|v| v.id.as_str()) != request.expected_predecessor_id.as_deref() {
-        return Err(AppError::validation("Applicability changed; review the current head"));
+        return Err(AppError::validation(
+            "Applicability changed; review the current head",
+        ));
     }
     let revision = head.map_or(1, |v| v.revision + 1);
     let mut subjects = request.subject_ids.clone();
     subjects.sort();
     if subjects.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(AppError::validation("Required subject identities must be unique"));
+        return Err(AppError::validation(
+            "Required subject identities must be unique",
+        ));
     }
     let subjects_json = serde_json::to_string(&subjects)
         .map_err(|_| AppError::validation("Required subject identities are invalid"))?;
@@ -270,11 +285,25 @@ pub fn append_authorized(
           curriculum_version_id, revision, predecessor_id, state, subject_ids_json, \
           source_citation, source_locator, source_revision, source_sha256, reason, actor_user_id) \
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
-        params![id, school, request.context.section_id, request.context.grading_period_id,
-            year, grade, request.curriculum_version_id, revision, request.expected_predecessor_id,
-            request.state.as_str(), subjects_json, request.evidence.citation,
-            request.evidence.locator, request.evidence.revision, request.evidence.sha256,
-            request.reason, actor],
+        params![
+            id,
+            school,
+            request.context.section_id,
+            request.context.grading_period_id,
+            year,
+            grade,
+            request.curriculum_version_id,
+            revision,
+            request.expected_predecessor_id,
+            request.state.as_str(),
+            subjects_json,
+            request.evidence.citation,
+            request.evidence.locator,
+            request.evidence.revision,
+            request.evidence.sha256,
+            request.reason,
+            actor
+        ],
     )?;
     let result = tx.query_row(&format!("{SELECT} WHERE id=?1"), [&id], row_version)?;
     tx.commit()?;
@@ -293,26 +322,35 @@ pub fn pin_draft_authorized(
     let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
     let member: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM user_school_memberships WHERE user_id=?1 AND school_id=?2)",
-        params![actor, school], |row| row.get(0),
+        params![actor, school],
+        |row| row.get(0),
     )?;
     if !member {
         return Err(AppError::Unauthorized);
     }
-    let record: Option<String> = tx.query_row(
-        "SELECT class_record_id FROM report_card_drafts WHERE id=?1 AND school_id=?2",
-        params![draft_id, school], |row| row.get(0),
-    ).optional()?;
+    let record: Option<String> = tx
+        .query_row(
+            "SELECT class_record_id FROM report_card_drafts WHERE id=?1 AND school_id=?2",
+            params![draft_id, school],
+            |row| row.get(0),
+        )
+        .optional()?;
     let record = record.ok_or(AppError::Unauthorized)?;
     if report_readiness::authorized_record(&tx, actor, school, &record)?.is_none() {
         return Err(AppError::Unauthorized);
     }
-    let existing: Option<String> = tx.query_row(
-        "SELECT version_id FROM report_required_subject_pins WHERE draft_id=?1",
-        [draft_id], |row| row.get(0),
-    ).optional()?;
+    let existing: Option<String> = tx
+        .query_row(
+            "SELECT version_id FROM report_required_subject_pins WHERE draft_id=?1",
+            [draft_id],
+            |row| row.get(0),
+        )
+        .optional()?;
     if let Some(existing) = existing {
         if existing != expected_version_id {
-            return Err(AppError::validation("A reporting applicability pin cannot be replaced"));
+            return Err(AppError::validation(
+                "A reporting applicability pin cannot be replaced",
+            ));
         }
     } else {
         let check = report_readiness::check_report_card_draft_source_in_snapshot(
@@ -320,7 +358,9 @@ pub fn pin_draft_authorized(
         )?
         .ok_or(AppError::Unauthorized)?;
         if check.source_status != "matches" {
-            return Err(AppError::validation("Capture current report evidence before pinning applicability"));
+            return Err(AppError::validation(
+                "Capture current report evidence before pinning applicability",
+            ));
         }
         tx.execute(
             "INSERT INTO report_required_subject_pins (draft_id,version_id,pinned_by_user_id) VALUES (?1,?2,?3)",
@@ -329,7 +369,8 @@ pub fn pin_draft_authorized(
     }
     let result = tx.query_row(
         &format!("{SELECT} WHERE id=?1 AND school_id=?2"),
-        params![expected_version_id, school], row_version,
+        params![expected_version_id, school],
+        row_version,
     )?;
     tx.commit()?;
     Ok(result)
@@ -343,17 +384,21 @@ pub fn pinned_draft_authorized(
     draft_id: &str,
 ) -> AppResult<Option<ApplicabilityVersion>> {
     let tx = conn.unchecked_transaction()?;
-    let record: Option<String> = tx.query_row(
-        "SELECT class_record_id FROM report_card_drafts WHERE id=?1 AND school_id=?2",
-        params![draft_id, school], |row| row.get(0),
-    ).optional()?;
+    let record: Option<String> = tx
+        .query_row(
+            "SELECT class_record_id FROM report_card_drafts WHERE id=?1 AND school_id=?2",
+            params![draft_id, school],
+            |row| row.get(0),
+        )
+        .optional()?;
     let record = record.ok_or(AppError::Unauthorized)?;
     if report_readiness::authorized_record(&tx, actor, school, &record)?.is_none() {
         return Err(AppError::Unauthorized);
     }
     let member: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM user_school_memberships WHERE user_id=?1 AND school_id=?2)",
-        params![actor, school], |row| row.get(0),
+        params![actor, school],
+        |row| row.get(0),
     )?;
     if !member {
         return Err(AppError::Unauthorized);

@@ -37,11 +37,13 @@ the applicable curriculum reference without rewriting older evidence. Annual
 SF5/SF6/SF10 keep mixed or unpinned policy context pending.
 Manual continuation only: the user explicitly skipped automation on 2026-10-17.
 Leave scheduled tasks unchanged; do not ask to free a slot or resume the old task.
-Documentation branch: `ctos/m11-reporting-verification-20261016` (PR142);
-its final receipt-only update requires documentation/security checks before merge.
-After that, continue the feature contract below rather than repeat completed work.
-Next independent feature: canonical versioned required-subject applicability,
-followed by immutable issue/amend transitions and cross-form reconciliation.
+PR142 final handoff is merged as `ee7d3cc775c8ac552138954d4cdacc5063d8638d`.
+PR144 now implements the narrow section-cohort/concrete-period applicability registry,
+native scoped APIs and optional immutable report-draft pins. Local SQL checks pass;
+native/Windows CI is pending. Read the 2026-10-17 applicability checkpoint.
+Finish exact-head verification and merge before wiring configuration UI, annual
+completeness and preparation consumers. Source-lock v2 does not include these pins.
+Then continue immutable issue/amend transitions and cross-form reconciliation.
 Use atomic versions and exact school/year/grade/cohort/period scope. PR103 is
 reference only, not a direct offering-code adoption or mass-merge candidate.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.

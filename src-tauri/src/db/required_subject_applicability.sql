@@ -14,6 +14,7 @@ CREATE TABLE required_subject_versions (
         json_valid(subject_ids_json) AND json_type(subject_ids_json) = 'array'
         AND json_array_length(subject_ids_json) <= 256
         AND (state = 'withdrawn' OR json_array_length(subject_ids_json) > 0)
+        AND (state <> 'withdrawn' OR json_array_length(subject_ids_json) = 0)
     ),
     source_citation TEXT NOT NULL CHECK (length(trim(source_citation)) BETWEEN 1 AND 2000),
     source_locator TEXT NOT NULL CHECK (length(trim(source_locator)) BETWEEN 1 AND 2000),
@@ -74,6 +75,24 @@ END;
 CREATE TRIGGER required_subject_version_no_delete BEFORE DELETE ON required_subject_versions
 BEGIN
     SELECT RAISE(ABORT, 'Required-subject versions are retained evidence');
+END;
+
+-- JSON preserves the full immutable set; retain the canonical referenced IDs.
+CREATE TRIGGER required_subject_identity_no_delete BEFORE DELETE ON subjects
+WHEN EXISTS (
+    SELECT 1 FROM required_subject_versions v, json_each(v.subject_ids_json) j
+    WHERE j.value = OLD.id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'Required-subject history retains this subject identity');
+END;
+CREATE TRIGGER required_subject_identity_scope BEFORE UPDATE OF id, school_id ON subjects
+WHEN (NEW.id IS NOT OLD.id OR NEW.school_id IS NOT OLD.school_id) AND EXISTS (
+    SELECT 1 FROM required_subject_versions v, json_each(v.subject_ids_json) j
+    WHERE j.value = OLD.id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'Required-subject history retains this subject scope');
 END;
 
 -- Optional binding for a retained reporting draft. No legacy backfill.
