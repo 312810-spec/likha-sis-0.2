@@ -106,3 +106,11 @@ The user explicitly skipped automation. Continue manually and leave scheduled
 tasks unchanged. Canonical applicability is the next independent implementation
 contract; official requirements and final device/professional acceptance remain
 external. No deployment.
+
+Scanner repair head `23b306c0c1fbd302ab5854a9e25f638a37b31142` passed
+gitleaks, cargo-deny and OSV. The scanner log confirms both relevant commits were
+scanned and only the three verified fingerprints skipped. Git subtree identities
+confirm unchanged native source/vendor, scripts and workflow definitions relative
+to the earlier tested ZIP candidate. Platform CI remains pending at this checkpoint.
+This follow-up contains only the reporting handoff; its CI base is PR143 to avoid
+repeating unchanged native builds for documentation. Retarget main after merge.
