@@ -15,7 +15,7 @@ Continue under the established implementation/push/merge authorization. No deplo
 ## Next unblocked work
 
 Active documentation branch: `ctos/m11-reporting-verification-20261016`.
-Finish its documentation-only checks/merge, then design/test canonical versioned
+After this documentation checkpoint merges, design/test canonical versioned
 required-subject applicability. The verification checkpoint records PR103 salvage
 risks and synthetic acceptance cases; do not directly adopt the old offering code.
 Hourly automation is still paused because all five task slots are occupied;

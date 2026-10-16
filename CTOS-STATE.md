@@ -32,11 +32,11 @@ SF4/SF6 enforce administrative reporting capability. Draft source v2 captures
 the applicable curriculum reference without rewriting older evidence. Annual
 SF5/SF6/SF10 keep mixed or unpinned policy context pending.
 Documentation branch: `ctos/m11-reporting-verification-20261016`; source guards
-are merged, documentation-only checkpoint verification remains in progress.
+are merged. Recheck live branch/PR status on resume.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-Finish the documentation checkpoint, then design/test canonical versioned
+After this documentation checkpoint merges, design/test canonical versioned
 required-subject applicability; adapt only
 the safe PR103 offering concepts, with atomic versions and exact scoped reads.
 Continue issue/amend transitions and cross-form reconciliation afterward.
