@@ -291,8 +291,13 @@ fn changed_section_grade_never_silently_reuses_old_applicability() {
     assert!(selected.confirmed.is_none());
     assert_eq!(
         history_authorized(&conn, "admin", "s", &req.context).unwrap(),
-        vec![original]
+        vec![original.clone()]
     );
+    let fresh =
+        report_readiness::capture_report_card_draft_authorized(&conn, "teacher", "s", "record")
+            .unwrap()
+            .unwrap();
+    assert!(pin_draft_authorized(&conn, "teacher", "s", &fresh.id, &original.id).is_err());
 }
 
 fn race(path: &Path, key: &[u8; crate::crypto::KEY_LEN], req: AppendVersion) -> usize {

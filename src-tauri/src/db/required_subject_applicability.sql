@@ -107,10 +107,14 @@ WHEN NOT EXISTS (
     SELECT 1 FROM report_card_drafts d
     JOIN class_records c ON c.id = d.class_record_id AND c.school_id = d.school_id
     JOIN required_subject_versions v ON v.id = NEW.version_id
+    JOIN sections s ON s.id = c.section_id AND s.school_id = c.school_id
+    JOIN grading_periods p ON p.id = c.grading_period_id AND p.school_id = c.school_id
     JOIN user_school_memberships m ON m.school_id = d.school_id AND m.user_id = NEW.pinned_by_user_id
     WHERE d.id = NEW.draft_id AND v.school_id = d.school_id
       AND v.section_id = c.section_id AND v.grading_period_id = c.grading_period_id
       AND v.curriculum_version_id = c.curriculum_version_id AND v.state = 'confirmed'
+      AND v.school_year = s.school_year AND v.school_year = p.school_year
+      AND v.grade_level = s.grade_level
       AND NOT EXISTS (
         SELECT 1 FROM required_subject_versions newer
         WHERE newer.school_id = v.school_id AND newer.section_id = v.section_id
