@@ -57,3 +57,23 @@ adopt selected identities and preserve legacy/unknown states before issue/amend 
 No broader cohort/track/equivalence rules or date-range precedence semantics.
 No installed-device, printer, teacher, official-form or release acceptance is claimed.
 M11 remains partial. Automation remains skipped.
+
+## Next consumer integration
+
+The current annual-export call sites are in `commands/export.rs` (SF5, SF6 and SF10).
+They call `class_record::annual_report_subject_names`, configured-period coverage,
+and `annual_report_has_pinned_policy_context`. Required-subject applicability must
+be an additional explicit input; configured assignments alone cannot fill it.
+
+Use canonical subject IDs with exact section/period versions. Preserve assigned
+and record-only subjects while making absent required subjects visible as pending.
+Do not require a subject in a period that explicitly excludes it, or silently
+choose among overlapping period policies. Missing/withdrawn/changed-context or
+mixed-curriculum selections keep affected annual results pending. Do not invent
+annual weighting/equivalence rules or convert registry confirmation into official
+source certification. Pin the adopted identities in the next preparation source
+version; old source locks and existing snapshots must remain unchanged.
+
+Regression targets: required subject without an assignment/record; term-specific
+subject; missing one period's confirmation; newer draft; withdrawal; changed grade;
+foreign cohort; duplicate/same-name identity; historical snapshot after correction.
