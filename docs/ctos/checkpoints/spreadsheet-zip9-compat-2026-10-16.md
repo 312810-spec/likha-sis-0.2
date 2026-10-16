@@ -74,3 +74,18 @@ Cargo.lock changes conservatively invalidate earlier draft-source matches throug
 the existing fingerprint; retained evidence is not rewritten. No installed-device,
 printer, official-form or release acceptance claim. Fresh CI and review of the
 final PR head remain required before merge; no deployment.
+
+## Continuation — 2026-10-17
+
+PR143 head `1ad99cfe2503115c1b82dc998854eea9268202e9` passed native
+Ubuntu/Windows Quality 38849394938, cargo-deny and OSV; gitleaks reported three
+new false positives. Two inventory values were independently checked against the
+SHA-256 of their exact upstream-source snapshot bytes; the third was ordinary
+typography prose. Only their exact immutable commit/path/rule/line fingerprints
+were added to the existing ignore file. No file, directory or scanning rule is
+excluded. Application/dependency/provenance bytes are unchanged.
+
+Fresh exact-head Security and applicable documentation checks are required before
+merge. Prior native evidence applies to unchanged application/dependency bytes;
+it is not installed-device acceptance. User requested manual continuation and
+skipped automation; leave scheduled tasks unchanged.
