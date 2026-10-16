@@ -2667,6 +2667,7 @@ pub fn migrations() -> Migrations<'static> {
         END;
         "#,
         ),
+        M::up(include_str!("required_subject_applicability.sql")),
     ])
 }
 

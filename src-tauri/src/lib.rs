@@ -81,6 +81,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::required_subject_applicability::append_required_subject_version,
+            commands::required_subject_applicability::select_required_subject_version,
+            commands::required_subject_applicability::list_required_subject_versions,
+            commands::required_subject_applicability::pin_report_required_subject_version,
+            commands::required_subject_applicability::get_report_required_subject_pin,
             commands::school::list_schools,
             commands::school::create_school,
             commands::school::set_school_logo,
