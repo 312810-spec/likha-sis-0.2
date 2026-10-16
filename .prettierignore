@@ -1,6 +1,8 @@
 dist
 src-tauri/target
 src-tauri/gen
+# Preserve upstream source and license bytes; provenance is checked separately.
+src-tauri/vendor
 node_modules
 package-lock.json
 # Vendored Impeccable skill plumbing (docs/adr/0030-ui-first-program-and-ux00.md)

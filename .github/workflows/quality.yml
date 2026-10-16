@@ -149,6 +149,10 @@ jobs:
           cargo fmt --version
           cargo clippy --version
 
+      - name: Verify spreadsheet compatibility source provenance
+        if: needs.classify.outputs.native == 'true'
+        run: python3 scripts/vendor-spreadsheet-compat.py --verify
+
       - name: Run native Rust quality gate
         if: needs.classify.outputs.native == 'true'
         run: cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings
@@ -179,6 +183,9 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Verify spreadsheet compatibility source provenance
+        run: python scripts/vendor-spreadsheet-compat.py --verify
 
       - name: Build the Windows-native Tauri application
         run: npm run tauri build -- --debug

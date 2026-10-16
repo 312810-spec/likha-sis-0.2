@@ -19,3 +19,6 @@
 *.icns binary
 *.woff binary
 *.woff2 binary
+
+# Vendored snapshots retain upstream bytes for the provenance inventory.
+src-tauri/vendor/** -text -whitespace
