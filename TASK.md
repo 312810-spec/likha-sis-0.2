@@ -5,18 +5,18 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Active continuation
 
-PR139 school-report permissions, PR140 curriculum source context and PR141 annual
-pinned-policy context are merged after their exact-head Quality/Security gates.
-Local native tests (1,518), rustfmt/Clippy, browser smoke and 50 browser recovery
-checks passed. Independent bounded source review found no blocking regression.
-Receipts and limits: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
+PR139 reporting permissions, PR140 curriculum source context, PR141 annual
+pinned-policy context and PR143 ZIP compatibility/security repair are merged.
+Current exact-head CI: 1,513 Ubuntu native / 1,522 Windows native / 1,565 frontend
+tests, formatting, Clippy, provenance and Security passed. See CTOS-STATE and
+`docs/ctos/checkpoints/spreadsheet-zip9-compat-2026-10-16.md` for receipts/limits.
 Continue under the established implementation/push/merge authorization. No deployment was performed.
 
 ## Next unblocked work
 
 Manual continuation: automation was explicitly skipped by the user on 2026-10-17.
-Leave all scheduled tasks unchanged. Finish PR143 dependency-security verification,
-then merge the reconciled PR142 documentation after exact-head gates pass.
+Leave all scheduled tasks unchanged. PR143 is verified and merged; finish PR142
+receipt-only documentation checks/merge if still open, then continue the feature contract.
 Three scanner false positives were verified and fixed without broad exclusions.
 The dependency repair is an explicit local compatibility fork; official support
 and installed-device acceptance are not implied.

@@ -5,19 +5,18 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current source and verification
 
-PR140 curriculum source context merged as `9444d9b427a41f1b501c1802c83fdd73a928a99f`.
-PR141 annual pinned-policy context merged as `e5703aa5a03024eaa26e8870b26e1aab83e2142f`.
-Heads `db7f992` / `62e9e45` passed Ubuntu/Windows Quality and Security;
-Quality runs 38842928675 / 38844011698. Windows test-installer artifact: 12023132448.
-Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 browser
-recovery checks passed. Independent bounded source review found no blocking issue.
-Exact receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
-Earlier PR136/137/139 receipts remain in their checkpoints. No deployment.
-Dependency continuation: PR143 `fix/spreadsheet-zip9-compat-20261016` replaces
-withdrawn ZIP 8 using explicit reproducible reader compatibility snapshots and ZIP 9.
-Native/frontend/provenance checks passed at its original head; three exact scanner
-false positives were independently verified and repaired on 2026-10-17.
-Fresh exact-head CI is pending. Keep cargo-deny and secret-scanning rules intact.
+PR143 head `23b306c0c1fbd302ab5854a9e25f638a37b31142` passed exact-head
+Quality 38976244515 (Ubuntu/Windows) and Security and merged as
+`ca750986bd38f3d74cf1ef632fccfaeb541451b8`. Native tests: 1,513 Ubuntu / 1,522 Windows;
+frontend: 1,565. Rustfmt, Clippy, source provenance and all three security tools
+passed. Windows test-installer artifact: 12080032092. No deployment.
+
+Earlier PR139–PR141 reporting/source/policy guards remain merged. Their receipts
+are preserved in `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
+Dependency repair and limitations:
+`docs/ctos/checkpoints/spreadsheet-zip9-compat-2026-10-16.md`.
+Three scanner false positives were verified and recorded with exact immutable
+fingerprints; no broad scanner/dependency-policy exclusion was added.
 Refresh live main, open PRs and Git status on resume; this document cannot prove a clean checkout.
 
 ## Program status
@@ -38,9 +37,9 @@ the applicable curriculum reference without rewriting older evidence. Annual
 SF5/SF6/SF10 keep mixed or unpinned policy context pending.
 Manual continuation only: the user explicitly skipped automation on 2026-10-17.
 Leave scheduled tasks unchanged; do not ask to free a slot or resume the old task.
-Documentation branch: `ctos/m11-reporting-verification-20261016`.
-Finish PR143's unchanged-head Quality/Security, then integrate/retarget PR142
-against the dependency repair and merge only after its documentation/security gates.
+Documentation branch: `ctos/m11-reporting-verification-20261016` (PR142);
+its final receipt-only update requires documentation/security checks before merge.
+After that, continue the feature contract below rather than repeat completed work.
 Next independent feature: canonical versioned required-subject applicability,
 followed by immutable issue/amend transitions and cross-form reconciliation.
 Use atomic versions and exact school/year/grade/cohort/period scope. PR103 is
