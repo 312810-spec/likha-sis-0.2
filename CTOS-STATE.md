@@ -36,7 +36,8 @@ administrative reporting capability. Head `b955dde` passed Ubuntu/Windows Qualit
 Receipt: `docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
 Active branch: `ctos/m11-reporting-continuation-20261016` from that merge.
 Curriculum draft fingerprints now include applicable reference metadata (v2);
-focused tests pass, full native verification pending. See
+PR140 focused/full native tests (1,513), rustfmt and Clippy pass locally;
+fresh platform CI pending. See
 `docs/ctos/checkpoints/m11-curriculum-source-context-2026-10-16.md`.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.

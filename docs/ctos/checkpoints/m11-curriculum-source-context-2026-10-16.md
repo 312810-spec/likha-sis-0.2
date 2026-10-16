@@ -24,7 +24,12 @@ capture the current default's reference. No schema or official policy changes.
 Three new native regressions cover metadata changes despite unchanged projections,
 retained evidence, pinned/unrelated context, legacy NULL references and v1 retention.
 Focused `cargo test --lib curriculum_`: 18 passed; rustfmt passed.
-Full native tests/Clippy and fresh CI pending. The prior merged PR139 baseline
+Full local native suite: 1,513 passed across 23 suites; Clippy with warnings
+denied passed. Changed-document formatting and Git whitespace checks passed.
+PR140 is open; fresh Ubuntu/Windows Quality/Security must pass before merge.
+Source implementation: `391aa4a4c6ade629a9c304010d0224057be5b75e`.
+No UI changes; no new browser or installed-device verification was performed.
+The prior merged PR139 baseline
 passed 1,510 native and 1,565 frontend tests plus web build on this Windows host.
 Versioned required-subject applicability, issuance/amendments and external/device
 acceptance remain pending. This slice establishes source context, not official

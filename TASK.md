@@ -16,8 +16,8 @@ Continue under the established implementation/push/merge authorization. No deplo
 
 PR139 permission fix is merged with green Quality/Security at head `b955dde`.
 Current branch: `ctos/m11-reporting-continuation-20261016` from merge `d033fb1`.
-Finish verification of v2 curriculum source fingerprints and preserve old drafts;
-focused native regressions pass. Read the curriculum source-context checkpoint.
+Finish PR140 CI for v2 curriculum source fingerprints and preserve old drafts;
+local native tests (1,513), rustfmt and Clippy pass. Read its checkpoint.
 Hourly automation is still paused because all five task slots are occupied;
 resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
 
