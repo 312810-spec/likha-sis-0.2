@@ -34,21 +34,22 @@ PR139 merged as `d033fb17817059c92b824d7f34717809e7838488`; SF4/SF6 now require
 administrative reporting capability. Head `b955dde` passed Ubuntu/Windows Quality
 38824681475 and Security. Local native suite: 1,510 passed; frontend: 1,565 passed.
 Receipt: `docs/ctos/checkpoints/m11-school-report-authority-2026-10-16.md`.
-PR140 branch: `ctos/m11-reporting-continuation-20261016` from that merge.
-Curriculum draft fingerprints now include applicable reference metadata (v2);
-PR140 focused/full native tests (1,513), rustfmt and Clippy pass locally;
-fresh platform CI pending. See
-`docs/ctos/checkpoints/m11-curriculum-source-context-2026-10-16.md`.
-Active branch: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
-PR141 is draft and targets PR140's branch; retarget main after PR140 merges.
-SF5/SF6/SF10 now guard matching explicitly pinned policy context before annual
-averaging. Five focused regressions, 1,518 full native tests, rustfmt and Clippy
-pass locally. See `docs/ctos/checkpoints/m11-annual-policy-context-2026-10-16.md`.
+PR140 merged as `9444d9b427a41f1b501c1802c83fdd73a928a99f`; head `db7f992`
+passed Ubuntu/Windows Quality 38842928675 and Security. Source v2 captures the
+applicable curriculum reference without rewriting older retained drafts.
+PR141 head `62e9e45` targets main. Ubuntu/Security and Windows build passed;
+Windows native tests remain pending. It guards pinned annual policy context.
+Local native suite: 1,518 passed; rustfmt/Clippy, browser smoke and 50 recovery
+checks passed. Independent bounded source review found no blocking regression.
+Documentation branch: `ctos/m11-reporting-verification-20261016`.
+Receipts/limits/next design: `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
 Hourly continuation remains paused: resumption hit the five-active-task limit.
 A task slot must be freed; no unrelated task was changed.
 
-Finish PR140 and annual-policy-context verification, then continue versioned
-required-subject/policy reconciliation and issue/amend transitions.
+Finish PR141 and the documentation checkpoint after exact-head gates pass.
+Then design/test canonical versioned required-subject applicability; adapt only
+the safe PR103 offering concepts, with atomic versions and exact scoped reads.
+Continue issue/amend transitions and cross-form reconciliation afterward.
 Configured periods/assignments do not prove official completeness. Keep missing values pending.
 
 Preserve current school hub and canonical data; historical issued records must remain unchanged.

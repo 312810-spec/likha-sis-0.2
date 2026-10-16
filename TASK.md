@@ -15,14 +15,14 @@ Continue under the established implementation/push/merge authorization. No deplo
 ## Next unblocked work
 
 PR139 permission fix is merged with green Quality/Security at head `b955dde`.
-PR140 branch: `ctos/m11-reporting-continuation-20261016` from merge `d033fb1`.
-Finish PR140 CI for v2 curriculum source fingerprints and preserve old drafts;
-local native tests (1,513), rustfmt and Clippy pass. Read its checkpoint.
-Active child: `ctos/m11-annual-policy-context-20261016` from PR140 head `db7f992`.
-PR141 contains the annual pinned-policy guard, currently based on PR140's branch.
-Merge PR140 after its gates pass, retarget PR141 to main, then require its own
-green gates before merge. Five focused tests, 1,518 full native tests, rustfmt and Clippy
-passed locally. Read the annual policy-context checkpoint.
+PR140 merged as `9444d9b` after full Quality/Security. PR141 head `62e9e45`
+now targets main; merge only when its remaining Windows native checks pass.
+Local native tests (1,518), rustfmt/Clippy, browser smoke and 50 browser recovery
+checks passed. Independent bounded source review found no blocking regression.
+Active documentation branch: `ctos/m11-reporting-verification-20261016`.
+Finish the integration receipts/checkpoint after PR141 merges, then design/test
+canonical versioned required-subject applicability. Read the reporting-verification
+checkpoint for the PR103 salvage assessment and synthetic acceptance cases.
 Hourly automation is still paused because all five task slots are occupied;
 resume existing task `6ace2785c2588191b7c940f124c3bfec` after a slot is freed.
 
