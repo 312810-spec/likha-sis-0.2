@@ -43,10 +43,22 @@ successors, cross-cohort lineage, wrong year, foreign/duplicate subjects, teache
 immutability, overlapping-period isolation, withdrawal/pin retention and concurrent
 root/successor inserts. Foreign-key check returned no violations.
 
-Rust toolchain is unavailable locally. First CI candidate reported rustfmt differences;
-apply the formatter output and rerun, without weakening any gates. Rust tests,
-compiler, Clippy, source provenance and Windows package evidence remain pending
-until recorded from successful final-head CI. JavaScript/UI changed files: none.
+Candidate `1fb734674525abd6d0b3d114eb2e16bbbeeb8629`, tree
+`14f867c5e1aa6a3fbcfca1b8711333792c19d1bb`, passed exact-head Quality
+run 38982145244: 1,522 Ubuntu native tests (job 117245342110) and 1,531 Windows
+native tests (job 117245342227). All nine new applicability regressions passed on
+both platforms. Rustfmt, Clippy with warnings denied, 618-file spreadsheet
+source-provenance verification and all Security scans passed.
+Windows debug packaging and test-installer artifact upload 12082630839 succeeded.
+
+PR144 merged as `1e6d2275499c8f7b4236126c557f6232670319b5`; the merged root
+tree equals the tested candidate tree. Initial formatting differences were corrected
+before the passing run. Rust is unavailable locally. JavaScript/UI files were not
+changed; the frontend unit suite was not rerun for this native-only slice.
+
+Additional local SQL probes rejected pins for another period or a changed grade,
+and rejected writes after administrator-role revocation. These are synthetic SQL
+checks, separate from the passing native repository tests above.
 
 ## Remaining work and limits
 
@@ -57,3 +69,23 @@ adopt selected identities and preserve legacy/unknown states before issue/amend 
 No broader cohort/track/equivalence rules or date-range precedence semantics.
 No installed-device, printer, teacher, official-form or release acceptance is claimed.
 M11 remains partial. Automation remains skipped.
+
+## Next consumer integration
+
+The current annual-export call sites are in `commands/export.rs` (SF5, SF6 and SF10).
+They call `class_record::annual_report_subject_names`, configured-period coverage,
+and `annual_report_has_pinned_policy_context`. Required-subject applicability must
+be an additional explicit input; configured assignments alone cannot fill it.
+
+Use canonical subject IDs with exact section/period versions. Preserve assigned
+and record-only subjects while making absent required subjects visible as pending.
+Do not require a subject in a period that explicitly excludes it, or silently
+choose among overlapping period policies. Missing/withdrawn/changed-context or
+mixed-curriculum selections keep affected annual results pending. Do not invent
+annual weighting/equivalence rules or convert registry confirmation into official
+source certification. Pin the adopted identities in the next preparation source
+version; old source locks and existing snapshots must remain unchanged.
+
+Regression targets: required subject without an assignment/record; term-specific
+subject; missing one period's confirmation; newer draft; withdrawal; changed grade;
+foreign cohort; duplicate/same-name identity; historical snapshot after correction.

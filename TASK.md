@@ -5,26 +5,29 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Active continuation
 
-PR139–PR143 are merged, including the final PR142 handoff.
-PR144 (`ctos/m11-required-subject-applicability-20261017`) implements the
-section-cohort/concrete-period required-subject registry and optional immutable
-report-draft pins. Read `docs/ctos/checkpoints/m11-required-subject-applicability-2026-10-17.md`.
-Local SQL verification passes. Native formatting/compiler/tests/Clippy and Windows
-package verification are pending CI; do not merge until exact-head applicable gates pass.
-Finish this slice and preserve its actual receipts before proceeding.
+PR144 required-subject applicability foundation is verified and merged as
+`1e6d2275499c8f7b4236126c557f6232670319b5`. Tested head `1fb7346`:
+1,522 Ubuntu / 1,531 Windows native tests; Rustfmt, Clippy, provenance, Security
+and Windows debug packaging passed. Test-installer artifact: 12082630839.
+Read `docs/ctos/checkpoints/m11-required-subject-applicability-2026-10-17.md`
+for exact identities, receipts and limits. PR139–PR143 remain merged.
 
 ## Next unblocked work
 
 Manual continuation: automation was explicitly skipped by the user on 2026-10-17.
-Leave scheduled tasks unchanged. Continue under established implementation/push/merge
-authorization; no deployment. Do not repeat completed dependency/reporting repairs.
+Leave scheduled tasks unchanged. Established implementation/push/merge authorization
+continues; no deployment. Do not repeat completed registry/dependency repairs.
 
-After PR144 verification: configure applicability through the existing app and
-integrate explicit selected/pinned versions with annual completeness and report
-preparation. Existing source-lock v2 does not incorporate the new optional pins.
-Keep unknown/withdrawn/mixed contexts pending. Do not invent official offerings,
-track/equivalence rules or required-subject counts. Section cohorts only are supported
-by this first registry; broader rules need explicit modeling and overlap semantics.
+Configure applicability through the existing app and integrate explicit selected/pinned
+versions with annual completeness and report preparation. Current SF5/SF6/SF10 call
+sites and regression targets are in the checkpoint. Source-lock v2 does not include
+the optional pins; the next preparation source version must adopt them explicitly
+without rewriting old snapshots, locks or reviews.
+
+Keep missing, withdrawn, changed-grade and mixed contexts pending. Do not invent
+official offerings, track/equivalence rules, annual weighting or required-subject counts.
+The registry supports exact section cohorts and concrete periods only. Broader
+cohort rules need explicit modeling and overlap semantics.
 
 Continue M11 immutable issuance/amendments and cross-form reconciliation.
 M10–M17 remain open. PR103 is salvage reference only; do not mass-merge.
