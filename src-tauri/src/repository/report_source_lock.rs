@@ -49,6 +49,10 @@ fn implementation_hash() -> String {
         ("disclosure", include_str!("../export/report_card.rs")),
         ("source_collector", include_str!("report_source_lock.rs")),
         ("schema", include_str!("../db/migrations.rs")),
+        (
+            "required_subject_schema",
+            include_str!("../db/required_subject_applicability.sql"),
+        ),
         ("native_dependencies", include_str!("../../Cargo.lock")),
     ] {
         digest.update(name.as_bytes());

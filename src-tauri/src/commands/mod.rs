@@ -19,6 +19,7 @@ pub mod learner_support;
 pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;
+pub mod required_subject_applicability;
 pub mod schedule_planning;
 pub mod school;
 pub mod section;
