@@ -44,13 +44,21 @@ immutability, overlapping-period isolation, withdrawal/pin retention and concurr
 root/successor inserts. Foreign-key check returned no violations.
 
 Candidate `1fb734674525abd6d0b3d114eb2e16bbbeeb8629`, tree
-`14f867c5e1aa6a3fbcfca1b8711333792c19d1bb`, passed Ubuntu Quality in
-run 38982145244, job 117245342110: 1,522 native tests, including all nine new
-applicability regressions; Rustfmt, Clippy with warnings denied and 618-file
-spreadsheet source-provenance verification passed. All candidate Security scans
-pass. Windows packaging/native tests remain pending; do not merge PR144 yet.
-First-candidate formatting differences were corrected before this passing run.
-Rust is unavailable locally. JavaScript/UI changed files: none.
+`14f867c5e1aa6a3fbcfca1b8711333792c19d1bb`, passed exact-head Quality
+run 38982145244: 1,522 Ubuntu native tests (job 117245342110) and 1,531 Windows
+native tests (job 117245342227). All nine new applicability regressions passed on
+both platforms. Rustfmt, Clippy with warnings denied, 618-file spreadsheet
+source-provenance verification and all Security scans passed.
+Windows debug packaging and test-installer artifact upload 12082630839 succeeded.
+
+PR144 merged as `1e6d2275499c8f7b4236126c557f6232670319b5`; the merged root
+tree equals the tested candidate tree. Initial formatting differences were corrected
+before the passing run. Rust is unavailable locally. JavaScript/UI files were not
+changed; the frontend unit suite was not rerun for this native-only slice.
+
+Additional local SQL probes rejected pins for another period or a changed grade,
+and rejected writes after administrator-role revocation. These are synthetic SQL
+checks, separate from the passing native repository tests above.
 
 ## Remaining work and limits
 

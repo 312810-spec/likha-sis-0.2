@@ -5,11 +5,17 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current source and verification
 
-PR143 head `23b306c0c1fbd302ab5854a9e25f638a37b31142` passed exact-head
-Quality 38976244515 (Ubuntu/Windows) and Security and merged as
-`ca750986bd38f3d74cf1ef632fccfaeb541451b8`. Native tests: 1,513 Ubuntu / 1,522 Windows;
-frontend: 1,565. Rustfmt, Clippy, source provenance and all three security tools
-passed. Windows test-installer artifact: 12080032092. No deployment.
+PR144 head `1fb734674525abd6d0b3d114eb2e16bbbeeb8629` passed exact-head
+Quality 38982145244: 1,522 Ubuntu / 1,531 Windows native tests, all nine new
+applicability regressions, Rustfmt, Clippy, source provenance and all Security scans.
+Windows debug test-installer artifact: 12082630839. PR144 merged as
+`1e6d2275499c8f7b4236126c557f6232670319b5`; merge tree equals the tested
+candidate tree. No deployment. Full receipts and next consumer contract:
+`docs/ctos/checkpoints/m11-required-subject-applicability-2026-10-17.md`.
+
+PR143 ZIP compatibility/security repair remains verified and merged as
+`ca750986bd38f3d74cf1ef632fccfaeb541451b8`. Its earlier frontend baseline was
+1,565 tests; that suite was not rerun for this native-only registry slice.
 
 Earlier PR139–PR141 reporting/source/policy guards remain merged. Their receipts
 are preserved in `docs/ctos/checkpoints/m11-reporting-verification-2026-10-16.md`.
@@ -38,12 +44,11 @@ SF5/SF6/SF10 keep mixed or unpinned policy context pending.
 Manual continuation only: the user explicitly skipped automation on 2026-10-17.
 Leave scheduled tasks unchanged; do not ask to free a slot or resume the old task.
 PR142 final handoff is merged as `ee7d3cc775c8ac552138954d4cdacc5063d8638d`.
-PR144 now implements the narrow section-cohort/concrete-period applicability registry,
-native scoped APIs and optional immutable report-draft pins. Local SQL and candidate
-`1fb7346` Ubuntu Quality pass (1,522 native tests, Rustfmt/Clippy/provenance).
-Security passes; Windows packaging/native tests remain pending. Read the 2026-10-17 applicability checkpoint.
-Finish exact-head verification and merge before wiring configuration UI, annual
-completeness and preparation consumers. Source-lock v2 does not include these pins.
+PR144's section-cohort/concrete-period registry, native scoped APIs and optional
+immutable report-draft pins are verified and merged. Next: configuration UI,
+annual completeness and preparation consumers. Source-lock v2 does not include
+these optional pins; adopt explicit selected/pinned identities in the next source
+version while preserving older evidence. See checkpoint for exact call sites.
 Then continue immutable issue/amend transitions and cross-form reconciliation.
 Use atomic versions and exact school/year/grade/cohort/period scope. PR103 is
 reference only, not a direct offering-code adoption or mass-merge candidate.
