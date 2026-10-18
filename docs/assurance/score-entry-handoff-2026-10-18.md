@@ -1,160 +1,91 @@
-# Score-entry bounded UI/UX + Assurance handoff
+# Bounded score-entry UI/UX + Assurance handoff
 
-## Publication and CI continuation
+## Result and checked target
 
-The user explicitly approved branch publication and a draft PR on 2026-10-18.
 Draft PR: https://github.com/312810-spec/likha-sis-0.2/pull/146.
-First published head `8b0aa8fc5e4d60bc6b136caa8608628188e5044c`, tree
-`aafea916ff36f658f884dc65409439af67265e56`, exactly matches local checkpoint.
-Shell Git lacked credentials; the connected GitHub route published the same tree;
-read-only fetch verified byte identity. Earlier approval-review blocks are resolved
-for publication; no merge/deployment requested or performed.
+Branch: `forge/bounded-journey-assurance-20261018`.
+Checked source: `129ef31d84992235e48c9f9d8ca70c950d683585`.
+CI merge: `1cec109a7a5fba7749259eba7d28cb2e9c01cab8`.
+Both have tree `014f02b5cf1bde516b8dea7ba52b642e3317d3a2`; fetched and compared.
+Baseline: `ac4c3add56fb7a0677f1a0f745bf1de816ea55ee`.
+Acceptance criteria remain unchanged in `score-entry-contract-2026-10-18.md`.
+User approved branch publication and a draft PR; no merge/deployment performed.
 
-Quality run 39113348314: Ubuntu frontend, UI smoke and recovery passed; native
-step stopped at two formatter differences in new tests. Apply the exact formatter
-output from job 117633983156 before rerunning. No native-test pass inferred.
-Security run 39113348165: gitleaks PASS; cargo-deny and OSV FAIL on unmaintained
-zvariant 5.15.0 (RUSTSEC-2026-0370), zbus_names 4.3.4 (0371), zvariant_derive
-5.15.0 (0372). Lockfiles are unchanged from baseline; those scanners were not run
-on baseline in this investigation. No suppressions or dependency changes added.
-Keep this existing-dependency maintenance outside the bounded journey and preserve
-these merge blockers. Await fresh native execution on the formatter-corrected head.
+**Bounded journey: READY FOR REVIEW against the unchanged contract.**
+**Merge/release readiness: BLOCKED by dependency-security gates.**
+Teacher task trial and installed-device acceptance remain pending.
+No whole-app completion or usability validation is claimed.
 
-## Earlier local result
+## Journey and boundary
 
-Checked implementation: `ef2b935a651468f05e2444167ae73f7d2a2d2517`.
-The final checkpoint changes only documentation/evidence; implementation hashes
-are retained in `score-entry-evidence-2026-10-18.json`.
-Full frontend quality PASS: 158 files / 1,569 tests, typecheck, lint, formatting,
-architecture, dead-code and batch-runner. Production build PASS (676.38 kB JS,
-175.53 kB gzip; existing large-chunk advisory). Required `quality:ui` PASS after
-restoring executable permission on the fresh cached browser in the same invocation.
-No production records changed, no remote publication, no merge or deployment.
+Enter/correct one eligible learner score in an existing Class Record. Selected
+because lost/misattributed scores can contaminate grading and reporting. Earlier
+F01–F16 findings were treated as claims. This was a bounded consequence judgment,
+not an exhaustive whole-app ranking. No redesign, report issuance or new policy.
 
-A second push was rejected after the target/permissions verification: automatic
-review explicitly stated that repository ownership and push permission do not
-establish authorization to publish this particular local work. Do not retry via
-another tool. Native CI remains blocked pending explicit publication approval.
+Trace: score input/selected roster → application validation → Tauri command →
+current session and trusted assignment check → eligibility/range/status checks →
+canonical score plus correction history → optional encrypted sync outbox → local
+confirmation. School/actor derive from session; item/learner IDs identify targets.
+Unique item+learner identity and school-scoped joins remain; no migration changed.
+Existing transfer evidence remains separate from local save. Session drafts remain
+memory only; no new reload/process-death recovery is promised.
 
-## Checked target and boundary
+Synthetic example: blank → submit 18 → type 19 while saving → persisted 18 with
+unsaved 19 retained → explicit correction reason → persisted 19 and history 18→19.
+Browser fixture storage was queried independently of displayed values. It is
+memory storage, not native persistence; native evidence is recorded separately.
 
-Baseline remote main: `ac4c3add56fb7a0677f1a0f745bf1de816ea55ee`.
-Branch: `forge/bounded-journey-assurance-20261018`, isolated worktree.
-This file describes its candidate changes, not main or a deployed app.
-Controlling contract: `score-entry-contract-2026-10-18.md`, frozen before repairs.
-Three attached modules, AGENTS, CTOS, state, task, current handoff and relevant
-11 October audit checkpoint read. Earlier completion reports treated as claims.
+## Verified causes and repairs
 
-Selected journey: enter/correct one learner score in Class Record. Consequence:
-score loss/wrong authority can contaminate grading/report projections. Evidence
-supports prioritizing this journey; no exhaustive whole-app ranking is claimed.
-Boundary ends at canonical score/history and local save/transfer evidence.
-No new feature, redesign, curriculum rule, official record or report issuance.
+| Failure                                                        | Root cause                                                                             | Smallest coherent repair                                                                                                           |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Older acknowledgment erased newer score input                  | Unconditional draft deletion and focus movement after asynchronous save                | Track input revision separately from write generation; retain newer draft/focus and require explicit next save.                    |
+| Same-school unassigned teacher could write a score             | Command checked session/school without current assignment authority                    | Reuse trusted AssessmentItem assignment/school-head guard for save, roster and history; action denial preserves the session/draft. |
+| Failed local correction left history claiming an unmade change | History append and score update lacked a surrounding transaction on unenrolled devices | Local nested savepoint wraps history and live score; existing enrolled score/outbox savepoint remains intact.                      |
 
-## Representative record trace
+## Executed checks
 
-Synthetic assessment `Bounded score probe`, learner Ana Santos: blank → submit 18
-→ type 19 while awaiting acknowledgment → persisted 18 plus retained unsaved 19
-→ explicit reason → persisted 19 with history 18 → 19. Browser repository is
-memory only, not native SQLite. No fixture names represent actual school records.
+| Check                                | Result / evidence                                                                                                                                                                                                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline UI deferred-save regression | FAIL as expected: typed 19 became 18. Candidate regression PASS.                                                                                                                                                                                                     |
+| Full frontend quality                | PASS: 158 files / 1,569 tests; typecheck, lint, formatting, architecture, dead-code and batch-runner.                                                                                                                                                                |
+| Production build                     | PASS; JS 676.38 kB / 175.53 kB gzip, existing bundle-size advisory.                                                                                                                                                                                                  |
+| Focused browser journey              | Eight checks PASS: retained draft/focus, explicit reason/history, rejection preservation, keyboard retry, four appearance/width checks.                                                                                                                              |
+| Accessibility/render                 | Zero assessed axe violations/overflow at light/dark × 1280/390; internal renders inspected. Existing UI smoke and recovery CI gates PASS. No screenshots delivered.                                                                                                  |
+| Source-SQL fallback                  | All 57 migration SQL blocks executed; baseline failed-update history count 1, candidate count 0; normal stable identity/value/history and assignment/reassignment predicates PASS. This is not Rust execution.                                                       |
+| Ubuntu native                        | PASS: 1,525 tests, including all three new score regressions, Rustfmt, Clippy and source provenance.                                                                                                                                                                 |
+| Native baseline comparisons          | PASS: both new authorization/rollback tests fail in their assertions against pinned original production code, and pass on the candidate. Candidate tests/synthetic fixture retained; source restored byte-for-byte. No compile error accepted as a negative control. |
+| Windows                              | PASS: native application/installer build and 1,534 tests, including all three new score regressions.                                                                                                                                                                 |
+| Security                             | Gitleaks PASS; cargo-deny and OSV FAIL on the three existing unmaintained dependency advisories below.                                                                                                                                                               |
 
-- UI: `ClassRecordWorkspace.handleRecord`, draft input, selected item and roster
-  request generation. Item/class draft keys are owner/session scoped; memory only.
-- Application: `LearnerScoreApplicationService.recordScore` validates IDs,
-  finite/range score and status/null pairing. Teacher/school are not client args.
-- Adapter: `TauriLearnerScoreRepository.record` invokes `record_learner_score`.
-- Trusted boundary: session resolves actor/school; new `require_score_item_access`
-  uses existing `data_scope::can_resolve_entity(AssessmentItem)` assignment and
-  established school-head rules. Roster and correction-history commands use the
-  same check. Denial is not treated as session expiry by the frontend adapter.
-- Schema: score uniqueness is assessment item + learner; school joins are checked;
-  scored requires non-null value, exceptions null. Repository checks eligibility
-  over the record period and assessment maximum. No migration changed.
-- Persistence: score ID remains stable on upsert; reason/history preserve prior
-  value/actor/time. New nested local savepoint wraps history and score together.
-- Sync: existing enrolled-device savepoint additionally includes encrypted outbox
-  enqueue; entity ID comes from persisted score, actor from session, device from
-  installation, base version from exact entity cache. No sync protocol changed.
-- Final output here: row value, correction history, recorded count and confirmed
-  local-save status. Existing `ScoreSyncEvidence` remains separate; internet or
-  local save does not establish transfer. CSV/report issuance is outside scope.
+Quality run `39113853343`; Ubuntu job `117635552350`; Windows job `117635552432`.
+Quality run concluded SUCCESS. Windows test-installer artifact `12131064945`
+was uploaded; no installed-app acceptance is inferred.
+Security run `39113853340`; jobs `117635465165` (gitleaks), `117635465401`
+(cargo-deny), `117635465447` (OSV). Detailed receipts and source hashes:
+`score-entry-evidence-2026-10-18.json`.
 
-## Findings and repair
+The native comparisons execute the original command/repository production code
+from the pinned baseline, with compatible candidate synthetic test setup. They
+are not execution of the entire untouched historical app. Both expected failures
+were observed; candidate positives ran first. The comparison harness also passed
+a local source-restoration check when Cargo was deliberately unavailable.
 
-1. **Observed major UI defect:** baseline deferred write regression submitted 18,
-   typed 19, then acknowledged 18: field became 18 (`expected 19, received 18`).
-   Root cause: unconditional learner draft deletion plus focus movement after
-   an older save. Fix: input revision separate from write generation; acknowledge
-   persisted value but preserve newer draft/focus. No automatic write replay.
-2. **Observed SQLite fallback defect; native execution pending:** execute actual
-   production migration/insert/upsert SQL in source order, inject failed update:
-   baseline leaves score 18 but one history row claiming 19. Candidate savepoint
-   policy leaves score 18 and zero history rows. Normal correction preserves
-   stable score ID and exact 18 → 19 lineage. This is a source-SQL reproduction,
-   not execution of Rust/SQLCipher/OS interruption handling.
-3. **Source-confirmed missing command authority; native reproduction pending:**
-   baseline record command required a session/school but did not check current
-   assignment before local writing. Hub authorization does not repair this local
-   boundary. Added the existing trusted assignment guard to save/roster/history.
-   Exact existing SQL distinguishes owner/unassigned teacher and revocation on
-   reassignment. Native command regression cases added, execution still pending.
+## Remaining limits and next action
 
-## Execution evidence and limitations
+Installed Windows GUI/credential ceremony,
+real two-device transfer/conflict/reassignment, process-death/upgrade recovery,
+Android and manual assistive-technology checks are not established by this slice.
+Teacher task trial: NOT RUN; usability validation pending.
 
-- Baseline UI regression: FAIL as expected; candidate focused score/service/adapter
-  run: 79/79 PASS. Later score + denial-handling run: 75/75 PASS.
-- Browser `scripts/assurance/score-journey-browser.mjs`: eight recorded checks PASS:
-  delayed acknowledgment/draft retention, explicit correction + lineage,
-  rejection preservation, keyboard retry, and four light/dark × 1280/390 renders.
-  Persisted fixture rows queried independently of displayed UI; no save claimed
-  for unsaved 19. No auto-replay observed. Native permission denial not simulated
-  as proof: injected repository rejection tests UI behavior only.
-- Axe tags wcag2a/wcag2aa/wcag21aa: zero violations in four assessed final states;
-  no document overflow. Internal desktop/light and mobile/dark render inspection
-  found the expected values/statuses and reachable controls. Manual AT and full
-  WCAG conformance remain unclaimed. No screenshots delivered or committed.
-- Initial cached browser crashed (SIGSEGV); software-rendering retry also failed.
-  File inspection found truncated executable/archive. Fresh official headless
-  shell 155.0.8059.84 completed the browser run. No repeated unchanged retry.
-- SQLite fallback executes all 57 migration SQL blocks (including included SQL),
-  real status/uniqueness/FK constraints, owner/outsider/reassignment predicate,
-  failed correction and successful exact-identity correction. Baseline history
-  rollback FAIL; candidate fallback PASS. Script is explicit about not executing
-  Rust dispatch, cryptography, role override or enrollment/sync transport.
-- Required native commands not locally executable: cargo, rustc, rustfmt absent.
-  Three new command tests cover unassigned same-school writer (enrolled/local),
-  interrupted local correction/history rollback and revoked assignment. They are
-  NOT RUN until native CI executes them; no compiler/Clippy/Rustfmt pass claimed.
-- Local security wrapper reports 0 ok / 0 failed / 3 missing: gitleaks, cargo-deny,
-  osv-scanner. This is NOT a security pass.
-- Browser fixtures cannot establish installed Windows, encrypted persistence,
-  actual hub transfer/conflict/retry, process-death recovery or Android readiness.
-- Teacher task trial: NOT RUN; usability validation remains pending.
+Security gates report RUSTSEC-2026-0370 (`zvariant` 5.15.0), 0371 (`zbus_names`
+4.3.4), 0372 (`zvariant_derive` 5.15.0), classified as unmaintained. Both lockfiles
+are unchanged from baseline. Baseline scanners were not executed here; do not
+claim an executed baseline security failure. No suppression/dependency change was
+added. Preserve these merge blockers for a separate dependency-maintenance scope.
 
-## Assurance readiness
-
-S1–S4: frontend/component execution PASS, including existing stale-item, rejected
-save, correction and separate sync-evidence regressions. S6: scoped browser/axe
-and internal render evidence PASS, manual AT pending. S7: pending teacher trial
-explicitly disclosed. **S5 remains INCONCLUSIVE** until actual native command,
-SQLCipher, authorization and sync enqueue tests execute at the candidate revision.
-Overall **INCONCLUSIVE**, not ready for merge/release or whole-app completion.
-Do not weaken the contract to convert SQLite/fixture results into native proof.
-
-## Resumption and action boundary
-
-Run repository quality/build/UI and native fmt/test/clippy/security checks on the
-exact candidate, repair failures, then assess the unchanged contract. Native
-baseline tests should also be run against baseline command/repository code with
-compatible synthetic assignment setup to verify the negative controls fail.
-Preserve the new tests; do not widen into other journeys before closing S5.
-Existing term-grade/export and assessment-management commands were traced only
-where needed; this slice does not certify their complete authorization surfaces.
-
-The first checkpoint push was rejected by automatic approval review, which called
-the remote unverified and the request local-only. Subsequent read-only repository
-metadata verified public `312810-spec/likha-sis-0.2`, exact clone/push URL and the
-connected account's push/admin permission. Current outgoing files are code,
-synthetic regression fixtures and documentation only; screenshots/cache are
-ignored. Prior user context explicitly authorizes pushing to this same repository.
-Remote status must be confirmed by an actual receipt; a local commit is not proof.
+S1–S6 pass with the recorded execution evidence. S7 passes its disclosure
+requirement; the actual teacher trial is NOT RUN. Retain the bounded handoff. Other assessment/term-grade/export authorization surfaces and official
+report issuance are not certified by this investigation. AI prepares; teacher
+reviews and approves.

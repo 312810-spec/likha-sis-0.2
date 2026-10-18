@@ -5,19 +5,18 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Bounded score-entry investigation — 2026-10-18
 
-The current user request selected one score-entry/correction journey; do not
-widen coverage until its unchanged Assurance contract is closed. Candidate
-implementation `ef2b935a651468f05e2444167ae73f7d2a2d2517` is local only.
-See `docs/assurance/score-entry-handoff-2026-10-18.md` and its evidence JSON.
-Frontend quality (1,569 tests), build, browser journey/accessibility, existing UI
-smoke and source-SQL fallback passed. Native authorization/atomicity regressions,
-SQLCipher, fmt/test/clippy and security tools remain NOT RUN locally. Readiness
-INCONCLUSIVE; teacher trial pending. User approved publication on 2026-10-18;
-draft PR #146 is open. First head 8b0aa8f has the exact local checkpoint tree.
-Ubuntu CI passed frontend/UI/recovery, then stopped on native test formatting;
-apply the actual formatter diff and rerun. Both dependency scanners fail on
-existing unmaintained zvariant/zbus_names crates; lockfiles unchanged. Preserve
-these blockers without expanding this journey into dependency maintenance.
+Approved draft PR #146 is published. Checked source `129ef31` and CI merge
+`1cec109` have the same tree. Frozen contract and current handoff/evidence:
+`docs/assurance/score-entry-handoff-2026-10-18.md`.
+Frontend quality (1,569 tests), build, browser/UI/recovery, source-SQL fallback,
+1,525 Ubuntu / 1,534 Windows native tests, Rustfmt, Clippy, provenance and native
+before/after comparisons passed. Windows installer artifact: 12131064945.
+The bounded contract is READY FOR REVIEW; merge readiness remains BLOCKED.
+Security gates fail on three existing unmaintained zvariant/zbus_names advisories;
+lockfiles unchanged, no new suppression. Keep draft; no merge/deployment.
+Teacher usability and installed-device acceptance remain pending. Do not widen
+this journey into dependency maintenance or unrelated M11 work. Resolve the
+recorded dependency-security blockers in a separate scope before merge.
 
 ## Active continuation
 
