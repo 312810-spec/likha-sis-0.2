@@ -138,3 +138,18 @@ to that public repository and a dependent draft PR targeting
 `forge/opener-dependency-maintenance-20261018`. Prior user publication authorization
 was present in supplied history, but automatic review did not accept it for this payload.
 Local Git commit and files are confirmed; remote persistence is not established.
+
+## Confirmed publication — supersedes the local publication block
+
+The user explicitly approved the pending publication on19 October2026 and requested
+continued automatic action. Platform approval controls remain in effect. Terminal Git
+credentials were unavailable, so the connected GitHub tool published the authorized
+payload. Remote implementation commit `e87b3c11db78dff72a6a1f38fc23bd1cf5b27bb7`
+has tree `872784025de745d96b4555806eaf0ec7784e2d01`, exactly matching the local reviewed
+checkpoint. Remote fetch/checkout succeeded; original local history is retained on
+`forge/scores-detail-local-checkpoint-20261019`.
+
+Draft PR149: https://github.com/312810-spec/likha-sis-0.2/pull/149, targeting
+`forge/opener-dependency-maintenance-20261018`. Publication is confirmed, not blocked.
+At this check Quality39150853445 and Security39150853292 are IN PROGRESS, not PASS.
+The prior native/teacher/device gates remain unresolved. No merge/deployment.

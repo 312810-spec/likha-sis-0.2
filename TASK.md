@@ -57,6 +57,14 @@ project development and publication under the existing scope without repeated pe
 questions. This is scoped user authorization, not a platform approval-policy override;
 required checks, consequential-action boundaries and truthful acceptance states still apply.
 
+## Confirmed publication
+
+Scores pilot is published as dependent draft PR149:
+https://github.com/312810-spec/likha-sis-0.2/pull/149. Implementation commit
+`e87b3c11db78dff72a6a1f38fc23bd1cf5b27bb7` has exactly the reviewed local tree.
+The user resolved the previous publication authorization block. Quality/Security were
+running at the last check; verify their results before acceptance. No merge/deployment.
+
 ## Active Scores pilot — 19 October 2026
 
 User executed Prompt Master revision2. Current dependent branch `forge/scores-detail-20261019`
