@@ -113,6 +113,44 @@ pub fn record(
     recorded_by_user_id: &str,
     correction_reason: Option<&str>,
 ) -> AppResult<Option<LearnerScore>> {
+    // A local-only correction must be atomic too. This named savepoint
+    // nests inside the command's score-plus-outbox savepoint when enrolled.
+    conn.execute_batch("SAVEPOINT record_learner_score_local")?;
+    let outcome = record_local(
+        conn,
+        school_id,
+        assessment_item_id,
+        learner_id,
+        status,
+        score,
+        recorded_by_user_id,
+        correction_reason,
+    );
+    match outcome {
+        Ok(recorded) => {
+            conn.execute_batch("RELEASE record_learner_score_local")?;
+            Ok(recorded)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO record_learner_score_local; RELEASE record_learner_score_local",
+            );
+            Err(error)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn record_local(
+    conn: &Connection,
+    school_id: &str,
+    assessment_item_id: &str,
+    learner_id: &str,
+    status: LearnerScoreStatus,
+    score: Option<f64>,
+    recorded_by_user_id: &str,
+    correction_reason: Option<&str>,
+) -> AppResult<Option<LearnerScore>> {
     let Some(item) = assessment_item::find_by_id_in_school(conn, school_id, assessment_item_id)?
     else {
         return Ok(None);

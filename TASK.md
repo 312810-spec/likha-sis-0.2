@@ -3,6 +3,19 @@
 Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
+## Bounded score-entry investigation — 2026-10-18
+
+The current user request selected one score-entry/correction journey; do not
+widen coverage until its unchanged Assurance contract is closed. Candidate
+implementation `ef2b935a651468f05e2444167ae73f7d2a2d2517` is local only.
+See `docs/assurance/score-entry-handoff-2026-10-18.md` and its evidence JSON.
+Frontend quality (1,569 tests), build, browser journey/accessibility, existing UI
+smoke and source-SQL fallback passed. Native authorization/atomicity regressions,
+SQLCipher, fmt/test/clippy and security tools remain NOT RUN locally. Readiness
+INCONCLUSIVE; teacher trial pending. Automatic review rejected publication twice,
+including after repository verification. Do not bypass or retry publication
+without explicit approval for this particular branch/draft PR.
+
 ## Active continuation
 
 PR144 required-subject applicability foundation is verified and merged as

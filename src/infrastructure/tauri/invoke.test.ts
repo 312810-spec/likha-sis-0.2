@@ -73,6 +73,9 @@ describe("invoke", () => {
     "create_section",
     "create_learner",
     "admin_reset_teacher_password",
+    "roster_for_assessment_item",
+    "record_learner_score",
+    "learner_score_correction_history",
   ])(
     "does not notify the listener for %s's own unauthorized rejection (a permission denial, not session expiry)",
     async (command) => {
