@@ -1,5 +1,15 @@
 # Scores detail execution — evidence and handoff
 
+## Current continuation result — supersedes the initial native block
+
+Native prerequisite repaired and fully CI-verified at e6f13fd /tree086de06e:
+1,526 Ubuntu /1,535 Windows native tests,1,581 frontend tests, Windows build and
+Security PASS. Detailed receipts/protocol: `sqlcipher-startup-handoff-2026-10-19.md`.
+Six additional zero/60-roster browser layout cases PASS, with explicit read-model limits.
+Full Scores pilot is now INCONCLUSIVE because required teacher/device/manual evidence
+is NOT RUN. Earlier BLOCKED statements below describe the first UI checkpoint.
+No merge/deployment or broader journey acceptance is inferred.
+
 ## Result and boundary
 
 Implemented the bounded Scores pilot on `forge/scores-detail-20261019`, based on

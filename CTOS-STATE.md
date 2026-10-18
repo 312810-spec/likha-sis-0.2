@@ -1,9 +1,18 @@
 # CTOS State
 
-Updated: 2026-10-18 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
+Updated: 2026-10-19 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V3-ADAPTER.md`.
 
-## Verified bounded follow-up — 2026-10-18
+## Current — Scores native prerequisite verified
+
+PR149 sourcee6f13fd passed full Quality39155819896 and Security39155819934:
+1,526 Ubuntu/1,535 Windows native tests plus1,581 frontend tests, build and UI/recovery.
+Current evidence: `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+The native failure is repaired; full pilot remains INCONCLUSIVE pending actual teacher,
+installed-device, exchange and manual accessibility evidence. No merge/deployment.
+This current checkpoint supersedes historical pending/blocked native claims below.
+
+## Earlier bounded follow-up — 2026-10-18
 
 The active score-entry stack is draft PR146 → PR147 → separate maintenance PR148.
 PR148 checked source `ceeab1d` and CI merge `9d97cb0` have identical tree
@@ -23,9 +32,11 @@ Prompt Master revision2 is executing on `forge/scores-detail-20261019`, dependen
 PR148 head237b7b5. Main ac4c3ad has not received these changes. See
 `docs/assurance/scores-detail-handoff-2026-10-19.md` for exact evidence and open gates.
 No M10–M17 completion, installed-device acceptance or release is inferred.
-Latest inherited PR148 Quality39137295517 FAILED Ubuntu database opening in two
-learner_management cases; previous green native receipts remain revision-bound.
-Current UI checks and missing teacher/device evidence are recorded separately.
+The inherited PR148 native startup failure is superseded by the verified repair at
+e6f13fd: Quality39155819896/Security39155819934 PASS,1,526 Ubuntu/1,535 Windows native
+and1,581 frontend tests plus UI/recovery/build gates. Actual checked source/tree and
+remaining teacher/device evidence: `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+Full Scores acceptance remains INCONCLUSIVE; no merge/deployment.
 
 ## Earlier source and verification
 

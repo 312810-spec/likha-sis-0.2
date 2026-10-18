@@ -1,9 +1,17 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-18 (Asia/Manila).
+Updated: 2026-10-19 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
-## Verified separate dependency maintenance — 2026-10-18
+## Current action
+
+The native Scores prerequisite is verified at sourcee6f13fd with complete Ubuntu/Windows
+and Security receipts. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+Remaining pilot acceptance requires the prepared teacher/disposable-device/manual checks;
+those observations are NOT RUN. No new runtime journey, merge or deployment is implied.
+Historical checkpoint instructions below do not reopen the repaired native/dependency work.
+
+## Earlier separate dependency maintenance — 2026-10-18
 
 Draft PR148, branch `forge/opener-dependency-maintenance-20261018`, depends on PR147.
 Read `docs/assurance/opener-maintenance-handoff-2026-10-18.md` and frozen O1–O6.
@@ -65,15 +73,22 @@ https://github.com/312810-spec/likha-sis-0.2/pull/149. Implementation commit
 The user resolved the previous publication authorization block. Quality/Security were
 running at the last check; verify their results before acceptance. No merge/deployment.
 
-## Current bounded native prerequisite
+## Verified native prerequisite and next acceptance
 
-PR149 head421cec8 passed Quality39150927681/Security39150927807; native/Windows
-steps were skipped. The inherited native failure was reproduced against pinned SQLCipher:
-racing rusqlite initialization can key before EXTRA_INIT finishes. App-owned db::open now
-has a one-time completion barrier; cold subprocess regression and dependency mechanism
-probe are added. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
-Local Rustfmt/probe48 PASS; app native compile blocked by missing system packages.
-Fresh full candidate CI remains required. Teacher/device acceptance and merge stay gated.
+Checked sourcee6f13fd /tree086de06e: Quality39155819896 and Security39155819934 PASS.
+1,526 Ubuntu /1,535 Windows native tests, new cold subprocess regression, previous
+learner-isolation failures, Rustfmt/Clippy, source provenance, private D-Bus and score
+negative controls PASS.1,581 frontend tests/UI/recovery50 PASS. Windows build/test
+installer artifact12147627096 is available for disposable-device testing only.
+Current receipts/next protocol: `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+The SQLCipher initialization race is repaired with no key/schema/score changes.
+Additional zero/60-roster layout/focus checks PASS; native roster/throughput not inferred.
+
+Native repair is technically READY FOR REVIEW. Full Scores acceptance INCONCLUSIVE:
+teacher observation, installed Windows GUI/upgrade, actual Android, real two-device
+exchange and manual AT/OS zoom remain NOT RUN. No merge/deployment. Do not widen
+runtime scope; use the prepared protocol and exact test artifact for these gates.
+Evidence/probe-only checkpoint leaves tested application/native/workflow source unchanged.
 
 ## Active Scores pilot — 19 October 2026
 
@@ -82,7 +97,7 @@ starts from PR148 head237b7b5 → PR147 → PR146; main remains ac4c3ad. Detaile
 control/token/effects specification and handoff: `docs/assurance/scores-detail-handoff-2026-10-19.md`.
 This explicitly selected Scores journey precedes the unrelated M11 continuation below.
 Do not mass-merge the old stack or claim deployment. Required teacher/device evidence and
-current native gate remain unresolved; finish this pilot before activating another journey.
+remaining acceptance gates stay unresolved; finish this pilot before activating another journey.
 
 ## Previous continuation (parked during Scores pilot)
 

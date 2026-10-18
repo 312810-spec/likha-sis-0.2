@@ -1054,5 +1054,5 @@
   ],
   "rustfmt": "PASS, stable1.99.1, edition2021",
   "local_native_test": "INCONCLUSIVE: compile attempted; missing pkg-config/GTK; no executed app-test result",
-  "full_native_ci": "PENDING"
+  "full_native_ci": "PASS at e6f13fd48fb682d4f0d2bf704a4027a1d4a5eda9; exact receipts in sqlcipher-startup-ci-2026-10-19.json"
 }
