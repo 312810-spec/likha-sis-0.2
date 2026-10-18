@@ -65,6 +65,16 @@ https://github.com/312810-spec/likha-sis-0.2/pull/149. Implementation commit
 The user resolved the previous publication authorization block. Quality/Security were
 running at the last check; verify their results before acceptance. No merge/deployment.
 
+## Current bounded native prerequisite
+
+PR149 head421cec8 passed Quality39150927681/Security39150927807; native/Windows
+steps were skipped. The inherited native failure was reproduced against pinned SQLCipher:
+racing rusqlite initialization can key before EXTRA_INIT finishes. App-owned db::open now
+has a one-time completion barrier; cold subprocess regression and dependency mechanism
+probe are added. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+Local Rustfmt/probe48 PASS; app native compile blocked by missing system packages.
+Fresh full candidate CI remains required. Teacher/device acceptance and merge stay gated.
+
 ## Active Scores pilot — 19 October 2026
 
 User executed Prompt Master revision2. Current dependent branch `forge/scores-detail-20261019`

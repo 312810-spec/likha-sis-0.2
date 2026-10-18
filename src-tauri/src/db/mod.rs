@@ -1,6 +1,7 @@
 mod migrations;
 
 use std::path::Path;
+use std::sync::OnceLock;
 
 use rusqlite::Connection;
 use tauri::AppHandle;
@@ -25,6 +26,7 @@ pub const SSPK_KEY_FILE_NAME: &str = "likha-sis-sspk.key";
 /// migration. Pure function of a filesystem path and key — no Tauri
 /// dependency — so it can be exercised directly in tests.
 pub fn open(path: &Path, key: &[u8; KEY_LEN]) -> AppResult<Connection> {
+    initialize_cipher_runtime()?;
     let mut conn = Connection::open(path)?;
 
     // Must be the very first statement on the connection: SQLCipher only
@@ -65,6 +67,30 @@ pub fn open(path: &Path, key: &[u8; KEY_LEN]) -> AppResult<Connection> {
     migrations::migrations().to_latest(&mut conn)?;
 
     Ok(conn)
+}
+
+// SQLite marks its core initialized before invoking SQLCipher's EXTRA_INIT.
+// Concurrent rusqlite threading checks can otherwise return from that core
+// initialization and issue PRAGMA key before the cipher provider is ready.
+// OnceLock publishes only the completed result, not SQLite's earlier flag.
+// This guards app-owned connection creation; no global shutdown/reconfiguration
+// is allowed here, and an initialization error never becomes a plaintext open.
+fn initialize_cipher_runtime() -> AppResult<()> {
+    static INITIALIZED: OnceLock<i32> = OnceLock::new();
+    let code = *INITIALIZED.get_or_init(|| {
+        // SAFETY: the linked library is the pinned threadsafe SQLCipher build.
+        // SQLite permits explicit initialization before any connection. The
+        // barrier waits for its extra initializer too; no connection escapes it.
+        unsafe { rusqlite::ffi::sqlite3_initialize() }
+    });
+    if code != rusqlite::ffi::SQLITE_OK {
+        return Err(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(code),
+            Some("Database encryption runtime initialization failed.".to_owned()),
+        )
+        .into());
+    }
+    Ok(())
 }
 
 pub(crate) fn base_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {

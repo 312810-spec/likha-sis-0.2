@@ -158,6 +158,10 @@ jobs:
         if: needs.classify.outputs.native == 'true'
         run: python3 scripts/vendor-opener-compat.py --verify
 
+      - name: Verify cold SQLCipher initialization mechanism
+        if: needs.classify.outputs.native == 'true'
+        run: python3 scripts/assurance/sqlcipher-startup-probe.py
+
       - name: Run native Rust quality gate
         if: needs.classify.outputs.native == 'true'
         run: cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings
