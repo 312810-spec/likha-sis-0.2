@@ -157,6 +157,10 @@ jobs:
         if: needs.classify.outputs.native == 'true'
         run: cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings
 
+      - name: Verify bounded score native baseline negative controls
+        if: needs.classify.outputs.native == 'true'
+        run: python3 scripts/assurance/score-native-negative-controls.py
+
   quality-windows:
     name: Quality (Windows)
     needs: classify

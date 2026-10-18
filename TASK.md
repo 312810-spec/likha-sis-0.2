@@ -3,6 +3,21 @@
 Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
+## Bounded score-entry investigation — 2026-10-18
+
+Approved draft PR #146 is published. Checked source `129ef31` and CI merge
+`1cec109` have the same tree. Frozen contract and current handoff/evidence:
+`docs/assurance/score-entry-handoff-2026-10-18.md`.
+Frontend quality (1,569 tests), build, browser/UI/recovery, source-SQL fallback,
+1,525 Ubuntu / 1,534 Windows native tests, Rustfmt, Clippy, provenance and native
+before/after comparisons passed. Windows installer artifact: 12131064945.
+The bounded contract is READY FOR REVIEW; merge readiness remains BLOCKED.
+Security gates fail on three existing unmaintained zvariant/zbus_names advisories;
+lockfiles unchanged, no new suppression. Keep draft; no merge/deployment.
+Teacher usability and installed-device acceptance remain pending. Do not widen
+this journey into dependency maintenance or unrelated M11 work. Resolve the
+recorded dependency-security blockers in a separate scope before merge.
+
 ## Active continuation
 
 PR144 required-subject applicability foundation is verified and merged as

@@ -29,7 +29,8 @@ pub fn roster_for_assessment_item(
     assessment_item_id: String,
 ) -> AppResult<Option<Vec<LearnerScoreRosterEntry>>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    require_score_item_access(&conn, &school_id, &user_id, &assessment_item_id)?;
     learner_score::roster_for_item(&conn, &school_id, &assessment_item_id)
 }
 
@@ -131,6 +132,26 @@ fn resolve_sspk_if_enrolled(
     }
 }
 
+/// Reuse the existing trusted assessment-item authority: current assignment
+/// ownership (or the established school-head role), never UI navigation state.
+fn require_score_item_access(
+    conn: &Connection,
+    school_id: &str,
+    user_id: &str,
+    assessment_item_id: &str,
+) -> AppResult<()> {
+    if !crate::auth::data_scope::can_resolve_entity(
+        conn,
+        user_id,
+        school_id,
+        EntityKind::AssessmentItem,
+        assessment_item_id,
+    )? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(())
+}
+
 /// Shared logic exercised directly by this module's own tests -- same
 /// reason as `commands::attendance::record_attendance_with_optional_sync`.
 /// `sspk` is `None` when this school has never enrolled a device: behaves
@@ -149,6 +170,7 @@ fn record_learner_score_with_optional_sync(
     correction_reason: Option<&str>,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<Option<LearnerScore>> {
+    require_score_item_access(conn, school_id, recorded_by_user_id, assessment_item_id)?;
     let Some(sspk) = sspk else {
         return learner_score::record(
             conn,
@@ -275,7 +297,8 @@ pub fn learner_score_correction_history(
     learner_id: String,
 ) -> AppResult<Vec<LearnerScoreCorrection>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    require_score_item_access(&conn, &school_id, &user_id, &assessment_item_id)?;
     learner_score::correction_history(&conn, &school_id, &assessment_item_id, &learner_id)
 }
 
@@ -332,7 +355,115 @@ mod tests {
         let l = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
         section_membership::enroll(&conn, &s.id, &sec.id, &l.id, "2026-06-08").unwrap();
         let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        crate::repository::teaching_assignment::create(&conn, &s.id, &teacher.id, &sec.id, &sub.id)
+            .unwrap()
+            .unwrap();
         (conn, s.id, item.id, l.id, teacher.id)
+    }
+
+    #[test]
+    fn command_rejects_unassigned_same_school_teacher_without_writing() {
+        let (conn, school, item, learner, _) = setup();
+        let outsider =
+            user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &school).unwrap();
+        for sspk in [None, Some(test_sspk())] {
+            let result = record_learner_score_with_optional_sync(
+                &conn,
+                &school,
+                &outsider.id,
+                &item,
+                &learner,
+                LearnerScoreStatus::Scored,
+                Some(18.0),
+                None,
+                sspk.as_ref(),
+            );
+            assert!(matches!(result, Err(AppError::Unauthorized)));
+        }
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM learner_scores", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        assert!(sync_outbox::pending_for_school(&conn, &school, 10)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn command_local_correction_failure_rolls_back_history() {
+        let (conn, school, item, learner, teacher) = setup();
+        record_learner_score_with_optional_sync(
+            &conn,
+            &school,
+            &teacher,
+            &item,
+            &learner,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            None,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        conn.execute_batch("CREATE TEMP TRIGGER reject_score_update BEFORE UPDATE ON learner_scores BEGIN SELECT RAISE(ABORT, 'synthetic interrupted update'); END;").unwrap();
+        let result = record_learner_score_with_optional_sync(
+            &conn,
+            &school,
+            &teacher,
+            &item,
+            &learner,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            Some("Synthetic correction"),
+            None,
+        );
+        assert!(result.is_err());
+        assert!(
+            learner_score::correction_history(&conn, &school, &item, &learner)
+                .unwrap()
+                .is_empty()
+        );
+        let roster = learner_score::roster_for_item(&conn, &school, &item)
+            .unwrap()
+            .unwrap();
+        assert_eq!(roster[0].score, Some(18.0));
+    }
+
+    #[test]
+    fn score_item_access_is_revoked_after_assignment_replacement() {
+        let (conn, school, item, learner, teacher) = setup();
+        let replacement =
+            user::create_user(&conn, "replacement", "password", "Replacement Teacher").unwrap();
+        user::add_school_membership(&conn, &replacement.id, &school).unwrap();
+        assert!(require_score_item_access(&conn, &school, &teacher, &item).is_ok());
+        conn.execute(
+            "UPDATE teaching_assignments SET teacher_user_id = ?1 WHERE school_id = ?2",
+            (&replacement.id, &school),
+        )
+        .unwrap();
+        assert!(matches!(
+            require_score_item_access(&conn, &school, &teacher, &item),
+            Err(AppError::Unauthorized)
+        ));
+        assert!(require_score_item_access(&conn, &school, &replacement.id, &item).is_ok());
+        let result = record_learner_score_with_optional_sync(
+            &conn,
+            &school,
+            &teacher,
+            &item,
+            &learner,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            None,
+            None,
+        );
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM learner_scores", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]

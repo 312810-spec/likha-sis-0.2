@@ -1742,6 +1742,40 @@ describe("assignment-owned score sync evidence", () => {
   });
 });
 
+describe("score save acknowledgment continuity", () => {
+  it("preserves a newer score draft and focus when an older save finishes", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      { ...ROSTER_ENTRY, learnerId: "l2", givenName: "Bo", familyName: "Reyes" },
+    ]);
+    let resolveSave!: (value: LearnerScore | null) => void;
+    vi.spyOn(repo, "record").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    renderScreen({ scoreRepo: repo });
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Written Works — Quiz 1 (max 20)",
+      }),
+    );
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    await user.type(input, "18{Enter}");
+    await user.clear(input);
+    await user.type(input, "19");
+    await act(async () => {
+      resolveSave(repo.recordResult);
+    });
+    expect(input).toHaveValue(19);
+    expect(input).toHaveFocus();
+    expect(screen.queryByText(/Saved on this device/)).not.toBeInTheDocument();
+    expect(repo.record).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("score draft continuity", () => {
   it("restores score text and selected item on remount without replaying a write", async () => {
     clearSessionDrafts();

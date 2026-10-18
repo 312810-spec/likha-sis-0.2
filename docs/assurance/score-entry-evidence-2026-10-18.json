@@ -1,0 +1,232 @@
+{
+  "baseline": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+  "tested_candidate": "129ef31d84992235e48c9f9d8ca70c950d683585",
+  "readiness": "BLOCKED for merge/release by dependency-security gates; bounded journey READY FOR REVIEW",
+  "source_sha256": {
+    "src/ui/ClassRecordWorkspace.tsx": "884534b4b368f4a3996432c74033cc1e4b96cebdd1c438780218f7d40bf3d6d5",
+    "src/ui/ClassRecordWorkspace.test.tsx": "e7efc6aebf9fe53785a9db3676b6024bbe473d0f8197654374126b0fd2896ef9",
+    "src-tauri/src/commands/learner_score.rs": "3cfd87f184b878060ec57ce1dce99fd3bc54c75c892a7d0ecc5d45f17a9d288c",
+    "src-tauri/src/repository/learner_score.rs": "a6359ed086f5f9928b5a15cbc7359429bee61ecae9184cd6e6a1e88f6ef2317f",
+    "src/infrastructure/tauri/invoke.ts": "216dc7088586225e5ad5b5be5d7b6dae5a30cd185a8f36f5ae729d500172d039",
+    "src/infrastructure/tauri/invoke.test.ts": "a71af294bf5b1d0930e3141b6aa46e71ce00b57972efc21ecc8295406ad8255b",
+    "scripts/assurance/score-journey-browser.mjs": "4a138d571a3e47008472e0a1f80a32b476e79c9ed9a19ff1903caee63c7afc6f",
+    "scripts/assurance/score-storage-probe.py": "50e81d395137229a01607236be2051d7807ff6d645829143cdd154a45916ab8f",
+    ".github/workflows/quality.yml": "410c339a3444c802cf270d2ed36cc2c8738119f8b32dfff3107deb54cb4715ee",
+    "scripts/assurance/score-native-negative-controls.py": "cb2c6bcea1a90569f678c509454268932fa4a7376e4b1f33e88aafee44b0b818"
+  },
+  "baseline_ui_regression": {
+    "result": "FAIL (expected negative control)",
+    "observation": "expected field 19, received 18 after deferred acknowledgment"
+  },
+  "candidate_frontend_quality": {
+    "result": "PASS",
+    "test_files": 158,
+    "tests": 1569,
+    "checks": [
+      "typecheck",
+      "eslint",
+      "prettier",
+      "architecture",
+      "dead-code",
+      "batch-runner",
+      "vitest"
+    ]
+  },
+  "candidate_build": {
+    "result": "PASS",
+    "advisory": "JS bundle 676.38 kB, gzip 175.53 kB; exceeds 500 kB advisory"
+  },
+  "browser": {
+    "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
+    "checks": [
+      {
+        "check": "older acknowledgment preserves newer draft and focus",
+        "displayed": 19,
+        "fixturePersisted": 18,
+        "calls": 1
+      },
+      {
+        "check": "explicit correction saves exact score and lineage",
+        "result": "PASS"
+      },
+      {
+        "check": "rejected write retains draft and has no saved claim",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit keyboard retry saves retained value",
+        "result": "PASS"
+      },
+      {
+        "check": "render and accessibility light/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility light/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility dark/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility dark/390",
+        "overflow": false,
+        "violations": []
+      }
+    ]
+  },
+  "storage_baseline": {
+    "revision": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+    "evidence": "SQLite source-SQL fallback, NOT Rust/SQLCipher execution",
+    "literal_migrations_executed": 57,
+    "failed_correction_history_rows": 1,
+    "atomic_policy_present": false,
+    "assignment_sql_owner_outsider_reassignment": "PASS",
+    "normal_correction_identity_and_values": "PASS",
+    "history_rollback": "FAIL"
+  },
+  "storage_candidate": {
+    "revision": "working-tree",
+    "evidence": "SQLite source-SQL fallback, NOT Rust/SQLCipher execution",
+    "literal_migrations_executed": 57,
+    "failed_correction_history_rows": 0,
+    "atomic_policy_present": true,
+    "assignment_sql_owner_outsider_reassignment": "PASS",
+    "normal_correction_identity_and_values": "PASS",
+    "history_rollback": "PASS"
+  },
+  "existing_ui_smoke": {
+    "result": "PASS",
+    "output": "\u2014 assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances \u00d7 three densities \u00d7 four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings."
+  },
+  "native": {
+    "ubuntu": {
+      "result": "PASS",
+      "tests": 1525,
+      "rustfmt": "PASS",
+      "clippy": "PASS",
+      "source_provenance": "PASS",
+      "new_command_regressions": "3 PASS"
+    },
+    "windows": {
+      "build": "PASS",
+      "tests": 1534,
+      "new_command_regressions": "3 PASS",
+      "installer_artifact_id": 12131064945
+    }
+  },
+  "security": {
+    "status": "FAIL",
+    "gitleaks": "PASS",
+    "cargo-deny": "FAIL",
+    "osv-scanner": "FAIL",
+    "advisories": ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"],
+    "classification": "unmaintained",
+    "lockfiles_changed": false,
+    "baseline_scanners_executed": false,
+    "suppressions_added": false
+  },
+  "teacher_trial": {
+    "status": "NOT RUN",
+    "usability_validation": "pending"
+  },
+  "publication": {
+    "status": "PUBLISHED",
+    "pr": 146,
+    "url": "https://github.com/312810-spec/likha-sis-0.2/pull/146",
+    "user_approval": "Explicit approval on 2026-10-18",
+    "no_merge_or_deployment": true
+  },
+  "earlier_local_candidate": "ef2b935a651468f05e2444167ae73f7d2a2d2517",
+  "tested_merge": "1cec109a7a5fba7749259eba7d28cb2e9c01cab8",
+  "tested_tree": "014f02b5cf1bde516b8dea7ba52b642e3317d3a2",
+  "earlier_publication_attempts": {
+    "status": "REJECTED",
+    "review_reason": "repository ownership and push permission do not establish user authorization to publish this previously local work",
+    "no_push_merge_or_deployment_claimed": true
+  },
+  "native_baseline_comparisons": {
+    "baseline": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+    "evidence": "Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture",
+    "source_restored": true,
+    "results": [
+      {
+        "case": "command_rejects_unassigned_same_school_teacher_without_writing",
+        "baseline_failed_as_expected": true
+      },
+      {
+        "case": "command_local_correction_failure_rolls_back_history",
+        "baseline_failed_as_expected": true
+      }
+    ]
+  },
+  "ci_receipts": {
+    "checked_source": "129ef31d84992235e48c9f9d8ca70c950d683585",
+    "checked_merge": "1cec109a7a5fba7749259eba7d28cb2e9c01cab8",
+    "pr_url": "https://github.com/312810-spec/likha-sis-0.2/pull/146",
+    "quality_run": 39113853343,
+    "ubuntu_job": 117635552350,
+    "windows_job": 117635552432,
+    "ubuntu_native_passed": 1525,
+    "native_negative_controls": {
+      "baseline": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+      "evidence": "Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture",
+      "source_restored": true,
+      "results": [
+        {
+          "case": "command_rejects_unassigned_same_school_teacher_without_writing",
+          "baseline_failed_as_expected": true
+        },
+        {
+          "case": "command_local_correction_failure_rolls_back_history",
+          "baseline_failed_as_expected": true
+        }
+      ]
+    },
+    "security_run": 39113853340,
+    "security_jobs": [
+      {
+        "id": 117635465165,
+        "name": "Security / gitleaks",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 117635465401,
+        "name": "Security / cargo-deny",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 117635465447,
+        "name": "Security / osv-scanner",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    ],
+    "security_advisories": ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"],
+    "lockfiles_changed": false,
+    "windows_status": "PASS",
+    "windows_native_passed": 1534,
+    "quality_status": "SUCCESS",
+    "checked_tree": "014f02b5cf1bde516b8dea7ba52b642e3317d3a2"
+  },
+  "source_restore_on_missing_cargo": "PASS",
+  "contract_results": {
+    "S1": "PASS",
+    "S2": "PASS",
+    "S3": "PASS",
+    "S4": "PASS",
+    "S5": "PASS",
+    "S6": "PASS",
+    "S7": {
+      "disclosure_requirement": "PASS",
+      "teacher_trial": "NOT RUN",
+      "usability_validation": "pending"
+    }
+  }
+}

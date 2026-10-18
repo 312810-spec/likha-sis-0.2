@@ -177,6 +177,9 @@ export function ClassRecordWorkspace({
   // may not have re-rendered yet. An imperative ref-based guard closes
   // that window regardless of render timing.
   const committingRef = useRef<Set<string>>(new Set());
+  // An acknowledgment confirms the submitted value, not any input typed
+  // while it was pending. Track edits independently of write generations.
+  const scoreDraftRevisionRef = useRef<Map<string, number>>(new Map());
   // Per-learner write "generation": incremented every time a new write
   // starts for that learner, whether via the score input's commit path
   // or the Excused/N/A exception buttons -- these are two separate call
@@ -560,6 +563,7 @@ export function ClassRecordWorkspace({
 
     setRowErrors((current) => ({ ...current, [learnerId]: "" }));
     const rosterRequest = rosterRequestRef.current;
+    const draftRevision = scoreDraftRevisionRef.current.get(learnerId) ?? 0;
     const generation = (writeGenerationRef.current.get(learnerId) ?? 0) + 1;
     writeGenerationRef.current.set(learnerId, generation);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
@@ -606,13 +610,16 @@ export function ClassRecordWorkspace({
             : item,
         ),
       );
+      const hasNewerDraft = (scoreDraftRevisionRef.current.get(learnerId) ?? 0) !== draftRevision;
       setScoreDrafts((current) => {
+        if ((scoreDraftRevisionRef.current.get(learnerId) ?? 0) !== draftRevision) return current;
         const next = { ...current };
         delete next[learnerId];
         return next;
       });
       maybeRefreshTermGrade(learnerId);
-      return true;
+      // Preserve focus too: moving it would blur/commit the newer draft.
+      return !hasNewerDraft;
     } catch (err) {
       if (
         writeGenerationRef.current.get(learnerId) !== generation ||
@@ -1293,12 +1300,16 @@ export function ClassRecordWorkspace({
                                         : "—"
                                   }
                                   value={draftScoreFor(entry.learnerId, entry.score)}
-                                  onChange={(event) =>
+                                  onChange={(event) => {
+                                    scoreDraftRevisionRef.current.set(
+                                      entry.learnerId,
+                                      (scoreDraftRevisionRef.current.get(entry.learnerId) ?? 0) + 1,
+                                    );
                                     setScoreDrafts((current) => ({
                                       ...current,
                                       [entry.learnerId]: event.target.value,
-                                    }))
-                                  }
+                                    }));
+                                  }}
                                   onKeyDown={(event) => {
                                     if (event.key === "Enter" || event.key === "ArrowDown") {
                                       event.preventDefault();
