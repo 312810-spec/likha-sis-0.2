@@ -132,6 +132,7 @@ jobs:
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             build-essential \
+            dbus \
             curl \
             wget \
             file \
@@ -153,9 +154,19 @@ jobs:
         if: needs.classify.outputs.native == 'true'
         run: python3 scripts/vendor-spreadsheet-compat.py --verify
 
+      - name: Verify opener compatibility source provenance
+        if: needs.classify.outputs.native == 'true'
+        run: python3 scripts/vendor-opener-compat.py --verify
+
       - name: Run native Rust quality gate
         if: needs.classify.outputs.native == 'true'
         run: cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings
+
+      - name: Exercise opener compatibility on a private synthetic D-Bus
+        if: needs.classify.outputs.native == 'true'
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+        run: python3 scripts/assurance/opener-dbus-probe.py
 
       - name: Verify bounded score native baseline negative controls
         if: needs.classify.outputs.native == 'true'
@@ -190,6 +201,9 @@ jobs:
 
       - name: Verify spreadsheet compatibility source provenance
         run: python scripts/vendor-spreadsheet-compat.py --verify
+
+      - name: Verify opener compatibility source provenance
+        run: python scripts/vendor-opener-compat.py --verify
 
       - name: Build the Windows-native Tauri application
         run: npm run tauri build -- --debug

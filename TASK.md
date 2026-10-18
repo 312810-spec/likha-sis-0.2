@@ -3,6 +3,16 @@
 Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
+## Active separate dependency maintenance — 2026-10-18
+
+Branch `forge/opener-dependency-maintenance-20261018`, based on PR147 head `88e0686`.
+Read `docs/assurance/opener-maintenance-handoff-2026-10-18.md`; frozen O1–O6 contract.
+Investigates/resolves the recorded three-advisory merge blocker separately. Official-source
+opener2.7.2 / zbus6 snapshot and Cargo-generated lock prepared; no new scanner exclusions.
+Provenance regeneration/tamper controls PASS. Private D-Bus probe/frontend checks in progress;
+security/native/Windows CI pending. Keep drafts, no merge/deploy until checked. Teacher/device
+acceptance remains pending and separate. Do not resume unrelated M11/Android work here.
+
 ## Active bounded score decision design — 2026-10-18
 
 Branch `forge/score-decision-design-20261018`, based on PR146 head `10cfe8c`.
