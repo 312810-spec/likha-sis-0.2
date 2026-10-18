@@ -1257,7 +1257,7 @@ describe("ClassRecordWorkspace", () => {
     expect(screen.queryByText("Ana Cruz")).not.toBeInTheDocument();
   });
 
-  it("never lets an older score-write response overwrite a newer exception-write for the same learner", async () => {
+  it("prevents a concurrent exception write while allowing another learner to save", async () => {
     const user = userEvent.setup();
 
     class OrderControlledLearnerScoreRepository implements LearnerScoreRepository {
@@ -1339,58 +1339,26 @@ describe("ClassRecordWorkspace", () => {
 
     const anaGroup = screen.getByRole("group", { name: "Exception status for Ana Cruz" });
 
-    // Start Ana's write (call 0: scored 18).
+    // Same learner is guarded; a different learner remains independently editable.
     await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Enter}");
-    // Start Bo's write (call 1: scored 15) -- this must not leave Ana's row
-    // stuck disabled once Bo's write is the one in flight, and must not
-    // block a later write for Ana from starting.
     await user.type(screen.getByLabelText("Score for Bo Reyes"), "15{Enter}");
-    // A second, newer write for Ana (call 2: Excused) starts before call 0
-    // resolves.
-    await user.click(within(anaGroup).getByRole("button", { name: "Excused" }));
-
-    expect(repo.calls).toEqual([
-      {
-        assessmentItemId: "ai-1",
-        learnerId: "l1",
-        status: "scored",
-        score: 18,
-        correctionReason: null,
-      },
-      {
-        assessmentItemId: "ai-1",
-        learnerId: "l2",
-        status: "scored",
-        score: 15,
-        correctionReason: null,
-      },
-      {
-        assessmentItemId: "ai-1",
-        learnerId: "l1",
-        status: "excused",
-        score: null,
-        correctionReason: null,
-      },
+    const exception = within(anaGroup).getByRole("button", { name: "Excused" });
+    expect(exception).toBeDisabled();
+    await user.click(exception);
+    expect(repo.calls.map((call) => [call.learnerId, call.status, call.score])).toEqual([
+      ["l1", "scored", 18],
+      ["l2", "scored", 15],
     ]);
-
-    // Resolve out of order: the newer write (call 2, Excused) resolves first...
-    repo.resolveCall(2);
-    await waitFor(() =>
-      expect(within(anaGroup).getByRole("button", { name: "Excused" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      ),
-    );
-    // ...then the older write (call 0, scored 18) arrives late.
-    repo.resolveCall(0);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Ana's displayed state must still reflect the newer write (Excused),
-    // never reverted by the stale, older response.
-    expect(within(anaGroup).getByRole("button", { name: "Excused" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await act(async () => repo.resolveCall(1));
+    expect(exception).toBeDisabled();
+    await act(async () => repo.resolveCall(0));
+    expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(18);
+    expect(exception).not.toBeDisabled();
+    await user.click(exception);
+    expect(await screen.findByLabelText(/Reason for changing Ana/)).toBeVisible();
+    expect(screen.getByText("Recorded: 18 / 20")).toBeVisible();
+    expect(screen.getByText("Change to: Excused")).toBeVisible();
+    expect(repo.calls).toHaveLength(2);
   });
 
   it("does not perform a write when the teacher selects the already-active exception status", async () => {
@@ -1634,12 +1602,12 @@ describe("assignment-owned score sync evidence", () => {
     });
     expect(getStatus).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Last sync check: Synced")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await user.click(screen.getByRole("button", { name: "Refresh transfer status" }));
     await screen.findByText("Last sync check: Waiting to sync");
     expect(getStatus).toHaveBeenCalledTimes(2);
     getStatus.mockResolvedValue("synced");
     expect(screen.queryByText("Last sync check: Synced")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await user.click(screen.getByRole("button", { name: "Refresh transfer status" }));
     await screen.findByText("Last sync check: Synced");
     expect(getStatus).toHaveBeenLastCalledWith("ta-1", "ai-1", "l1");
     expect(scoreRepo.recordCalls).toHaveLength(1);
@@ -1663,10 +1631,10 @@ describe("assignment-owned score sync evidence", () => {
     });
     await openItem(user);
     await screen.findByText("Last sync check: Waiting to sync");
-    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await user.click(screen.getByRole("button", { name: "Refresh transfer status" }));
     await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(2));
     expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await user.click(screen.getByRole("button", { name: "Refresh transfer status" }));
     await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(3));
     await act(async () => resolve("synced"));
     expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
@@ -1699,7 +1667,7 @@ describe("assignment-owned score sync evidence", () => {
     });
     await openItem(user);
     await screen.findByText("Last sync check: Synced");
-    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await user.click(screen.getByRole("button", { name: "Refresh transfer status" }));
     await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(2));
     expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
     expect(screen.getByText(/Saved on this device/)).toBeInTheDocument();
@@ -1854,6 +1822,51 @@ describe("score decision design", () => {
     await user.tab();
     expect(input).not.toHaveFocus();
     expect(repo.recordCalls).toHaveLength(0);
+  });
+
+  it("does not submit an IME composition Enter in the correction reason", async () => {
+    const { user, repo, input } = await openSavedScore();
+    await user.clear(input);
+    await user.type(input, "19{Enter}");
+    const reason = await screen.findByLabelText(/Reason for changing Ana/);
+    fireEvent.change(reason, { target: { value: "Rechecked work" } });
+    fireEvent.keyDown(reason, { key: "Enter", isComposing: true });
+    expect(repo.recordCalls).toHaveLength(0);
+    expect(reason).toBeInTheDocument();
+    fireEvent.keyDown(reason, { key: "Enter", isComposing: false });
+    await waitFor(() => expect(repo.recordCalls).toHaveLength(1));
+  });
+
+  it("lets native Tab reach an interior learner's row actions after restoring the input", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      { ...ROSTER_ENTRY, learnerId: "l2", givenName: "Bo", familyName: "Reyes" },
+    ]);
+    renderScreen({ scoreRepo: repo });
+    await user.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    await user.click(input);
+    await user.type(input, "13{Escape}");
+    await user.tab();
+    expect(
+      within(screen.getByRole("group", { name: "Exception status for Ana Cruz" })).getByRole(
+        "button",
+        { name: "Excused" },
+      ),
+    ).toHaveFocus();
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+
+  it("discloses pending edits while completeness uses saved records", async () => {
+    const { user, input } = await openSavedScore();
+    expect(screen.getByText(/Based on saved records on this device/)).toBeVisible();
+    expect(screen.queryByText(/This item has pending edits/)).not.toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, "19");
+    expect(screen.getByText(/This item has pending edits/)).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText(/This item has pending edits/)).not.toBeInTheDocument();
   });
 
   it("guards an explicit correction while its acknowledgment is pending", async () => {

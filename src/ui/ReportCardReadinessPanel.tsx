@@ -10,6 +10,7 @@ interface Props {
   classRecordId: string;
   revision: unknown;
   disabled: boolean;
+  pendingEdits?: boolean;
 }
 interface Result {
   service: ExportApplicationService;
@@ -20,7 +21,13 @@ interface Result {
 }
 
 /** On-demand full-period read model. Never exports, reviews, approves or issues. */
-export function ReportCardReadinessPanel({ service, classRecordId, revision, disabled }: Props) {
+export function ReportCardReadinessPanel({
+  service,
+  classRecordId,
+  revision,
+  disabled,
+  pendingEdits = false,
+}: Props) {
   const { mode } = useTeacherMode();
   const [result, setResult] = useState<Result | null>(null);
   const request = useRef(0);
@@ -72,6 +79,15 @@ export function ReportCardReadinessPanel({ service, classRecordId, revision, dis
         Read-only check for the full grading-period roster. It does not export a file, approve
         grades or issue an official form. Refresh after external roster or record changes.
       </p>
+      <p className="field-hint">
+        Based on saved records on this device. Unsaved input is excluded.
+      </p>
+      {pendingEdits && (
+        <p className="score-draft-note" role="status">
+          This item has pending edits. Save or cancel them, then run the check again to review the
+          saved result.
+        </p>
+      )}
       {mode === "guided" && (
         <p className="field-hint">
           This may include learners who left during the period. A complete computed grade is not

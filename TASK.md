@@ -49,7 +49,24 @@ Teacher usability and installed-device acceptance remain pending. Do not widen
 this journey into dependency maintenance or unrelated M11 work. Resolve the
 recorded dependency-security blockers in a separate scope before merge.
 
-## Active continuation
+## Authorization carryover — 19 October 2026
+
+User explicitly approved the pending Scores branch push and dependent draft PR after
+reviewing the publication block, and requested continued automatic action. Continue routine
+project development and publication under the existing scope without repeated permission
+questions. This is scoped user authorization, not a platform approval-policy override;
+required checks, consequential-action boundaries and truthful acceptance states still apply.
+
+## Active Scores pilot — 19 October 2026
+
+User executed Prompt Master revision2. Current dependent branch `forge/scores-detail-20261019`
+starts from PR148 head237b7b5 → PR147 → PR146; main remains ac4c3ad. Detailed contract,
+control/token/effects specification and handoff: `docs/assurance/scores-detail-handoff-2026-10-19.md`.
+This explicitly selected Scores journey precedes the unrelated M11 continuation below.
+Do not mass-merge the old stack or claim deployment. Required teacher/device evidence and
+current native gate remain unresolved; finish this pilot before activating another journey.
+
+## Previous continuation (parked during Scores pilot)
 
 PR144 required-subject applicability foundation is verified and merged as
 `1e6d2275499c8f7b4236126c557f6232670319b5`. Tested head `1fb7346`:

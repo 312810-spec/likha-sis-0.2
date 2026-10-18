@@ -17,7 +17,17 @@ continuing. Teacher/device trials and broader M10–M17 acceptance remain pendin
 these checks do not certify installed Windows, Android or real two-device exchange.
 Old branch receipts retain their original revisions until actual integration.
 
-## Current source and verification
+## Active bounded Scores redesign — 19 October 2026
+
+Prompt Master revision2 is executing on `forge/scores-detail-20261019`, dependent on
+PR148 head237b7b5. Main ac4c3ad has not received these changes. See
+`docs/assurance/scores-detail-handoff-2026-10-19.md` for exact evidence and open gates.
+No M10–M17 completion, installed-device acceptance or release is inferred.
+Latest inherited PR148 Quality39137295517 FAILED Ubuntu database opening in two
+learner_management cases; previous green native receipts remain revision-bound.
+Current UI checks and missing teacher/device evidence are recorded separately.
+
+## Earlier source and verification
 
 PR144 head `1fb734674525abd6d0b3d114eb2e16bbbeeb8629` passed exact-head
 Quality 38982145244: 1,522 Ubuntu / 1,531 Windows native tests, all nine new

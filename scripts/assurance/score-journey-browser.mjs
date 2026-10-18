@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import axe from "axe-core";
 import { uiBrowserExecutable } from "../ui-browser.mjs";
-const output = ".cache/score-assurance";
+const output = process.env.LIKHA_SCORE_OUTPUT ?? ".cache/score-assurance";
 const url = "http://127.0.0.1:1420/dev-preview.html";
 const vite = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1"], {
   stdio: ["ignore", "pipe", "pipe"],
@@ -15,6 +15,7 @@ vite.stdout.on("data", (c) => (logs += c));
 vite.stderr.on("data", (c) => (logs += c));
 let browser;
 const checks = [];
+const inventory = [];
 try {
   for (let n = 0; n < 80; n++) {
     try {
@@ -186,35 +187,148 @@ try {
     check: "blank edit preserves recorded value and Escape restores it",
     result: "PASS",
   });
+  await input.focus();
+  await input.press("Tab");
+  const rowActionsReachable = await row
+    .getByRole("button", { name: "Correction history for Ana Santos" })
+    .evaluate((n) => n === document.activeElement);
+  checks.push({
+    check: "clean interior score reaches History via native Tab",
+    result: rowActionsReachable ? "PASS" : "FAIL",
+  });
+  if (!process.env.LIKHA_BASELINE) assert(rowActionsReachable);
   await input.fill("20");
   await input.press("Enter");
   await reason.fill("Synthetic pending correction; do not save");
+  // Reproduce the audited wide-to-phone resize with focus retained.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await reason.focus();
+  await reason.evaluate((node) => node.scrollIntoView({ block: "center" }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(250);
+  const clearance = await reason.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const nav = document.querySelector(".app-bottomnav").getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      navTop: nav.top,
+      hit: hit === node,
+      focused: document.activeElement === node,
+    };
+  });
+  checks.push({ check: "focused correction clears fixed navigation after resize", ...clearance });
+  await writeFile(`${output}/focus-resize.json`, JSON.stringify(clearance, null, 2));
+  if (!process.env.LIKHA_BASELINE) {
+    assert(
+      clearance.focused &&
+        clearance.hit &&
+        clearance.top >= 0 &&
+        clearance.bottom <= clearance.navTop,
+    );
+  }
   for (const appearance of ["light", "dark"]) {
     await page.getByRole("button", { name: /Account preferences for/ }).click();
     const panel = page.getByRole("dialog", { name: "Account preferences", exact: true });
     await panel.getByLabel("Appearance").selectOption(appearance);
     await page.keyboard.press("Escape");
-    for (const width of [1280, 640, 390]) {
-      await page.setViewportSize({ width, height: 1000 });
-      await page.addScriptTag({ content: axe.source });
-      const result = await page.evaluate(async () => ({
-        overflow: document.documentElement.scrollWidth > innerWidth + 1,
-        violations: (
-          await window.axe.run(document, {
-            runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
-          })
-        ).violations.map((v) => v.id),
-      }));
-      assert.equal(result.overflow, false);
-      assert.deepEqual(result.violations, []);
-      await reason.scrollIntoViewIfNeeded();
-      await page.screenshot({
-        path: `${output}/design-${appearance}-${width}.png`,
-        fullPage: true,
-      });
-      checks.push({ check: `render and accessibility ${appearance}/${width}`, ...result });
+    for (const mode of ["efficient", "comfortable", "guided"]) {
+      await page.getByRole("button", { name: /Account preferences for/ }).click();
+      await panel
+        .getByRole("button", { name: mode[0].toUpperCase() + mode.slice(1), exact: true })
+        .click();
+      await page.keyboard.press("Escape");
+      for (const width of [1280, 640, 390]) {
+        await page.setViewportSize({
+          width,
+          height: width === 640 ? 450 : width === 390 ? 844 : 900,
+        });
+        await page.addScriptTag({ content: axe.source });
+        const result = await page.evaluate(async () => ({
+          overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          violations: (
+            await window.axe.run(document, {
+              runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
+            })
+          ).violations.map((v) => v.id),
+        }));
+        assert.equal(result.overflow, false);
+        assert.deepEqual(result.violations, []);
+        await reason.focus();
+        await page.waitForTimeout(100);
+        const controls = await page.evaluate(() =>
+          [
+            ...document.querySelectorAll(
+              ".concept-folio button, .concept-folio input, .concept-folio select, .concept-folio summary",
+            ),
+          ]
+            .filter(
+              (n) => n.getBoundingClientRect().width > 0 && n.getBoundingClientRect().height > 0,
+            )
+            .map((n, index) => {
+              const s = getComputedStyle(n),
+                r = n.getBoundingClientRect();
+              return {
+                index,
+                id: n.id,
+                tag: n.tagName,
+                text: n.textContent?.trim(),
+                label:
+                  n.getAttribute("aria-label") ??
+                  (n.labels ? [...n.labels].map((l) => l.textContent.trim()).join(" ") : null),
+                className: n.className,
+                disabled: n.disabled ?? n.getAttribute("aria-disabled"),
+                role: n.getAttribute("role"),
+                selected: n.getAttribute("aria-pressed") ?? n.getAttribute("aria-selected"),
+                geometry: { width: r.width, height: r.height },
+                style: Object.fromEntries(
+                  [
+                    "fontFamily",
+                    "fontSize",
+                    "fontWeight",
+                    "lineHeight",
+                    "padding",
+                    "gap",
+                    "border",
+                    "borderRadius",
+                    "backgroundColor",
+                    "color",
+                    "minHeight",
+                    "outline",
+                    "transition",
+                    "zIndex",
+                  ].map((k) => [k, s[k]]),
+                ),
+              };
+            }),
+        );
+        inventory.push({ appearance, mode, width, reducedMotion: true, controls });
+        const focus = await reason.evaluate((n) => {
+          const r = n.getBoundingClientRect(),
+            nav = document.querySelector(".app-bottomnav").getBoundingClientRect();
+          return {
+            top: r.top,
+            bottom: r.bottom,
+            navTop: nav.height > 0 ? nav.top : innerHeight,
+            hit: document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === n,
+          };
+        });
+        if (!process.env.LIKHA_BASELINE)
+          assert(focus.hit && focus.top >= 0 && focus.bottom <= focus.navTop);
+        checks.push({ check: `focus clearance ${appearance}/${mode}/${width}`, ...focus });
+        await page.screenshot({
+          path: `${output}/design-${appearance}-${mode}-${width}.png`,
+          fullPage: true,
+        });
+        checks.push({
+          check: `render and accessibility ${appearance}/${mode}/${width}`,
+          ...result,
+        });
+      }
     }
   }
+  await writeFile(`${output}/control-inventory.json`, JSON.stringify(inventory, null, 2));
   await page.setViewportSize({ width: 390, height: 1000 });
   await correctionRow.getByRole("button", { name: "Cancel", exact: true }).tap();
   assert.equal(await input.inputValue(), "19");

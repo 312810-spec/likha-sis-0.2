@@ -26,7 +26,7 @@ export function ScoreSyncEvidence({
 }: ScoreSyncEvidenceProps) {
   const [evidence, setEvidence] = useState<{
     identity: string;
-    status: LearnerScoreSyncStatus;
+    status: LearnerScoreSyncStatus | "unavailable" | "error";
     service: LearnerScoreSyncStatusApplicationService;
   } | null>(null);
   const identity = JSON.stringify([teachingAssignmentId, assessmentItemId, learnerId]);
@@ -36,15 +36,31 @@ export function ScoreSyncEvidence({
     void Promise.resolve()
       .then(() => service.getStatus(teachingAssignmentId, assessmentItemId, learnerId))
       .then((status) => {
-        if (!cancelled) setEvidence(status === null ? null : { identity, status, service });
+        if (!cancelled) setEvidence({ identity, status: status ?? "unavailable", service });
       })
       .catch(() => {
-        if (!cancelled) setEvidence(null);
+        if (!cancelled) setEvidence({ identity, status: "error", service });
       });
     return () => {
       cancelled = true;
     };
   }, [service, teachingAssignmentId, assessmentItemId, learnerId, identity]);
-  if (!evidence || evidence.identity !== identity || evidence.service !== service) return null;
-  return <div className="score-saved-note">Last sync check: {LABELS[evidence.status]}</div>;
+  const status =
+    evidence?.identity === identity && evidence.service === service ? evidence.status : "checking";
+  return (
+    <div className="score-saved-note" role="status" aria-atomic="true">
+      {status === "checking" ? (
+        "Checking transfer status…"
+      ) : status === "unavailable" ? (
+        "Transfer status unavailable. Local save is separate. Refresh transfer status to check again."
+      ) : status === "error" ? (
+        "Could not check transfer status. Local save is separate. Refresh transfer status to retry."
+      ) : (
+        <>
+          <span>Last sync check: {LABELS[status]}</span>
+          <span className="score-snapshot-hint">Snapshot only; refresh to check again.</span>
+        </>
+      )}
+    </div>
+  );
 }
