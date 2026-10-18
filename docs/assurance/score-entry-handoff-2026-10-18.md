@@ -1,6 +1,26 @@
 # Score-entry bounded UI/UX + Assurance handoff
 
-## Final local result
+## Publication and CI continuation
+
+The user explicitly approved branch publication and a draft PR on 2026-10-18.
+Draft PR: https://github.com/312810-spec/likha-sis-0.2/pull/146.
+First published head `8b0aa8fc5e4d60bc6b136caa8608628188e5044c`, tree
+`aafea916ff36f658f884dc65409439af67265e56`, exactly matches local checkpoint.
+Shell Git lacked credentials; the connected GitHub route published the same tree;
+read-only fetch verified byte identity. Earlier approval-review blocks are resolved
+for publication; no merge/deployment requested or performed.
+
+Quality run 39113348314: Ubuntu frontend, UI smoke and recovery passed; native
+step stopped at two formatter differences in new tests. Apply the exact formatter
+output from job 117633983156 before rerunning. No native-test pass inferred.
+Security run 39113348165: gitleaks PASS; cargo-deny and OSV FAIL on unmaintained
+zvariant 5.15.0 (RUSTSEC-2026-0370), zbus_names 4.3.4 (0371), zvariant_derive
+5.15.0 (0372). Lockfiles are unchanged from baseline; those scanners were not run
+on baseline in this investigation. No suppressions or dependency changes added.
+Keep this existing-dependency maintenance outside the bounded journey and preserve
+these merge blockers. Await fresh native execution on the formatter-corrected head.
+
+## Earlier local result
 
 Checked implementation: `ef2b935a651468f05e2444167ae73f7d2a2d2517`.
 The final checkpoint changes only documentation/evidence; implementation hashes

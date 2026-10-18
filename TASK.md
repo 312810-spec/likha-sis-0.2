@@ -12,9 +12,12 @@ See `docs/assurance/score-entry-handoff-2026-10-18.md` and its evidence JSON.
 Frontend quality (1,569 tests), build, browser journey/accessibility, existing UI
 smoke and source-SQL fallback passed. Native authorization/atomicity regressions,
 SQLCipher, fmt/test/clippy and security tools remain NOT RUN locally. Readiness
-INCONCLUSIVE; teacher trial pending. Automatic review rejected publication twice,
-including after repository verification. Do not bypass or retry publication
-without explicit approval for this particular branch/draft PR.
+INCONCLUSIVE; teacher trial pending. User approved publication on 2026-10-18;
+draft PR #146 is open. First head 8b0aa8f has the exact local checkpoint tree.
+Ubuntu CI passed frontend/UI/recovery, then stopped on native test formatting;
+apply the actual formatter diff and rerun. Both dependency scanners fail on
+existing unmaintained zvariant/zbus_names crates; lockfiles unchanged. Preserve
+these blockers without expanding this journey into dependency maintenance.
 
 ## Active continuation
 

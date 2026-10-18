@@ -356,15 +356,9 @@ mod tests {
         section_membership::enroll(&conn, &s.id, &sec.id, &l.id, "2026-06-08").unwrap();
         let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
-        crate::repository::teaching_assignment::create(
-            &conn,
-            &s.id,
-            &teacher.id,
-            &sec.id,
-            &sub.id,
-        )
-        .unwrap()
-        .unwrap();
+        crate::repository::teaching_assignment::create(&conn, &s.id, &teacher.id, &sec.id, &sub.id)
+            .unwrap()
+            .unwrap();
         (conn, s.id, item.id, l.id, teacher.id)
     }
 
@@ -426,9 +420,11 @@ mod tests {
             None,
         );
         assert!(result.is_err());
-        assert!(learner_score::correction_history(&conn, &school, &item, &learner)
-            .unwrap()
-            .is_empty());
+        assert!(
+            learner_score::correction_history(&conn, &school, &item, &learner)
+                .unwrap()
+                .is_empty()
+        );
         let roster = learner_score::roster_for_item(&conn, &school, &item)
             .unwrap()
             .unwrap();
