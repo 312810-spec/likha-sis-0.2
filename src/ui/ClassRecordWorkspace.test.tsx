@@ -1770,6 +1770,8 @@ describe("score save acknowledgment continuity", () => {
       resolveSave(repo.recordResult);
     });
     expect(input).toHaveValue(19);
+    expect(screen.getByText(/Not saved/)).toBeVisible();
+    expect(screen.getByText(/On this device: 18 \/ 20/)).toBeVisible();
     expect(input).toHaveFocus();
     expect(screen.queryByText(/Saved on this device/)).not.toBeInTheDocument();
     expect(repo.record).toHaveBeenCalledTimes(1);
@@ -1802,5 +1804,97 @@ describe("score draft continuity", () => {
     await screen.findByText(/Quiz 1/);
     expect(screen.queryByLabelText(/Score for Ana Cruz/i)).not.toBeInTheDocument();
     clearSessionDrafts();
+  });
+});
+
+describe("score decision design", () => {
+  async function openSavedScore() {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    renderScreen({ scoreRepo: repo });
+    await user.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    return { user, repo, input };
+  }
+
+  it("reviews recorded and proposed values before a correction is committed", async () => {
+    const { user, repo, input } = await openSavedScore();
+    await user.clear(input);
+    await user.type(input, "19{Enter}");
+    const reason = await screen.findByLabelText("Reason for changing Ana Cruz's recorded score");
+    expect(screen.getByText("Recorded: 15 / 20")).toBeVisible();
+    expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+    expect(reason).toHaveAccessibleDescription(/Recorded: 15 \/ 20.*Change to: 19 \/ 20/);
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+
+  it("lets keyboard users reach Cancel without saving a completed reason", async () => {
+    const { user, repo, input } = await openSavedScore();
+    await user.clear(input);
+    await user.type(input, "19{Enter}");
+    await user.type(await screen.findByLabelText(/Reason for changing Ana/), "Rechecked work");
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Save correction" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(repo.recordCalls).toHaveLength(0);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveFocus());
+    expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(15);
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+
+  it("explains a blank edit without erasing the recorded score and lets Tab leave the final input", async () => {
+    const { user, repo, input } = await openSavedScore();
+    await user.clear(input);
+    expect(screen.getByText(/Blank input does not clear the recorded value/)).toBeVisible();
+    expect(screen.getByText(/On this device: 15 \/ 20/)).toBeVisible();
+    await user.tab();
+    expect(input).not.toHaveFocus();
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+
+  it("guards an explicit correction while its acknowledgment is pending", async () => {
+    const { user, repo, input } = await openSavedScore();
+    let resolveSave!: (value: LearnerScore | null) => void;
+    vi.spyOn(repo, "record").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    await user.clear(input);
+    await user.type(input, "19{Enter}");
+    const reason = await screen.findByLabelText(/Reason for changing Ana/);
+    await user.type(reason, "Rechecked work{Enter}{Enter}");
+    expect(repo.record).toHaveBeenCalledTimes(1);
+    expect(reason).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: "Save correction" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await act(async () => resolveSave({ ...repo.recordResult!, score: 19 }));
+    expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(19);
+  });
+});
+
+describe("score decision status distinctions", () => {
+  it.each([
+    ["scored", 0, "0 / 20"],
+    ["excused", null, "Excused"],
+    ["not_applicable", null, "N/A"],
+  ] as const)("keeps %s distinct during correction review", async (status, score, label) => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status, score, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    renderScreen({ scoreRepo: repo });
+    await user.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    await user.clear(input);
+    await user.type(input, "19{Enter}");
+    expect(screen.getByText(`Recorded: ${label}`)).toBeVisible();
+    expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+    expect(repo.recordCalls).toHaveLength(0);
   });
 });

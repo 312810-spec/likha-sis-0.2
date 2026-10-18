@@ -480,6 +480,18 @@ export function ClassRecordWorkspace({
     }
   }
 
+  function describeRecordedScore(
+    status: LearnerScoreStatus | null,
+    score: number | null,
+    maximum: number,
+  ): string {
+    return status === "scored" && score !== null
+      ? `${score} / ${maximum}`
+      : status === null
+        ? "Not recorded"
+        : STATUS_LABELS[status];
+  }
+
   function draftScoreFor(learnerId: string, currentScore: number | null): string {
     return scoreDrafts[learnerId] ?? (currentScore === null ? "" : String(currentScore));
   }
@@ -656,11 +668,11 @@ export function ClassRecordWorkspace({
    * `moveFocusTo` when the save actually succeeded, so a validation error
    * keeps focus on the row that needs fixing. */
   /** CTOS M01: replays a held correction with the reason the teacher just
-   * entered. Called from the inline reason field's Enter/blur, so the
+   * entered. Explicit Enter/arrow or Save commits; Tab only navigates. The
    * keyboard flow through a correction stays unbroken. */
   async function commitPendingCorrection(entry: LearnerScoreRosterEntry, moveFocusTo?: string) {
     const pending = pendingCorrections[entry.learnerId];
-    if (!pending) return;
+    if (!pending || committingRef.current.has(entry.learnerId)) return;
     const reason = (correctionReasons[entry.learnerId] ?? "").trim();
     if (reason === "") {
       setRowErrors((current) => ({
@@ -669,11 +681,16 @@ export function ClassRecordWorkspace({
       }));
       return;
     }
-    const saved =
-      pending.status === "scored"
-        ? await handleRecord(entry.learnerId, "scored", pending.scoreText)
-        : await handleRecord(entry.learnerId, pending.status, null);
-    if (saved) focusScoreInput(moveFocusTo);
+    committingRef.current.add(entry.learnerId);
+    try {
+      const saved =
+        pending.status === "scored"
+          ? await handleRecord(entry.learnerId, "scored", pending.scoreText)
+          : await handleRecord(entry.learnerId, pending.status, null);
+      if (saved) focusScoreInput(moveFocusTo);
+    } finally {
+      committingRef.current.delete(entry.learnerId);
+    }
   }
 
   /** CTOS M01: drops a held correction and its draft reason, restoring the
@@ -689,7 +706,12 @@ export function ClassRecordWorkspace({
       delete next[learnerId];
       return next;
     });
-    focusScoreInput(learnerId);
+    // The score field remounts after the correction editor is removed.
+    const rosterRequest = rosterRequestRef.current;
+    window.setTimeout(() => {
+      if (activeSource.current.mounted && rosterRequestRef.current === rosterRequest)
+        focusScoreInput(learnerId);
+    }, 0);
   }
 
   function clearPendingCorrection(learnerId: string) {
@@ -1169,17 +1191,36 @@ export function ClassRecordWorkspace({
                     {roster.map((entry) => {
                       const isSaving = savingLearnerIds.has(entry.learnerId);
                       const hasRowError = Boolean(rowErrors[entry.learnerId]);
+                      const pending = pendingCorrections[entry.learnerId];
+                      const draft = scoreDrafts[entry.learnerId];
+                      const recordedLabel = describeRecordedScore(
+                        entry.status,
+                        entry.score,
+                        selectedItem.maxScore,
+                      );
                       return (
                         <tr key={entry.learnerId}>
                           <th scope="row">
                             {entry.givenName} {entry.familyName}
                           </th>
                           <td>
-                            {pendingCorrections[entry.learnerId] ? (
+                            {pending ? (
                               <div className="correction-reason">
+                                <div
+                                  id={`score-review-${entry.learnerId}`}
+                                  className="score-correction-review"
+                                >
+                                  <span>Recorded: {recordedLabel}</span>
+                                  <strong>
+                                    Change to:{" "}
+                                    {pending.status === "scored"
+                                      ? `${pending.scoreText} / ${selectedItem.maxScore}`
+                                      : STATUS_LABELS[pending.status]}
+                                  </strong>
+                                </div>
                                 <label
                                   htmlFor={`correction-reason-${entry.learnerId}`}
-                                  className="visually-hidden"
+                                  className="score-correction-label"
                                 >
                                   Reason for changing {entry.givenName} {entry.familyName}'s
                                   recorded score
@@ -1192,17 +1233,26 @@ export function ClassRecordWorkspace({
                                   className="score-entry-input"
                                   type="text"
                                   placeholder="Reason for the change"
+                                  readOnly={isSaving}
                                   aria-invalid={hasRowError}
-                                  aria-describedby={
-                                    hasRowError ? `score-error-${entry.learnerId}` : undefined
-                                  }
+                                  aria-describedby={`score-review-${entry.learnerId}${hasRowError ? ` score-error-${entry.learnerId}` : ""}`}
                                   value={correctionReasons[entry.learnerId] ?? ""}
-                                  onChange={(event) =>
+                                  onChange={(event) => {
                                     setCorrectionReasons((current) => ({
                                       ...current,
                                       [entry.learnerId]: event.target.value,
-                                    }))
-                                  }
+                                    }));
+                                    if (
+                                      event.target.value.trim() &&
+                                      rowErrors[entry.learnerId] ===
+                                        "A reason is required to change a recorded score."
+                                    ) {
+                                      setRowErrors((current) => ({
+                                        ...current,
+                                        [entry.learnerId]: "",
+                                      }));
+                                    }
+                                  }}
                                   onKeyDown={(event) => {
                                     if (event.key === "Enter" || event.key === "ArrowDown") {
                                       event.preventDefault();
@@ -1216,29 +1266,15 @@ export function ClassRecordWorkspace({
                                         entry,
                                         neighborLearnerId(entry.learnerId, -1),
                                       );
-                                    } else if (event.key === "Tab") {
-                                      // CTOS M07: Tab commits the held
-                                      // correction and continues down the
-                                      // roster, so correcting a score mid-run
-                                      // costs no extra navigation.
-                                      event.preventDefault();
-                                      void commitPendingCorrection(
-                                        entry,
-                                        neighborLearnerId(entry.learnerId, event.shiftKey ? -1 : 1),
-                                      );
                                     } else if (event.key === "Escape") {
                                       event.preventDefault();
-                                      cancelPendingCorrection(entry.learnerId);
+                                      if (!isSaving) cancelPendingCorrection(entry.learnerId);
                                     }
                                   }}
-                                  onBlur={() => void commitPendingCorrection(entry)}
                                 />
                                 <button
                                   type="button"
-                                  // Prevents the reason field's blur-commit
-                                  // from racing this click — the click is the
-                                  // only thing that should act here.
-                                  onMouseDown={(event) => event.preventDefault()}
+                                  disabled={isSaving}
                                   onClick={() =>
                                     void commitPendingCorrection(
                                       entry,
@@ -1250,7 +1286,7 @@ export function ClassRecordWorkspace({
                                 </button>
                                 <button
                                   type="button"
-                                  onMouseDown={(event) => event.preventDefault()}
+                                  disabled={isSaving}
                                   onClick={() => cancelPendingCorrection(entry.learnerId)}
                                 >
                                   Cancel
@@ -1290,7 +1326,14 @@ export function ClassRecordWorkspace({
                                   max={selectedItem.maxScore}
                                   aria-invalid={hasRowError}
                                   aria-describedby={
-                                    hasRowError ? `score-error-${entry.learnerId}` : undefined
+                                    [
+                                      hasRowError ? `score-error-${entry.learnerId}` : null,
+                                      draft !== undefined && !isSaving
+                                        ? `score-draft-${entry.learnerId}`
+                                        : null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ") || undefined
                                   }
                                   placeholder={
                                     entry.status === "excused"
@@ -1333,11 +1376,16 @@ export function ClassRecordWorkspace({
                                       // commits the draft first and only moves
                                       // focus on a successful save, so Tab
                                       // never silently drops an entry.
-                                      event.preventDefault();
-                                      void commitScoreDraft(
-                                        entry,
-                                        neighborLearnerId(entry.learnerId, event.shiftKey ? -1 : 1),
+                                      const neighbor = neighborLearnerId(
+                                        entry.learnerId,
+                                        event.shiftKey ? -1 : 1,
                                       );
+                                      if (neighbor) {
+                                        event.preventDefault();
+                                        void commitScoreDraft(entry, neighbor);
+                                      }
+                                      // At the boundary native Tab leaves the grid;
+                                      // blur still runs the same commit/validation.
                                     } else if (event.key === "Escape") {
                                       event.preventDefault();
                                       setScoreDrafts((current) => {
@@ -1349,6 +1397,22 @@ export function ClassRecordWorkspace({
                                   }}
                                   onBlur={() => void commitScoreDraft(entry)}
                                 />
+                                {draft !== undefined && !isSaving && (
+                                  <p
+                                    id={`score-draft-${entry.learnerId}`}
+                                    className="score-draft-note"
+                                  >
+                                    <strong>
+                                      {draft.trim() === ""
+                                        ? "Blank input does not clear the recorded value."
+                                        : "Not saved."}
+                                    </strong>{" "}
+                                    On this device: {recordedLabel}.{" "}
+                                    {draft.trim() === ""
+                                      ? "Enter a score or press Escape to restore."
+                                      : "Press Enter to save; Escape to restore."}
+                                  </p>
+                                )}
                                 {entry.status === null && !isSaving && (
                                   <StatusChip tone="neutral">Not recorded</StatusChip>
                                 )}
@@ -1423,6 +1487,7 @@ export function ClassRecordWorkspace({
                                   key={status}
                                   type="button"
                                   aria-pressed={entry.status === status}
+                                  disabled={Boolean(pending)}
                                   onClick={() =>
                                     void handleRecord(entry.learnerId, status, null).then(
                                       (saved) => {

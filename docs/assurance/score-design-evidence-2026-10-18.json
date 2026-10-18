@@ -1,0 +1,380 @@
+{
+  "baseline": "10cfe8c16033a8ec260a2ba030f7518c4ec25741",
+  "branch": "forge/score-decision-design-20261018",
+  "recorded_at": "2026-10-18T11:57:48.386836+00:00",
+  "baseline_browser": {
+    "review": "Ana Santos\t\nReason for changing Ana Santos's recorded score\nSave correction\nCancel\n\nA reason is required to change a recorded score.\n\n\t\nExcused\nN/A",
+    "recordedComparisonVisible": false,
+    "proposedComparisonVisible": false,
+    "callsAfterReasonTab": 2,
+    "focusedElement": "<input id=\"score-l2\" class=\"score-entry-input\" inputmode=\"decimal\" min=\"0\" max=\"20\" aria-invalid=\"false\" placeholder=\"\u2014\" type=\"number\" value=\"\" style=\"\">",
+    "evidence": "Production UI, synthetic memory fixture. No participant trial."
+  },
+  "baseline_tests": {
+    "status": "FAIL as expected",
+    "executed": "node node_modules/vitest/vitest.mjs run src/ui/ClassRecordWorkspace.test.tsx -t 'score decision design'",
+    "observations": [
+      "No recorded/proposed comparison",
+      "Reason Tab saves instead of reaching actions",
+      "No blank/persisted value guidance",
+      "Two Enter presses make two repository calls while pending"
+    ],
+    "failed": 4,
+    "skipped": 58,
+    "raw_log_sha256": "1157dc2dc5402ef2029b3d16b6e450f7559c3f2e095c617b2abf8e337f1f7ab5",
+    "stdout_summary": "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 4 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > reviews recorded and proposed values before a correction is committed\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > lets keyboard users reach Cancel without saving a completed reason\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > explains a blank edit without erasing the recorded score and lets Tab leave the final input\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > guards an explicit correction while its acknowledgment is pending\nAssertionError: expected \"record\" to be called 1 times, but got 2 times\n Test Files  1 failed (1)\n      Tests  4 failed | 58 skipped (62)\n   Duration  4.31s (tests 45%, environment 25%, transform 16%, import 7%, setup 6%)"
+  },
+  "candidate_browser": {
+    "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
+    "checks": [
+      {
+        "check": "older acknowledgment preserves newer draft and focus",
+        "displayed": 19,
+        "fixturePersisted": 18,
+        "calls": 1
+      },
+      {
+        "check": "correction comparison and keyboard cancel without a write",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit correction saves exact score and lineage",
+        "result": "PASS"
+      },
+      {
+        "check": "rejected write retains draft and has no saved claim",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit keyboard retry saves retained value",
+        "result": "PASS"
+      },
+      {
+        "check": "native Tab exits at both score sequence boundaries",
+        "result": "PASS"
+      },
+      {
+        "check": "blank edit preserves recorded value and Escape restores it",
+        "result": "PASS"
+      },
+      {
+        "check": "render and accessibility light/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility light/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility light/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility dark/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility dark/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "render and accessibility dark/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "touch-emulated Cancel restores recorded score without writing",
+        "result": "PASS",
+        "limit": "Browser emulation; not installed Android evidence"
+      },
+      {
+        "check": "640px reflow models a 1280px workspace at 200% CSS zoom",
+        "result": "PASS",
+        "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
+      }
+    ]
+  },
+  "source_sql": {
+    "revision": "working-tree",
+    "evidence": "SQLite source-SQL fallback, NOT Rust/SQLCipher execution",
+    "literal_migrations_executed": 57,
+    "failed_correction_history_rows": 0,
+    "atomic_policy_present": true,
+    "assignment_sql_owner_outsider_reassignment": "PASS",
+    "normal_correction_identity_and_values": "PASS",
+    "history_rollback": "PASS"
+  },
+  "native_files_unchanged": {
+    "src-tauri/src/commands/learner_score.rs": "3cfd87f184b878060ec57ce1dce99fd3bc54c75c892a7d0ecc5d45f17a9d288c",
+    "src-tauri/src/repository/learner_score.rs": "a6359ed086f5f9928b5a15cbc7359429bee61ecae9184cd6e6a1e88f6ef2317f",
+    "src-tauri/src/db/migrations.rs": "86eb07e9ce3d8508860f59cbf58f57e00bb13de36596a11d932c4bf023b9019f",
+    "src/application/learner-score-service.ts": "9b4c91842d9f36261433b3c81fd79c5350143b8ba2edc3a77b6deb08e5d998a5",
+    "src/infrastructure/tauri/learner-score-repository.ts": "10977c3410337ba90d755f0febdab44ee5ea47d82790a1c7291fa7e5445e5dcb"
+  },
+  "source_references": {
+    "02-FORGE-UI-UX-Functions-and-Project-Playbook-1.md": "78bb2039234ff3d273d1e765de06e0c05d7d4b09942949426f37900ccfde8f55",
+    "04-FORGE-OS-v3.1-Release-Specification.md": "1710ffec008ba547cc2d2eed66804f8575d963a2025f6d3239a67516ede9c0f2",
+    "03-FORGE-Assurance-v1.0.md": "29be61783235dc4ac6ae3faee5db978f5bb603f5fd4a8c09e271106d024081a3",
+    "01-DesignMotion-Philosophy-FORGE-Research.md": "84dec18562e42ce4aa5aed1b70cfab221ee192a881c0ce2bc0d35b98c3db85b7"
+  },
+  "checked_implementation": "54bdb1488dd2863e67f9f31cfa8310886e2b3dbb",
+  "executed_checks": {
+    "quality": {
+      "command": "npm run quality",
+      "status": "PASS",
+      "sha256": "bea8b48322835d7a47db3c5bd2a28f6f3d02c78687f7dfadcb2a3a5058be6475",
+      "output": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality\n> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 typecheck\n> node node_modules/typescript-compiler/bin/tsc -b --noEmit\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 lint\n> eslint .\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 format:check\n> prettier --check .\n\nChecking formatting...\nAll matched files use Prettier code style!\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed: no restricted imports found.\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:deadcode\n> knip\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test:batch-runner\n> node --test scripts/ctos/verify-batches.node-test.mjs\n\n\u2714 a successful executed check passes (94.526748ms)\n\u2714 failure cannot be reported as pass (95.640376ms)\n\u2714 missing execution capability stays not run (3.526078ms)\n\u2714 timeout cannot be reported as completed (35.440729ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 371.149586\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test\n> vitest run\n\n\n RUN  v5.0.3 /workspace/scratch/a95f6cc82001/likha-sis\n\n\n Test Files  158 passed (158)\n      Tests  1576 passed (1576)\n   Start at  19:57:07\n   Duration  82.42s (environment 49%, tests 35%, setup 6%, import 6%, transform 3%, worker 1%)\n\nEnvironment  jsdom was created 158 times \u00b7 245.95s total, 49% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n"
+    },
+    "browser": {
+      "command": "node scripts/assurance/score-journey-browser.mjs",
+      "status": "PASS",
+      "sha256": "aa79e2488b2991203b59ac9bd3b40973be18e67a6438bf83dcc0a59af6a92b64",
+      "output": "[\n  {\n    \"check\": \"older acknowledgment preserves newer draft and focus\",\n    \"displayed\": 19,\n    \"fixturePersisted\": 18,\n    \"calls\": 1\n  },\n  {\n    \"check\": \"correction comparison and keyboard cancel without a write\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"explicit correction saves exact score and lineage\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"rejected write retains draft and has no saved claim\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"explicit keyboard retry saves retained value\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"native Tab exits at both score sequence boundaries\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"blank edit preserves recorded value and Escape restores it\",\n    \"result\": \"PASS\"\n  },\n  {\n    \"check\": \"render and accessibility light/1280\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"render and accessibility light/640\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"render and accessibility light/390\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"render and accessibility dark/1280\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"render and accessibility dark/640\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"render and accessibility dark/390\",\n    \"overflow\": false,\n    \"violations\": []\n  },\n  {\n    \"check\": \"touch-emulated Cancel restores recorded score without writing\",\n    \"result\": \"PASS\",\n    \"limit\": \"Browser emulation; not installed Android evidence\"\n  },\n  {\n    \"check\": \"640px reflow models a 1280px workspace at 200% CSS zoom\",\n    \"result\": \"PASS\",\n    \"limit\": \"Equivalent CSS viewport; not native OS/browser zoom or assistive technology\"\n  }\n]\n"
+    },
+    "ui-smoke": {
+      "command": "npm run quality:ui",
+      "status": "PASS",
+      "sha256": "9b628cc102b563fddf0adc6a78727270f45e69377b03cd2657ddec3b8f1c963a",
+      "output": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality:ui\n> node scripts/ui-smoke.mjs\n\nquality:ui PASS \u2014 assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances \u00d7 three densities \u00d7 four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.\n"
+    },
+    "recovery": {
+      "command": "npm run quality:ui:recovery",
+      "status": "PASS",
+      "sha256": "a523aef93009dbfd0110a00d19dec5bd88c4b161552c2541502023bc09d7f902",
+      "output": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality:ui:recovery\n> node scripts/ui-recovery.mjs\n\nquality:ui:recovery PASS \u2014 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.\n"
+    },
+    "build": {
+      "command": "npm run build",
+      "status": "PASS",
+      "sha256": "cde3330a9220d2d42b40edcfd75ff9b797ad9ab08257840327ac05628b3da63e",
+      "output": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 build\n> node node_modules/typescript-compiler/bin/tsc -b && vite build\n\nvite v8.3.2 building client environment for production...\ntransforming...\n\u2713 191 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                                 0.39 kB \u2502 gzip:   0.26 kB\ndist/assets/public-sans-vietnamese-600-normal-P4BtCUdw.woff2    4.50 kB\ndist/assets/public-sans-vietnamese-700-normal-D97ShjGS.woff2    4.51 kB\ndist/assets/public-sans-vietnamese-400-normal-TxZB8OSn.woff2    4.52 kB\ndist/assets/public-sans-vietnamese-700-normal-Dq5VrXjD.woff     5.93 kB\ndist/assets/public-sans-vietnamese-400-normal-BO1meqcx.woff     5.94 kB\ndist/assets/public-sans-vietnamese-600-normal-CcnAzmUX.woff     5.94 kB\ndist/assets/public-sans-latin-ext-400-normal-mk90oQqJ.woff2    10.45 kB\ndist/assets/public-sans-latin-ext-600-normal-DchWdWJ_.woff2    10.52 kB\ndist/assets/public-sans-latin-ext-700-normal-CgolUQuG.woff2    10.53 kB\ndist/assets/public-sans-latin-ext-700-normal-jWHjnMgZ.woff     14.18 kB\ndist/assets/public-sans-latin-ext-400-normal-B02wwOdZ.woff     14.20 kB\ndist/assets/public-sans-latin-ext-600-normal-DfkbVac2.woff     14.26 kB\ndist/assets/public-sans-latin-600-normal-Fru-LXNs.woff2        14.59 kB\ndist/assets/public-sans-latin-700-normal-BqJmxWdE.woff2        14.60 kB\ndist/assets/public-sans-latin-400-normal-8Rpg0ruU.woff2        14.63 kB\ndist/assets/public-sans-latin-400-normal-SBbinRkI.woff         18.48 kB\ndist/assets/public-sans-latin-600-normal-BR59oU-I.woff         18.55 kB\ndist/assets/public-sans-latin-700-normal-Dm-oTPSL.woff         18.65 kB\ndist/assets/index-ChqAVwWs.css                                 70.86 kB \u2502 gzip:  11.78 kB\ndist/assets/index-CF1DHgeY.js                                 677.49 kB \u2502 gzip: 175.92 kB\n\n\u2713 built in 522ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    }
+  },
+  "candidate_source_sha256": {
+    "src/ui/ClassRecordWorkspace.tsx": "0843860360b2474f0a6a428b7e4d82180ee3b64b6407bce7fd4a7a0edd93ddff",
+    "src/ui/ClassRecordWorkspace.test.tsx": "fe62a75b0c2564ffbd6197dbf86252fa864848b2f5d6b3578096312b4af38956",
+    "src/ui/theme/styles.css": "c9dcd7c4f071d7279311691ef5ae5d00bd9572cf570743fd40754f54fed3c527",
+    "scripts/assurance/score-journey-browser.mjs": "b19908bf31439b4dbaa4003d969434d4f76dcbdf571af406c34a3f7db115cfaa"
+  },
+  "acceptance": {
+    "D1": {
+      "status": "PASS",
+      "evidence": "baseline/candidate browser comparison, unit description association, internal renders"
+    },
+    "D2": {
+      "status": "PASS",
+      "evidence": "deferred-save browser repository assertions, blank behavior, zero/exception unit controls"
+    },
+    "D3": {
+      "status": "PASS",
+      "evidence": "baseline keyboard write reproduced; candidate no-write Tab/Cancel, repeated Enter guard tests"
+    },
+    "D4": {
+      "status": "PASS",
+      "evidence": "real browser first/last Tab boundary checks"
+    },
+    "D5": {
+      "status": "PASS",
+      "evidence": "1576 tests, existing journey assertions, byte-identical native/service files; original native execution remains revision-bound"
+    },
+    "D6": {
+      "status": "PASS",
+      "evidence": "six internally inspected render states, axe, no overflow, 15 browser probes, smoke gate and 50 recovery checks"
+    },
+    "D7": {
+      "status": "NOT RUN",
+      "required": false,
+      "reason": "No authorized recruited teacher trial; test script provided, usability benefit provisional"
+    }
+  },
+  "readiness": {
+    "bounded_design": "READY FOR REVIEW",
+    "teacher_usability": "UNVALIDATED",
+    "merge_release": "BLOCKED by existing PR146 dependency security gates; no merge/deploy",
+    "new_ci": "Quality39125554539 PASS on implementation8c9ce19; Security39125554557 FAIL, existing RUSTSEC-2026-0370/0371/0372, gitleaks PASS; final documentation checkpoint does not change checked source."
+  },
+  "publication_preflight": {
+    "first_push": "Rejected by automatic approval review as destination/export authorization unverified; no push receipt",
+    "verified_repository": {
+      "id": "1344185717",
+      "full_name": "312810-spec/likha-sis-0.2",
+      "owner": "312810-spec",
+      "visibility": "public",
+      "connector_permissions": ["admin", "push"]
+    },
+    "authorization": "Existing project-scoped implementation/push authorization preserved in current user project instructions and supplied prior conversation. No production deployment.",
+    "resolution": "Destination verified; Git retry failed for missing shell credentials. Authenticated GitHub publication succeeded and was fetched/read back."
+  },
+  "remote_ci_receipt": {
+    "implementation": "8c9ce19e60b43ff66776fde762eb64f1250e58a7",
+    "runs": [
+      {
+        "id": 39125554557,
+        "name": "Security Gate",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1525,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554557/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554557/logs",
+        "workflow_id": 342872406
+      },
+      {
+        "id": 39125554539,
+        "name": "Quality Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1062,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554539/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554539/logs",
+        "workflow_id": 342524866
+      }
+    ],
+    "jobs": [
+      {
+        "id": 117669810864,
+        "name": "Quality / classify affected work",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Determine changed files",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify classifier behavior",
+            "conclusion": "success"
+          },
+          {
+            "name": "Classify affected work",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 117669843641,
+        "name": "Quality (Ubuntu)",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Update npm to current stable",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Node dependencies",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run documentation formatting gate",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify harness contract",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run JavaScript and TypeScript quality gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Chromium for deterministic UI verification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run UI workflow and accessibility smoke gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify UX recovery journeys",
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload UI verification screenshots",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Tauri Linux build dependencies",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run native Rust quality gate",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify bounded score native baseline negative controls",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 117669845022,
+        "name": "Quality (Windows)",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "publication": {
+    "pr": "https://github.com/312810-spec/likha-sis-0.2/pull/147",
+    "base_pr": 146,
+    "remote_implementation": "8c9ce19e60b43ff66776fde762eb64f1250e58a7",
+    "tree": "0aee5373ff2f4c9e48cd0224326ae3a28f68e39e",
+    "matches_local_checkpoint": "96cf5def5f13502d8ce1d38c8453fd01227e12f9",
+    "method": "Authenticated GitHub connector after destination verification; subsequent git fetch and full tree diff PASS",
+    "merged": false,
+    "deployed": false
+  }
+}

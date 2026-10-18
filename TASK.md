@@ -3,6 +3,21 @@
 Updated: 2026-10-17 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
+## Active bounded score decision design — 2026-10-18
+
+Branch `forge/score-decision-design-20261018`, based on PR146 head `10cfe8c`.
+Read `docs/assurance/score-design-handoff-2026-10-18.md` and its frozen D1–D7 contract.
+Implemented explicit correction review/confirmation, keyboard Cancel and sequence escape,
+unsaved/blank explanations and duplicate-submit protection. Local quality PASS: 1,576 tests;
+15 focused browser probes, UI smoke, 50 recovery checks, build and internal final renders.
+D1–D6 PASS; teacher trial D7 NOT RUN. Native/backend sources are unchanged; original
+native receipts remain revision-bound. Keep scope on this journey. No deployment.
+Published as dependent draft PR147 after repository ownership/push permission verification.
+Remote implementation `8c9ce19` exactly matches the locally verified checkpoint tree.
+Quality CI run 39125554539 PASS on implementation `8c9ce19`; Security 39125554557 FAIL on the existing
+three zbus/zvariant advisories (gitleaks PASS). No merge/deployment. Existing blockers
+remain separate. Teacher trial script is in the handoff; usability gains are provisional.
+
 ## Bounded score-entry investigation — 2026-10-18
 
 Approved draft PR #146 is published. Checked source `129ef31` and CI merge
