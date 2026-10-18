@@ -1,7 +1,23 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-17 (Asia/Manila).
+Updated: 2026-10-18 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
+
+## Verified separate dependency maintenance — 2026-10-18
+
+Draft PR148, branch `forge/opener-dependency-maintenance-20261018`, depends on PR147.
+Read `docs/assurance/opener-maintenance-handoff-2026-10-18.md` and frozen O1–O6.
+Checked source `ceeab1d`: all O1–O6 PASS; Quality39135625221 and Security39135625254
+SUCCESS.1,576 frontend tests,1,525 Ubuntu/1,534 Windows native tests; Rustfmt/Clippy,
+UI/recovery, private synthetic D-Bus success/fallback/denial and unchanged-policy
+security gates passed. Windows test-installer artifact12140346037 is bound to this source.
+The final checkpoint is documentation only; source hashes bind the completed receipts.
+The separate compatibility snapshot removes retired dependencies without new scanner ignores.
+No merge/deployment. Old PR147/146 receipts stay revision-bound until actual integration.
+Teacher trial, disposable installed Windows GUI/upgrade, Android and real two-device
+acceptance remain NOT RUN. Next: review/integrate this verified stack under existing
+checks, then conduct the scoped teacher/device trial. Do not repeat maintenance or
+resume unrelated M11/Android work merely because the automated checks passed.
 
 ## Active bounded score decision design — 2026-10-18
 

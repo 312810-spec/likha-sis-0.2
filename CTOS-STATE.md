@@ -1,7 +1,21 @@
 # CTOS State
 
-Updated: 2026-10-17 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
+Updated: 2026-10-18 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V3-ADAPTER.md`.
+
+## Verified bounded follow-up — 2026-10-18
+
+The active score-entry stack is draft PR146 → PR147 → separate maintenance PR148.
+PR148 checked source `ceeab1d` and CI merge `9d97cb0` have identical tree
+`3f1dfa15eab3173a30d0f5daa685776d9c11ae2c`. Quality39135625221 and
+Security39135625254 passed: 1,576 frontend tests, 1,525 Ubuntu / 1,534 Windows
+native tests, provenance, Rustfmt/Clippy, UI/recovery and private synthetic D-Bus cases.
+Windows test-installer artifact12140346037 is bound to that source. No new scanner
+exclusions; no merge/deployment. Final checkpoint changes documentation only.
+Read `TASK.md` and `docs/assurance/opener-maintenance-handoff-2026-10-18.md` before
+continuing. Teacher/device trials and broader M10–M17 acceptance remain pending;
+these checks do not certify installed Windows, Android or real two-device exchange.
+Old branch receipts retain their original revisions until actual integration.
 
 ## Current source and verification
 

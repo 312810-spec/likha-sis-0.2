@@ -1,0 +1,658 @@
+{
+  "baseline": "88e0686bab8c01d04fb293a737e0fd38dcaa99d5",
+  "final_ci_receipt": {
+    "source": "ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a",
+    "base": "88e0686bab8c01d04fb293a737e0fd38dcaa99d5",
+    "ciMerge": "9d97cb079d179056b76ee2565ad3e86de64c6e84",
+    "tree": "3f1dfa15eab3173a30d0f5daa685776d9c11ae2c",
+    "runs": [
+      {
+        "id": 39135625254,
+        "name": "Security Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1531,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39135625254/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39135625254/logs",
+        "workflow_id": 342872406
+      },
+      {
+        "id": 39135625221,
+        "name": "Quality Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1065,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39135625221/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39135625221/logs",
+        "workflow_id": 342524866
+      }
+    ],
+    "securityJobs": [
+      {
+        "id": 117699430479,
+        "name": "Security / gitleaks",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625254,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout (full history)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run gitleaks",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Post Checkout (full history)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          }
+        ]
+      },
+      {
+        "id": 117699430568,
+        "name": "Security / cargo-deny",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625254,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Build EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run cargo-deny",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          }
+        ]
+      },
+      {
+        "id": 117699430802,
+        "name": "Security / osv-scanner",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625254,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Download and verify osv-scanner v2.6.0 (linux_amd64)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run osv-scanner",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          }
+        ]
+      }
+    ],
+    "qualityJobs": [
+      {
+        "id": 117699490188,
+        "name": "Quality / classify affected work",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625221,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout full history for diff classification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Determine changed files",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Verify classifier behavior",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Classify affected work",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Post Checkout full history for diff classification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          }
+        ]
+      },
+      {
+        "id": 117699527102,
+        "name": "Quality (Windows)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625221,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Update npm to current stable",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Install Node dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Verify opener compatibility source provenance",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Build the Windows-native Tauri application",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          },
+          {
+            "name": "Test native Windows behavior",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Upload Windows test installers",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          },
+          {
+            "name": "Post Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 21
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 22
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23
+          }
+        ]
+      },
+      {
+        "id": 117699527114,
+        "name": "Quality (Ubuntu)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39135625221,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Update npm to current stable",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Install Node dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Run documentation formatting gate",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 6
+          },
+          {
+            "name": "Verify harness contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Run JavaScript and TypeScript quality gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Install Chromium for deterministic UI verification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          },
+          {
+            "name": "Run UI workflow and accessibility smoke gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Verify UX recovery journeys",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          },
+          {
+            "name": "Upload UI verification screenshots",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12
+          },
+          {
+            "name": "Install Tauri Linux build dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Verify opener compatibility source provenance",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Run native Rust quality gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          },
+          {
+            "name": "Exercise opener compatibility on a private synthetic D-Bus",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 18
+          },
+          {
+            "name": "Verify bounded score native baseline negative controls",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 19
+          },
+          {
+            "name": "Post Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 37
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 38
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 39
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12140346037,
+        "name": "likha-sis-windows-test-installers",
+        "size_in_bytes": 22956396,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12140346037",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12140346037/zip",
+        "expired": false,
+        "created_at": "2026-10-18T14:36:10Z",
+        "expires_at": "2026-11-01T14:36:08Z",
+        "updated_at": "2026-10-18T14:36:10Z",
+        "digest": "sha256:598e719d06f7eb34a727267902bdd949ae8690780eb77906c91aafb651389bab",
+        "workflow_run": {
+          "id": 39135625221,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/opener-dependency-maintenance-20261018",
+          "head_sha": "ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a"
+        }
+      },
+      {
+        "id": 12139304624,
+        "name": "likha-sis-ui-verification",
+        "size_in_bytes": 908711,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12139304624",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12139304624/zip",
+        "expired": false,
+        "created_at": "2026-10-18T14:25:21Z",
+        "expires_at": "2026-10-25T14:25:21Z",
+        "updated_at": "2026-10-18T14:25:21Z",
+        "digest": "sha256:936e206289a0865742b1f9d32c748366aec20ba18a099507152e09a2ab4b77fb",
+        "workflow_run": {
+          "id": 39135625221,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/opener-dependency-maintenance-20261018",
+          "head_sha": "ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a"
+        }
+      }
+    ],
+    "ubuntuNativeTests": 1525,
+    "windowsNativeTests": 1534,
+    "ubuntuSummary": [
+      "2026-10-18T14:24:26.8290033Z \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1576 passed\u001b[39m\u001b[22m\u001b[90m (1576)\u001b[39m",
+      "2026-10-18T14:24:59.9330936Z quality:ui PASS \u2014 assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances \u00d7 three densities \u00d7 four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-18T14:25:21.0460381Z quality:ui:recovery PASS \u2014 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-18T14:26:01.9436341Z opener provenance PASS: 37 files, exact upstream2.7.2 / zbus6 compatibility snapshot",
+      "2026-10-18T14:35:12.8699321Z test result: ok. 1312 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 318.83s",
+      "2026-10-18T14:35:12.8854671Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-18T14:35:16.9253101Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.04s",
+      "2026-10-18T14:35:26.7125587Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.78s",
+      "2026-10-18T14:35:31.5508963Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.83s",
+      "2026-10-18T14:35:32.1826606Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s",
+      "2026-10-18T14:35:36.3236968Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.14s",
+      "2026-10-18T14:36:00.1270617Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.80s",
+      "2026-10-18T14:36:05.5116496Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s",
+      "2026-10-18T14:36:17.6975843Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.18s",
+      "2026-10-18T14:36:22.2850456Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.58s",
+      "2026-10-18T14:36:24.7984725Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.51s",
+      "2026-10-18T14:36:30.5939751Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.79s",
+      "2026-10-18T14:36:30.9730782Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s",
+      "2026-10-18T14:36:32.8685486Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.89s",
+      "2026-10-18T14:36:41.5193397Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.65s",
+      "2026-10-18T14:36:53.1499379Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.63s",
+      "2026-10-18T14:36:54.8069466Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s",
+      "2026-10-18T14:37:02.5243357Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.71s",
+      "2026-10-18T14:37:09.7350290Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.21s",
+      "2026-10-18T14:37:09.7681911Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "2026-10-18T14:37:21.1379340Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.37s",
+      "2026-10-18T14:37:28.5675970Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.43s",
+      "2026-10-18T14:37:29.5733538Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-18T14:39:14.4136113Z opener private D-Bus success: PASS",
+      "2026-10-18T14:39:14.4688015Z opener private D-Bus fallback: PASS",
+      "2026-10-18T14:39:14.5239931Z opener private D-Bus denied: PASS",
+      "2026-10-18T14:39:31.6257175Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1311 filtered out; finished in 1.20s",
+      "2026-10-18T14:39:32.5536976Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1311 filtered out; finished in 0.64s",
+      "2026-10-18T14:39:32.5541743Z SCORE_NATIVE_NEGATIVE_CONTROLS_JSON={\"baseline\": \"ac4c3add56fb7a0677f1a0f745bf1de816ea55ee\", \"evidence\": \"Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture\", \"source_restored\": true, \"results\": [{\"case\": \"command_rejects_unassigned_same_school_teacher_without_writing\", \"baseline_failed_as_expected\": true}, {\"case\": \"command_local_correction_failure_rolls_back_history\", \"baseline_failed_as_expected\": true}]}"
+    ],
+    "windowsSummary": [
+      "2026-10-18T14:23:07.0149937Z opener provenance PASS: 37 files, exact upstream2.7.2 / zbus6 compatibility snapshot\r",
+      "2026-10-18T14:30:08.1358856Z        Built application at: D:\\a\\likha-sis-0.2\\likha-sis-0.2\\src-tauri\\target\\debug\\app.exe\r",
+      "2026-10-18T14:30:51.7280329Z     Finished 2 bundles at:\r",
+      "2026-10-18T14:35:00.0783739Z test result: ok. 1321 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 154.40s\r",
+      "2026-10-18T14:35:00.1035695Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-18T14:35:02.1187991Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s\r",
+      "2026-10-18T14:35:06.9204649Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.79s\r",
+      "2026-10-18T14:35:08.9792103Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s\r",
+      "2026-10-18T14:35:09.4593565Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s\r",
+      "2026-10-18T14:35:11.1317337Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.66s\r",
+      "2026-10-18T14:35:22.4121968Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.27s\r",
+      "2026-10-18T14:35:28.3249300Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.90s\r",
+      "2026-10-18T14:35:33.7413284Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.40s\r",
+      "2026-10-18T14:35:35.7114362Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.96s\r",
+      "2026-10-18T14:35:37.0407502Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s\r",
+      "2026-10-18T14:35:39.8608996Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.81s\r",
+      "2026-10-18T14:35:40.0344477Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\r",
+      "2026-10-18T14:35:40.9909429Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s\r",
+      "2026-10-18T14:35:44.6127606Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.61s\r",
+      "2026-10-18T14:35:49.4938314Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.87s\r",
+      "2026-10-18T14:35:50.3653273Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s\r",
+      "2026-10-18T14:35:54.2674201Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.89s\r",
+      "2026-10-18T14:35:57.4349556Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.15s\r",
+      "2026-10-18T14:35:57.4712447Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\r",
+      "2026-10-18T14:36:02.7962406Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.31s\r",
+      "2026-10-18T14:36:06.4990817Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.69s\r",
+      "2026-10-18T14:36:07.7285452Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-18T14:36:10.3350507Z Artifact download URL: https://github.com/312810-spec/likha-sis-0.2/actions/runs/39135625221/artifacts/12140346037\r"
+    ]
+  },
+  "baseline_quality_run": 39125900679,
+  "baseline_security_run": 39125900458,
+  "baseline_cargo_deny_job": 117670844070,
+  "baseline_osv_job": 117670844085,
+  "baseline_gitleaks_job": 117670843861,
+  "advisories": ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"],
+  "opener_archive_sha256": "53810be1b4fed22bb6ac3f4cab5a2b80d9391d1af436bda145607532bc0bb219",
+  "opener_source_commit": "44293a5722efcaf27060504e63b17aeba721b40f",
+  "lockfile_sha256": "09d4e7263fdcfab0dda1382fef522eee5aa0d7cfe125425d19ead82a83b95dac",
+  "resolved_graph": "Cargo1.99.1 generated; three retired crates absent; zbus6.0.0 / macros6.0.0 / utils6.0.0 / zruntime0.2.0; tokio1.53.3 required by zbus6",
+  "tokio_preservation_attempt": "    Updating crates.io index\nerror: failed to select a version for the requirement `tokio = \"^1.53.3\"`\ncandidate versions found which didn't match: 1.53.1\nlocation searched: crates.io index\nrequired by package `zbus v6.0.0`\n    ... which satisfies dependency `zbus = \"^6.0.0\"` (locked to 6.0.0) of package `tauri-plugin-opener v2.7.2 (/workspace/scratch/a95f6cc82001/likha-sis/src-tauri/vendor/tauri-plugin-opener-2.7.2)`\n    ... which satisfies dependency `tauri-plugin-opener = \"^2.7.2\"` (locked to 2.7.2) of package `app v0.2.0 (/workspace/scratch/a95f6cc82001/likha-sis/src-tauri)`\n",
+  "source_provenance_regressions": "opener provenance PASS: 37 files, exact upstream2.7.2 / zbus6 compatibility snapshot\nClean regeneration byte-for-byte PASS\nExisting snapshot overwrite refused PASS\nSource tamper rejected PASS\nopener provenance PASS: 37 files, exact upstream2.7.2 / zbus6 compatibility snapshot\nUnexpected source rejected PASS\n",
+  "context7": "ctx7 0.8.0 resolved unversioned /z-galaxy/zbus. Mixed historical blocking examples were not used as v6 API authority; actual v6 crate source and compiler govern. No runtime integration.",
+  "status": {
+    "O1": "PASS",
+    "O2": "PASS",
+    "O3": "PASS",
+    "O4": "PASS",
+    "O5": "PASS",
+    "O6": "PASS"
+  },
+  "sources": [
+    "https://rustsec.org/advisories/RUSTSEC-2026-0370.html",
+    "https://rustsec.org/advisories/RUSTSEC-2026-0371.html",
+    "https://rustsec.org/advisories/RUSTSEC-2026-0372.html",
+    "https://docs.rs/crate/tauri-plugin-opener/2.7.2/source/Cargo.toml",
+    "https://github.com/z-galaxy/zbus/blob/main/book/src/upgrading-to-6.md",
+    "https://index.crates.io/ta/ur/tauri-plugin-opener"
+  ],
+  "local_dbus_probe_output": "    Updating crates.io index\n     Locking 89 packages to highest compatible versions\n   Compiling proc-macro2 v1.0.107\n   Compiling unicode-ident v1.0.27\n   Compiling quote v1.0.47\n   Compiling stable_deref_trait v1.2.1\n   Compiling serde_core v1.0.229\n   Compiling writeable v0.6.4\n   Compiling serde v1.0.229\n   Compiling litemap v0.8.3\n   Compiling icu_normalizer_data v2.3.0\n   Compiling icu_properties_data v2.3.0\n   Compiling utf8_iter v1.0.4\n   Compiling libc v0.2.191\n   Compiling once_cell v1.21.4\n   Compiling winnow v1.0.4\n   Compiling smallvec v1.16.3\n   Compiling rustix v1.1.5\n   Compiling pin-project-lite v0.2.17\n   Compiling futures-core v0.3.34\n   Compiling linux-raw-sys v0.12.1\n   Compiling tracing-core v0.1.36\n   Compiling bitflags v2.13.2\n   Compiling futures-io v0.3.34\n   Compiling percent-encoding v2.3.2\n   Compiling thiserror v2.0.21\n   Compiling form_urlencoded v1.2.2\n   Compiling ordered-stream v0.2.0\n   Compiling hex v0.4.3\n   Compiling endi v1.1.1\n   Compiling syn v3.0.9\n   Compiling syn v2.0.119\n   Compiling socket2 v0.6.5\n   Compiling uuid v1.28.0\n   Compiling tracing-attributes v0.1.31\n   Compiling tracing v0.1.44\n   Compiling synstructure v0.14.0\n   Compiling zruntime v0.2.0\n   Compiling zerofrom-derive v0.1.8\n   Compiling yoke-derive v0.8.4\n   Compiling zerovec-derive v0.11.6\n   Compiling displaydoc v0.2.7\n   Compiling serde_derive v1.0.229\n   Compiling async-trait v0.1.92\n   Compiling thiserror-impl v2.0.21\n   Compiling serde_repr v0.1.21\n   Compiling zerofrom v0.1.8\n   Compiling yoke v0.8.3\n   Compiling zerovec v0.11.8\n   Compiling zerotrie v0.2.5\n   Compiling tinystr v0.8.4\n   Compiling potential_utf v0.1.6\n   Compiling icu_collections v2.3.0\n   Compiling icu_locale_core v2.3.0\n   Compiling icu_provider v2.3.1\n   Compiling zbus_utils v6.0.0\n   Compiling zcheapstr v1.1.0\n   Compiling icu_normalizer v2.3.0\n   Compiling icu_properties v2.3.0\n   Compiling zbus_macros v6.0.0\n   Compiling idna_adapter v1.2.2\n   Compiling idna v1.1.0\n   Compiling url v2.5.8\n   Compiling zbus v6.0.0\n   Compiling likha-opener-probe v0.0.0 (/workspace/scratch/a95f6cc82001/likha-sis/.cache/opener-maintenance/dbus-probe-992gz82w)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 51.49s\ndbus-daemon[1255]: Failed to start message bus: Failed to open socket: Operation not permitted\nTraceback (most recent call last):\n  File \"/workspace/scratch/a95f6cc82001/likha-sis/scripts/assurance/opener-dbus-probe.py\", line 130, in <module>\n    run()\n  File \"/workspace/scratch/a95f6cc82001/likha-sis/scripts/assurance/opener-dbus-probe.py\", line 98, in run\n    raise RuntimeError(\"Private D-Bus did not start\")\nRuntimeError: Private D-Bus did not start\n",
+  "first_candidate": {
+    "head": "ec13fbee94bdef0d581da1f798015e9fa5afc27e",
+    "security_run": 39135152795,
+    "quality_run": 39135152772,
+    "cargo_deny": {
+      "job": 117698055333,
+      "status": "PASS"
+    },
+    "gitleaks": {
+      "job": 117698055123,
+      "status": "FAIL",
+      "verified_cause": "Public upstream api-iife.js SHA256 map value matched generic-api-key; no credential; replace map with explicit path/sha256 records"
+    },
+    "osv": {
+      "job": 117698055398,
+      "status": "FAIL",
+      "observed": "Zero vulnerable packages; invalid upstream SPDX legacy notice caused extraction exit127; preserve bytes under explicit text notice path"
+    },
+    "windows": {
+      "job": 117698095402,
+      "status": "FAIL",
+      "cause": "Provenance relative path str() is platform-specific; use as_posix for canonical inventory keys"
+    }
+  },
+  "candidate_changed_files_gitleaks": "\n    \u25cb\n    \u2502\u2572\n    \u2502 \u25cb\n    \u25cb \u2591\n    \u2591    gitleaks\n\n11:19AM INF scanned ~296103 bytes (296.10 KB) in 68.5ms\n11:19AM INF no leaks found\n",
+  "candidate_publication": {
+    "pr": "https://github.com/312810-spec/likha-sis-0.2/pull/148",
+    "head": "ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a",
+    "tree": "3f1dfa15eab3173a30d0f5daa685776d9c11ae2c",
+    "local_remote_full_diff": "PASS after fetch",
+    "security_run": 39135625254,
+    "quality_run": 39135625221
+  },
+  "final_security_jobs": {
+    "gitleaks": {
+      "job": 117699430479,
+      "status": "PASS"
+    },
+    "cargo-deny": {
+      "job": 117699430568,
+      "status": "PASS"
+    },
+    "osv-scanner": {
+      "job": 117699430802,
+      "status": "PASS"
+    }
+  },
+  "frontend_quality_output": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality\n> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 typecheck\n> node node_modules/typescript-compiler/bin/tsc -b --noEmit\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 lint\n> eslint .\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 format:check\n> prettier --check .\n\nChecking formatting...\nAll matched files use Prettier code style!\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed: no restricted imports found.\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:deadcode\n> knip\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test:batch-runner\n> node --test scripts/ctos/verify-batches.node-test.mjs\n\n\u2714 a successful executed check passes (105.236999ms)\n\u2714 failure cannot be reported as pass (90.961804ms)\n\u2714 missing execution capability stays not run (5.781775ms)\n\u2714 timeout cannot be reported as completed (38.711945ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 390.737484\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test\n> vitest run\n\n\n RUN  v5.0.3 /workspace/scratch/a95f6cc82001/likha-sis\n\n\n Test Files  158 passed (158)\n      Tests  1576 passed (1576)\n   Start at  11:13:12\n   Duration  72.83s (tests 43%, environment 41%, import 6%, setup 5%, transform 4%, worker 1%)\n\nEnvironment  jsdom was created 158 times \u00b7 188.23s total, 41% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n",
+  "candidate_hashes": {
+    "src-tauri/Cargo.toml": "c8ac8f4220271f06388559a621dd9a3bce5ae23708f0f246cd37710c79b89736",
+    "src-tauri/Cargo.lock": "09d4e7263fdcfab0dda1382fef522eee5aa0d7cfe125425d19ead82a83b95dac",
+    "scripts/vendor-opener-compat.py": "e200596b36592da00a9c7fe102baf8f5888242a13d4dde50544d623eefdcd7d8",
+    "scripts/assurance/opener-dbus-probe.py": "72f299a8f3b0188ce3ac895f80524462c46a3f111a72576222add37eff5b3e23",
+    ".github/workflows/quality.yml": "2451f46c17ff096cb5cce491c86cc4efed6c667ec4598401e985367b4e857cac",
+    "src-tauri/vendor/opener-provenance.json": "6e4040d871b824e826eec82a619f9bc4c9c48e412baa6fa136a0dcede001a807"
+  },
+  "readiness": {
+    "bounded_maintenance": "READY FOR REVIEW",
+    "checked_source": "ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a",
+    "merge_deployment": "NOT PERFORMED; draft dependent PR148",
+    "teacher_trial": "NOT RUN",
+    "installed_Windows_GUI_upgrade": "NOT RUN",
+    "actual_Android": "NOT RUN",
+    "real_desktop_portal": "NOT RUN (private synthetic D-Bus only)"
+  }
+}
