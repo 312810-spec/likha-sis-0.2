@@ -32,7 +32,11 @@ Final checkpoint updates documentation only; four implementation/test/probe hash
 recorded with raw check receipts in `score-design-evidence-2026-10-18.json`.
 D1–D6 PASS; advisory D7 NOT RUN. Bounded technical readiness: READY FOR REVIEW.
 Teacher usability benefit remains provisional. Merge/release remains BLOCKED by the
-existing PR146 dependency-security failures. New remote CI is pending publication.
+existing PR146 dependency-security failures. Remote Quality Gate run 39125554539 PASS on published implementation `8c9ce19`:
+Ubuntu job 117669843641 SUCCESS; JavaScript quality, UI smoke and recovery steps PASS.
+Windows/native execution skipped by affected-work classification; no new native claim. Security run
+39125554557 FAIL; gitleaks PASS, OSV reports the same three existing zbus/zvariant
+advisories (RUSTSEC-2026-0370/0371/0372). Lockfiles/suppressions unchanged.
 Native commands/repository/migrations/service/bridge are byte-identical to baseline;
 original native receipts remain revision-bound. Browser fixtures are memory only.
 
@@ -40,7 +44,13 @@ Initial push was rejected by automatic approval review because export authorizat
 destination were considered unverified. GitHub connector then confirmed repository
 1344185717 is exactly the expected user-owned public repository, with push/admin access.
 Existing scoped push authorization is preserved; retry only after this concrete verification.
-Remote persistence is not yet claimed in this checkpoint.
+Publication succeeded through the authenticated GitHub connector after verification; shell
+Git retry lacked credentials. Draft PR147: https://github.com/312810-spec/likha-sis-0.2/pull/147,
+based on PR146. Published implementation `8c9ce19e60b43ff66776fde762eb64f1250e58a7`
+has tree `0aee5373ff2f4c9e48cd0224326ae3a28f68e39e`, exactly matching local verified
+checkpoint `96cf5de`. A fresh public Git fetch confirmed byte-identical remote contents.
+Local branch now tracks that published commit; original local history is retained under
+`checkpoint/score-design-local-96cf5de`. No merge or deployment.
 
 ## Design decision
 
@@ -78,4 +88,12 @@ success is evidence for behavior only. Keep findings provisional until this tria
 Existing PR146 dependency-security blockers remain separate; do not merge/deploy this stack.
 Installed Windows UI, actual Android, real two-device exchange, manual screen reader and native
 browser/OS zoom remain untested. Six rendered widths/themes and 640px reflow are not device proof.
-Publish a separate dependent draft PR and confirm remote persistence; bind CI to its exact head. No automation or unrelated work is authorized here.
+Review the remaining CI result on PR147, then conduct the teacher trial when participants
+are available and authorized. Keep existing dependency repairs in a separate scope. No automation or unrelated work is authorized here.
+
+## Verification boundary
+
+Keyboard evidence covers score sequence boundaries and correction Save/Cancel/Enter,
+not a complete keyboard or screen-reader audit of all roster exception/history actions.
+Baseline/candidate used the same 18→19 task and synthetic repository; candidate additionally
+stressed a longer item title. No matched participant timing comparison occurred.

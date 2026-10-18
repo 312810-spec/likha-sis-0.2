@@ -12,7 +12,7 @@
   },
   "baseline_tests": {
     "status": "FAIL as expected",
-    "executed": "vitest run src/ui/ClassRecordWorkspace.test.tsx -t score decision design",
+    "executed": "node node_modules/vitest/vitest.mjs run src/ui/ClassRecordWorkspace.test.tsx -t 'score decision design'",
     "observations": [
       "No recorded/proposed comparison",
       "Reason Tab saves instead of reaching actions",
@@ -20,7 +20,9 @@
       "Two Enter presses make two repository calls while pending"
     ],
     "failed": 4,
-    "skipped": 58
+    "skipped": 58,
+    "raw_log_sha256": "1157dc2dc5402ef2029b3d16b6e450f7559c3f2e095c617b2abf8e337f1f7ab5",
+    "stdout_summary": "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 4 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > reviews recorded and proposed values before a correction is committed\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > lets keyboard users reach Cancel without saving a completed reason\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > explains a blank edit without erasing the recorded score and lets Tab leave the final input\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > score decision design > guards an explicit correction while its acknowledgment is pending\nAssertionError: expected \"record\" to be called 1 times, but got 2 times\n Test Files  1 failed (1)\n      Tests  4 failed | 58 skipped (62)\n   Duration  4.31s (tests 45%, environment 25%, transform 16%, import 7%, setup 6%)"
   },
   "candidate_browser": {
     "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
@@ -194,7 +196,7 @@
     "bounded_design": "READY FOR REVIEW",
     "teacher_usability": "UNVALIDATED",
     "merge_release": "BLOCKED by existing PR146 dependency security gates; no merge/deploy",
-    "new_ci": "NOT RUN before publication"
+    "new_ci": "Quality39125554539 PASS on implementation8c9ce19; Security39125554557 FAIL, existing RUSTSEC-2026-0370/0371/0372, gitleaks PASS; final documentation checkpoint does not change checked source."
   },
   "publication_preflight": {
     "first_push": "Rejected by automatic approval review as destination/export authorization unverified; no push receipt",
@@ -205,6 +207,174 @@
       "visibility": "public",
       "connector_permissions": ["admin", "push"]
     },
-    "authorization": "Existing project-scoped implementation/push authorization preserved in current user project instructions and supplied prior conversation. No production deployment."
+    "authorization": "Existing project-scoped implementation/push authorization preserved in current user project instructions and supplied prior conversation. No production deployment.",
+    "resolution": "Destination verified; Git retry failed for missing shell credentials. Authenticated GitHub publication succeeded and was fetched/read back."
+  },
+  "remote_ci_receipt": {
+    "implementation": "8c9ce19e60b43ff66776fde762eb64f1250e58a7",
+    "runs": [
+      {
+        "id": 39125554557,
+        "name": "Security Gate",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1525,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554557/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554557/logs",
+        "workflow_id": 342872406
+      },
+      {
+        "id": 39125554539,
+        "name": "Quality Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1062,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554539/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39125554539/logs",
+        "workflow_id": 342524866
+      }
+    ],
+    "jobs": [
+      {
+        "id": 117669810864,
+        "name": "Quality / classify affected work",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Determine changed files",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify classifier behavior",
+            "conclusion": "success"
+          },
+          {
+            "name": "Classify affected work",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 117669843641,
+        "name": "Quality (Ubuntu)",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Update npm to current stable",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Node dependencies",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run documentation formatting gate",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify harness contract",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run JavaScript and TypeScript quality gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Chromium for deterministic UI verification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run UI workflow and accessibility smoke gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify UX recovery journeys",
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload UI verification screenshots",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Tauri Linux build dependencies",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run native Rust quality gate",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify bounded score native baseline negative controls",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 117669845022,
+        "name": "Quality (Windows)",
+        "status": "completed",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "publication": {
+    "pr": "https://github.com/312810-spec/likha-sis-0.2/pull/147",
+    "base_pr": 146,
+    "remote_implementation": "8c9ce19e60b43ff66776fde762eb64f1250e58a7",
+    "tree": "0aee5373ff2f4c9e48cd0224326ae3a28f68e39e",
+    "matches_local_checkpoint": "96cf5def5f13502d8ce1d38c8453fd01227e12f9",
+    "method": "Authenticated GitHub connector after destination verification; subsequent git fetch and full tree diff PASS",
+    "merged": false,
+    "deployed": false
   }
 }

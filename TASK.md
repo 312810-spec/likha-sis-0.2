@@ -12,9 +12,10 @@ unsaved/blank explanations and duplicate-submit protection. Local quality PASS: 
 15 focused browser probes, UI smoke, 50 recovery checks, build and internal final renders.
 D1–D6 PASS; teacher trial D7 NOT RUN. Native/backend sources are unchanged; original
 native receipts remain revision-bound. Keep scope on this journey. No deployment.
-Publication initially rejected by approval review; repository ownership/push permission
-subsequently verified through GitHub connector. Retry with this evidence; do not claim
-remote persistence or CI until confirmed. Existing dependency-security merge blockers
+Published as dependent draft PR147 after repository ownership/push permission verification.
+Remote implementation `8c9ce19` exactly matches the locally verified checkpoint tree.
+Quality CI run 39125554539 PASS on implementation `8c9ce19`; Security 39125554557 FAIL on the existing
+three zbus/zvariant advisories (gitleaks PASS). No merge/deployment. Existing blockers
 remain separate. Teacher trial script is in the handoff; usability gains are provisional.
 
 ## Bounded score-entry investigation — 2026-10-18
