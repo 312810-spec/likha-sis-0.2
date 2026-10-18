@@ -1,75 +1,85 @@
-# Separate opener maintenance checkpoint
+# Opener maintenance — verified handoff
 
-Branch `forge/opener-dependency-maintenance-20261018`, based on PR147 head `88e0686`.
-Frozen criteria O1–O6 in `opener-maintenance-contract-2026-10-18.md`.
-Latest PR147 Quality39125900679 PASS; Security39125900458 FAIL on the same three
-retired standalone crates. This branch preserves that journey and its pending trials.
+## Outcome and source
 
-## Mechanism and candidate
+**READY FOR REVIEW: frozen O1–O6 all PASS.** Separate dependency maintenance resolves
+the three-advisory blocker without widening score design or changing scanner policy.
+Draft PR148: https://github.com/312810-spec/likha-sis-0.2/pull/148, dependent on PR147→PR146.
+Branch: `forge/opener-dependency-maintenance-20261018`. No merge or deployment.
 
-The graph is opener2.7.0 → zbus5.19 → zvariant/zbus_names/zvariant_derive.
-Official RustSec says the standalone APIs moved into zbus6. Latest stable opener2.7.2
-still requires zbus5.9. A normal update is insufficient; scanner filtering/suppression
-and removing teacher export reveal were rejected.
+Checked source: `ceeab1d53b4901f372f7ead6da2fcb2b9ea0278a`.
+CI merge: `9d97cb079d179056b76ee2565ad3e86de64c6e84`.
+Fresh fetch confirms identical tree: `3f1dfa15eab3173a30d0f5daa685776d9c11ae2c`.
+Final checkpoint edits documentation only; implementation/workflow/verifier/lock hashes
+and executed receipts are in `opener-maintenance-evidence-2026-10-18.json`.
+Frozen contract: `opener-maintenance-contract-2026-10-18.md`.
 
-Verified official opener2.7.2 archive checksum; retained 37 files and both licenses.
-Only normalized Cargo.toml and Unix reveal implementation are patched. zbus6 removed
-its blocking facade: use async Connection/proxies with block_on on the existing dedicated
-thread; retain FileManager1 first, portal fallback for the first path, and propagated denial.
-Windows code, permissions/scopes, commands and mobile assets are byte-identical to upstream.
-No upstream support or installed-platform acceptance is implied by this local snapshot.
+## Mechanism and decisions
 
-Cargo1.99.1 generated the real lockfile: removes all three retired crates and their unused
-async stack. zbus6 requires Tokio1.53.3; attempting to preserve1.53.1 failed the resolver,
-so the required patch update is retained. No blanket update, spoofed checksums or new ignore.
-Toolchain archives were checked against official stable-manifest SHA256 before local use.
-Context7 returned an unversioned index with mixed historical examples; downloaded v6 source
-and actual compilation take precedence. No Context7 component is added to teacher runtime.
+The old graph was opener2.7.0→zbus5.19→standalone zvariant/zbus_names/zvariant_derive.
+RustSec retired these standalone crates after their APIs moved into zbus6. Stable
+opener2.7.2 still requires zbus5.9; a normal update cannot remove the findings.
 
-## Executed / pending
+The explicit official-source opener2.7.2 snapshot retains 37 files and both full licenses.
+Its archive checksum is verified against the published registry value. Only normalized
+Cargo.toml and Unix reveal code are patched: async zbus6 Connection/proxies are driven
+by block_on on the existing dedicated thread. Preserve FileManager1-first behavior,
+first-path portal fallback and propagated denial. Windows, commands, permission/scope
+and mobile code remain byte-identical to upstream. This is a local compatibility fork.
+Cargo generated the real lockfile; zbus6 requires Tokio1.53.3. A precise1.53.1 preservation
+attempt failed the resolver, so only that required patch update is retained.
 
-O1 local PASS: clean regeneration byte-for-byte, refuses overwrite, rejects source tamper
-and unexpected file; 37-file provenance and original spreadsheet provenance PASS.
-O2 local PASS: Cargo-generated lock contains none of the three retired crates; unchanged
-security policy, score source and export bridge checked byte-for-byte.
-O3 security CI pending. O4 native/Windows checks pending. The actual patched Unix module and synthetic mock services compiled with zbus6 locally.
-Local execution then stopped because this host denied the private D-Bus socket (Operation
-not permitted). Runtime behavior remains NOT RUN locally, not a product failure or pass.
-Earlier harness namespace/API setup errors were corrected before the successful compilation.
-The same probe is wired to unrestricted Ubuntu CI; it never uses a real desktop/session bus.
-O5 frontend gate running; no teacher-app UI source changes. O6 verifier/private-bus regression
-steps wired into native Ubuntu CI and provenance into Windows CI; not yet remotely executed.
+Initial candidate ec13fbe and its CI failures remain in evidence/checkpoint history:
 
-## Next action and limits
+- Public source SHA256 map entry matched generic-api-key. Explicit path/sha256 records
+  remove that false-positive representation; same-version changed-file scan passes.
+- Upstream LICENSE.spdx is an invalid legacy SPDX document. Retain its bytes as
+  LICENSE-SPDX-notice.txt with explicit original-path provenance, not as an asserted SBOM.
+- Windows inventory keys needed as_posix(), not platform-specific str(relative_path).
+  No new ignore, scanner filtering, capability removal, version spoof or broad update.
+  Only this task-owned unmerged branch was replaced with an exact expected-head lease;
+  other branches/history stayed intact. Prior failures were not relabeled as passes.
 
-Complete local probe, publish this separate dependent draft and capture security/native/Windows
-receipts against exact source. Repair any actual failure; no readiness claim until O1–O6 pass.
-Teacher trial, installed Windows GUI, real desktop portal and Android remain untested.
-Do not claim this dependency patch alone closes those acceptance items. No deployment.
+## Executed checks
 
-## First candidate CI and targeted repairs
+| Check                  | Result / receipt                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provenance O1          | PASS: 37-file inventory on Windows/Ubuntu; clean byte-for-byte regeneration; overwrite refusal; tamper/extra-file rejection; original 618-file spreadsheet provenance.                              |
+| Resolved graph O2      | PASS: Cargo1.99.1-generated lock removes the three retired crates; candidate hashes retained.                                                                                                       |
+| Security O3            | Run39135625254 SUCCESS; Gitleaks117699430479, cargo-deny117699430568, OSV117699430802 all PASS under unchanged policy.                                                                              |
+| Ubuntu O4              | Job117699527114 SUCCESS: 1,525 native tests, Rustfmt and Clippy PASS.                                                                                                                               |
+| Actual Unix adapter O4 | Private synthetic D-Bus success, fallback and denial all PASS in CI; the production module itself is extracted and compiled, not reimplemented.                                                     |
+| Windows O4             | Job117699527102 SUCCESS: 1,534 native tests, native application and NSIS/MSI build PASS.                                                                                                            |
+| Journey O5             | 1,576 frontend tests, UI smoke and 50 recovery checks PASS. Score native negative controls fail as expected against pinned pre-fix production code; candidate positives pass; source_restored=true. |
+| O6                     | Provenance/private-bus checks wired and executed in Quality39135625221; exact PR/source/tree/artifact receipts retained.                                                                            |
 
-Published first candidate ec13fbe as draft PR148, dependent on PR147. Cargo-deny
-job117698055333 PASS: retired crate blocker removed. Gitleaks job117698055123
-flagged the public SHA256 of upstream api-iife.js in the path→hash JSON map, not a
-credential; the digest was checked against archive bytes. Inventory format2 uses
-explicit path/sha256 records. A scan of all changed candidate files with the same
-Gitleaks8.24.3 binary/rules then PASS (zero findings). A broad vendor directory scan
-still reports the two historical spreadsheet inventory matches already recorded in
-existing policy; no new ignore was added.
+Local private-bus execution was blocked by host socket permissions. Actual CI execution
+supersedes that missing runtime evidence; it does not turn the local blocked run into PASS.
+Context7 returned unversioned/mixed historical snippets; actual v6 source/compiler governed.
+No Context7 component or teacher-runtime network request was added.
 
-OSV job117698055398 reported zero vulnerable packages but failed extracting upstream
-LICENSE.spdx: its old DataFormat tag is not a valid SPDX package field. Preserve the
-notice bytes as LICENSE-SPDX-notice.txt with an explicit provenance path mapping;
-both complete license texts remain intact. This is document typing, not a dependency
-or vulnerability exclusion. Clean regeneration including that mapping PASS.
+## Windows review artifact
 
-Windows job117698095402 stopped at the new provenance checker: str(relative_path)
-produces Windows backslashes while upstream inventory uses slash paths. Use as_posix()
-for inventory identity on every platform; do not normalize hashes or accept mismatch.
-Full Windows compile/test and final security results still need the repaired candidate.
+Test installer, exact source ceeab1d:
+https://github.com/312810-spec/likha-sis-0.2/actions/runs/39135625221/artifacts/12140346037
+SHA256: `598e719d06f7eb34a727267902bdd949ae8690780eb77906c91aafb651389bab`.
+Artifact expiry: 2026-11-01. Test only in a disposable Windows installation/profile/VM;
+no existing installation or user data was overwritten in this work.
 
-The first unmerged maintenance commit is retained in local checkpoint history and CI
-receipts. Replace only this task-owned draft branch using an exact expected-head lease,
-so Gitleaks evaluates the corrected inventory representation rather than an obsolete
-false-positive intermediate commit. No other branch/history or scanner policy changes.
+## Pending and next action
+
+Teacher trial, installed Windows GUI/upgrade, actual Android, real desktop portal and
+real two-device transfer remain NOT RUN. Private synthetic services do not establish
+real portal/device acceptance. UI source/tokens, score application source, export bridge,
+permission files and scanner policies remain unchanged from PR147.
+
+Review/integrate only the verified PR148→PR147→PR146 stack under existing gates. Old
+branch security receipts do not become green merely because this candidate passed.
+Then perform the scoped teacher/disposable-device trial already specified in the score
+handoff. No broader M10–M17 closure or deployment follows from these checks.
+
+Recheck when source/advisory data changes. Remove the local snapshot once a maintained
+compatible opener release supports zbus6, then rerun provenance/security/native/Windows
+checks. Do not repeat this completed maintenance or resume unrelated M11/Android work
+by default. GitHub publication of this final documentation checkpoint must be confirmed
+before claiming that checkpoint is durable.
