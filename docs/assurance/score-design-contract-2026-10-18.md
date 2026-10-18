@@ -1,0 +1,28 @@
+# Score decision design — frozen supplemental contract
+
+Baseline: `10cfe8c16033a8ec260a2ba030f7518c4ec25741`; branch `forge/score-decision-design-20261018`.
+Scope: the existing Class Record score/correction row. Builds on PR146 without weakening S1–S7; no native, policy, migration, dependency or report changes. Original contract excluded redesign; this explicitly authorized follow-up adds bounded interaction design.
+
+## Outcome and selection
+
+Teacher knows which value is recorded, which is merely typed, and exactly what a correction will replace before committing it. This journey already has evidenced score-loss consequences. Current source replaces the score with a reason field without showing the old/new values; preserves newer drafts but supplies no unsaved explanation; and intercepts every reason-field Tab as a save. Teacher observations, actual usage frequency, task times and device trials are unavailable. These are source-backed hypotheses until reproduced, not participant research.
+
+## Required acceptance checks
+
+| ID  | Requirement                                                                                                                                                                                              | Severity | Evidence                                                                                                                                                           |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | Correction review shows recorded and proposed score/status, range and learner context; reason is visibly labeled and associated with the review.                                                         | Major    | Baseline/candidate interaction, text/association assertions and render inspection.                                                                                 |
+| D2  | Newer draft after acknowledgment identifies itself as unsaved and distinguishes the recorded value; blank never implies deletion/zero; exception and zero remain distinct.                               | Major    | Deferred-save test plus browser repository assertions, blank/exception/zero positive controls.                                                                     |
+| D3  | Teacher can reach correction Save/Cancel with keyboard without a write caused by focus traversal; cancel restores recorded value and focus; an in-flight correction cannot be submitted/cancelled twice. | Major    | Baseline failure, browser keyboard interactions, repository call counts and deferred regression.                                                                   |
+| D4  | Last/first score input supports leaving the entry sequence via Tab/Shift+Tab without losing the existing save/reason checks.                                                                             | Major    | Real browser focus and unit tests.                                                                                                                                 |
+| D5  | Existing S1–S6 behavior stays intact. No backend contract changes or new sync/durability claims.                                                                                                         | Critical | Focused/full frontend checks, original browser probe, unchanged native source hashes and original revision-bound receipts; source-SQL check as corroboration only. |
+| D6  | Candidate works in light/dark at 1280/390 and 200% equivalent viewport; long synthetic learner/item text; keyboard/touch input; reduced motion; no relevant automated accessibility/overflow failure.    | Major    | Playwright/axe, focus checks, internal renders. Manual screen-reader and installed native behavior remain separate.                                                |
+| D7  | Representative teacher usability validation.                                                                                                                                                             | Advisory | Actual trial only; otherwise NOT RUN and usability benefit provisional.                                                                                            |
+
+Required failures block readiness; missing required evidence is inconclusive. D7 is advisory to permit technical review without presenting it as teacher acceptance. No invented numerical improvement target. Local browser fixture assertions establish UI behavior, not native durability.
+
+## Candidate and alternative
+
+Baseline: score disappears during reason capture; no comparison; Tab submits reason. Candidate: inline recorded → proposed review above a visibly labeled reason, explicit Save/Enter commit, native Tab to actions, contextual draft guidance, boundary escape. Alternative: modal confirmation with repeated details. Prefer inline because learner identity stays in its row, consecutive entry remains available and an extra overlay/focus transition adds no evidenced benefit. This is a testable design judgment, not validated preference.
+
+Typography, muted/semantic text, space and surfaces use incumbent tokens. Proposed change receives emphasis via a compact textual review; exceptions/history stay secondary. No new fonts, colors, animation or dependencies. Revisit after teacher trial if reading burden or accidental saves persist.
