@@ -5,6 +5,10 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Current action
 
+Use `docs/assurance/scores-windows-trial-2026-10-19.md` for the pinned installer and
+`prepare-scores-trial.mjs` helper. It verifies the original ZIP and creates untested
+observations; it does not install or establish teacher/device acceptance.
+
 The latest Scores checkpoint ee2b781 passed Quality39158028481 and Security39158028370,
 including executed Ubuntu/Windows native gates. Receipt: `docs/assurance/scores-checkpoint-ci-2026-10-19.json`. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
 Remaining pilot acceptance requires the prepared teacher/disposable-device/manual checks;

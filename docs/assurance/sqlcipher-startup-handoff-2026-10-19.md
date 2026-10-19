@@ -149,6 +149,10 @@ source checksums and evidence classes: `sqlcipher-startup-evidence-2026-10-19.js
 
 ## Remaining Scores observation protocol — NOT RUN
 
+Runnable preparation and current pinned trial artifact:
+`scores-windows-trial-2026-10-19.md`. The helper verifies the ZIP and starts all
+observations as NOT RUN; its Linux tests do not establish Windows execution.
+
 Reuse the six-task trial in `score-design-handoff-2026-10-18.md`; do not repeat its
 old PR/security status as current. Add these cases for the current candidate:
 
