@@ -5,6 +5,12 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Current action
 
+Active prerequisite: sole-account legacy setup-role recovery, based on PR149 d78374f.
+Read `docs/assurance/legacy-setup-recovery-handoff-2026-10-20.md` and R1–R7.
+User confirmed sole account; recovery is explicit/password-rechecked, not automatic
+promotion or a database reset. Exact candidate native/security/installer gates pending.
+Do not infer installed recovery or close the Scores pilot from browser/CI results.
+
 Use `docs/assurance/scores-windows-trial-2026-10-19.md` for the pinned installer and
 `prepare-scores-trial.mjs` helper. It verifies the original ZIP and creates untested
 observations; it does not install or establish teacher/device acceptance.
