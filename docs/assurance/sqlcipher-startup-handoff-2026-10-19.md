@@ -1,5 +1,30 @@
 # SQLCipher cold startup — implementation checkpoint
 
+## Latest checkpoint CI — verified on continuation
+
+Checkpoint `ee2b7817df16c677ffb0a008176cc6b06a579915` (tree
+`cb0f5eb81dd4d1cf29a0b605589707593da98d84`) passed Quality39158028481 and
+Security39158028370. This is a new exact-head receipt, beyond the implementation
+receipt below. Inspected job steps show native gates executed, not skipped:
+Ubuntu117765249349 passed1,526 native tests; Windows117765249295 passed1,535
+native tests and application/installer build. Cold subprocess regression,48 mechanism
+checks, UI smoke/recovery50 and restored-source negative controls passed.
+All three security jobs passed. Only the documentation-format step was skipped.
+Machine-readable job/step/log/artifact evidence: `scores-checkpoint-ci-2026-10-19.json`.
+
+Latest disposable Windows test artifact:
+https://github.com/312810-spec/likha-sis-0.2/actions/runs/39158028481/artifacts/12148083473
+GitHub-reported archive digest:
+`sha256:74075c899a852cddfc662b243606c0974d5ea1c10f2269aa18c1348d24bb01d8`.
+Expires2026-11-01T19:36:58Z. This supersedes the older trial artifact below;
+no installed-GUI, upgrade or independent binary-checksum observation is claimed.
+
+Current execution host is Linux; neither `adb` nor `wine` is on PATH. No accessible
+installed Windows/Android target or teacher observation has been established.
+Full pilot remains INCONCLUSIVE. Execute the remaining observation protocol below
+on the actual target devices and return the recorded outcomes; no further runtime
+change or repeat automated suite is justified by this successful checkpoint alone.
+
 ## Verified native prerequisite — current result
 
 **N1–N6: READY FOR REVIEW within this native repair. Full Scores pilot: INCONCLUSIVE**

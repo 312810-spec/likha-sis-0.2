@@ -5,8 +5,8 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Current action
 
-The native Scores prerequisite is verified at sourcee6f13fd with complete Ubuntu/Windows
-and Security receipts. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+The latest Scores checkpoint ee2b781 passed Quality39158028481 and Security39158028370,
+including executed Ubuntu/Windows native gates. Receipt: `docs/assurance/scores-checkpoint-ci-2026-10-19.json`. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
 Remaining pilot acceptance requires the prepared teacher/disposable-device/manual checks;
 those observations are NOT RUN. No new runtime journey, merge or deployment is implied.
 Historical checkpoint instructions below do not reopen the repaired native/dependency work.

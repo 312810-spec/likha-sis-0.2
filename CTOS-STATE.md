@@ -5,6 +5,11 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current — Scores native prerequisite verified
 
+Latest checkpoint ee2b781 passed Quality39158028481 and Security39158028370;
+all native platform steps executed. Latest disposable Windows test artifact12148083473.
+Exact steps/logs/digest: `docs/assurance/scores-checkpoint-ci-2026-10-19.json`.
+Teacher/device/manual observations still require execution outside this Linux host.
+
 PR149 sourcee6f13fd passed full Quality39155819896 and Security39155819934:
 1,526 Ubuntu/1,535 Windows native tests plus1,581 frontend tests, build and UI/recovery.
 Current evidence: `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
