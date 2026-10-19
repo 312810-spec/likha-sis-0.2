@@ -94,3 +94,15 @@ app must show setup controls from the returned roles. Verify existing identity a
 records, then configure the intended section/assignment. Actual user-device recovery
 remains NOT RUN until observed; never mark it complete from CI/mock screenshots.
 Full Scores teacher/installed-upgrade/Android/exchange/manual acceptance stays separate.
+
+## First candidate CI follow-up
+
+Published source6e2f271 /tree6ba27a61; CI mergea8bb32e0 has the same tree.
+Security39337985890 passed all3 unchanged-policy scanners. Quality39337985884
+Ubuntu118352260331 failed in the existing pending-record test: workspace heading
+was found before the assessment-loading effect called its spy (0 calls at the
+immediate assertion). Local suite had passed; CI timing exposed the test race.
+Source shows the heading renders independently of the loading effect. Changed
+only the test synchronization to wait for the same exact `cr-2` call, retaining
+no-replacement assertion. No production Scores/recovery behavior was changed.
+Revised candidate must pass full CI; the failed receipt is retained as history.
