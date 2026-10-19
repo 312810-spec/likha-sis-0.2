@@ -4,6 +4,40 @@ Base: PR149 d78374f220ed1cb64358725952a72b445840d9a2. Separate dependent repair;
 no merge/deployment, no new runtime journey. Frozen R1–R7:
 `legacy-setup-recovery-contract-2026-10-20.md`.
 
+## Verified implementation and current installer
+
+R1–R7 technically READY FOR REVIEW within this bounded repair. Actual recovery on
+the user's installation remains NOT RUN until observed. Full Scores pilot remains
+INCONCLUSIVE; no merge/deployment.
+
+Checked source52a761cc3d1368a2cc91c95c1ab59a06a07ef266,
+tree1ed35b828a649b5a6bfa376acf7359e2fe7814c9. CI merge
+4e5a951a2bd17816c3365442a577772613938c27 has exactly the same tree.
+Quality39338547483 SUCCESS: Ubuntu118354179062 passed1,535 native tests,
+Rustfmt/Clippy, both vendor provenance checks, private D-Bus and restored-source
+score negative controls; Windows118354179127 passed1,544 native tests and actual
+application/NSIS/MSI build. All9 new native recovery cases passed on both platforms.
+Frontend1,593/UI smoke/recovery50 passed. Security39338547311 passed Gitleaks,
+cargo-deny and OSV under unchanged policy. Exact jobs/steps/focused logs/artifact:
+`legacy-setup-recovery-ci-2026-10-20.json`.
+
+[Replacement Windows test-installer ZIP](https://github.com/312810-spec/likha-sis-0.2/actions/runs/39338547483/artifacts/12228374752).
+GitHub-reported archive SHA-256:
+`f43f96151e69ad1dbb64b124cc9f499c173e46c01a2a54c2648b551c9efcb1bc`;
+22,970,803 bytes, expires2026-11-02T23:23:52Z. This binds the original ZIP, not an
+extracted installer. `prepare-scores-trial.mjs` and the Windows trial runbook now
+pin this candidate; the old trial ZIP is no longer the helper's accepted candidate.
+All7 helper integrity/output-protection tests and focused formatting/diff checks
+passed after the metadata update. No application/native/test/workflow source was
+changed after the checked implementation; later edits are receipts/helper pin only.
+
+On the affected installation, close LIKHA-SIS and install the replacement test build
+without deleting its app-data. Sign in, choose Restore setup access, review the
+application permissions and confirm with the current password. Then check that
+Sections offers Create section. Preserve the database/key; no manual SQL or password
+reset is needed by this flow. If recovery is unavailable, leave the data intact:
+its eligibility guard is authoritative and ambiguous cases require further diagnosis.
+
 ## Problem and decision
 
 User reports this installation's only account worked on an older build, the new
@@ -80,8 +114,8 @@ ineligibility is not proof that the sign-in session expired.
 
 ## Remaining gates and device steps
 
-R7/native execution is INCONCLUSIVE pending exact-source Ubuntu/Windows and Security
-CI and Windows packaging. New native cases cover actual legacy schema/hash upgrade,
+At the original implementation checkpoint, R7/native execution was INCONCLUSIVE
+pending exact-source CI; the verified result above supersedes that pending status. New native cases cover actual legacy schema/hash upgrade,
 correct/wrong/locked password, absent/expired/revoked session, extra account/school,
 missing membership/bootstrap, existing role or historical management, stale status,
 atomic audit rollback, duplicate and concurrent-connection recovery.

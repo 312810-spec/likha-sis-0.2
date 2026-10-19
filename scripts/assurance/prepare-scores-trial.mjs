@@ -5,15 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// GitHub artifact metadata retrieved 2026-10-19; digest covers the original ZIP.
+// GitHub artifact metadata retrieved 2026-10-20; digest covers the original ZIP.
 export const candidate = Object.freeze({
-  source: "fdf007dda30d016ebcbf04c42c6e75a4c3dc3f77",
-  run: 39204212688,
-  artifact: 12165548257,
-  bytes: 22956730,
-  sha256: "548a6862c593530f2bf13b8c46404e59158ea38081f81e7dbffa4ffec8c85978",
-  url: "https://github.com/312810-spec/likha-sis-0.2/actions/runs/39204212688/artifacts/12165548257",
-  expiresAt: "2026-11-02T05:45:39Z",
+  source: "52a761cc3d1368a2cc91c95c1ab59a06a07ef266",
+  run: 39338547483,
+  artifact: 12228374752,
+  bytes: 22970803,
+  sha256: "f43f96151e69ad1dbb64b124cc9f499c173e46c01a2a54c2648b551c9efcb1bc",
+  url: "https://github.com/312810-spec/likha-sis-0.2/actions/runs/39338547483/artifacts/12228374752",
+  expiresAt: "2026-11-02T23:23:52Z",
 });
 
 const tasks = [

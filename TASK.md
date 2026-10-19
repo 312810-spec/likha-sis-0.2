@@ -8,7 +8,9 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 Active prerequisite: sole-account legacy setup-role recovery, based on PR149 d78374f.
 Read `docs/assurance/legacy-setup-recovery-handoff-2026-10-20.md` and R1–R7.
 User confirmed sole account; recovery is explicit/password-rechecked, not automatic
-promotion or a database reset. Exact candidate native/security/installer gates pending.
+promotion or a database reset. Checked source52a761c passed Quality39338547483 and Security39338547311, including
+1,535 Ubuntu/1,544 Windows native tests and installer artifact12228374752. Actual
+user-device recovery is NOT RUN until observed; use the current handoff/installer.
 Do not infer installed recovery or close the Scores pilot from browser/CI results.
 
 Use `docs/assurance/scores-windows-trial-2026-10-19.md` for the pinned installer and

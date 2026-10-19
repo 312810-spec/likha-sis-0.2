@@ -3,6 +3,18 @@
 Updated: 2026-10-19 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V3-ADAPTER.md`.
 
+## Current prerequisite — legacy sole-account setup access
+
+Dependent draft PR150 repairs the roleless legacy sole-owner setup dead end.
+Checked source52a761c: Quality39338547483/Security39338547311 PASS,1,535 Ubuntu /
+1,544 Windows native tests plus1,593 frontend, UI/recovery and Windows package.
+Installer12228374752; source/steps/digest and user steps:
+`docs/assurance/legacy-setup-recovery-handoff-2026-10-20.md`.
+Recovery is explicit and password-rechecked, with session-derived scope and atomic
+eligibility/role/audit checks. No password/key/schema or school-record rewrite.
+Actual installed recovery remains NOT RUN; full Scores pilot INCONCLUSIVE.
+No merge/deployment. Older pending statements below remain historical.
+
 ## Current — Scores native prerequisite verified
 
 Latest checkpoint ee2b781 passed Quality39158028481 and Security39158028370;
