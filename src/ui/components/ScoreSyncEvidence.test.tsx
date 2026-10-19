@@ -34,6 +34,9 @@ it.each([null, "unauthorized"])("does not invent evidence for %s", async (result
   );
   await act(async () => {});
   expect(screen.queryByText(/Last sync check:/)).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    result === null ? "Transfer status unavailable" : "Could not check transfer status",
+  );
 });
 
 it("discards a late response after the saved-row instance is replaced", async () => {
@@ -65,5 +68,21 @@ it("hides the old snapshot immediately when its service is replaced", async () =
   const { rerender } = render(<ScoreSyncEvidence {...context} service={first} />);
   await screen.findByText("Last sync check: Synced");
   rerender(<ScoreSyncEvidence {...context} service={next} />);
+  expect(screen.queryByText(/Last sync check:/)).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Checking transfer status");
+});
+
+it("announces a pending check without inventing a receipt", () => {
+  render(
+    <ScoreSyncEvidence
+      {...context}
+      service={
+        new LearnerScoreSyncStatusApplicationService({
+          getStatus: vi.fn().mockImplementation(() => new Promise(() => {})),
+        })
+      }
+    />,
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("Checking transfer status");
   expect(screen.queryByText(/Last sync check:/)).not.toBeInTheDocument();
 });

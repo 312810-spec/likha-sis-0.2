@@ -1,0 +1,616 @@
+{
+  "source_parent": "237b7b5bfc1df50fe11b9069cf966288c3276877",
+  "main": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+  "source_sha256": [
+    {
+      "path": "src/ui/ClassRecordWorkspace.tsx",
+      "sha256": "aaf894109e799ab0c134dae57b21cc31233912e776a91a2d92e3bed52ae14d33"
+    },
+    {
+      "path": "src/ui/components/ScoreSyncEvidence.tsx",
+      "sha256": "468401d493a7839d545daab9a24714153f82f01af1a1c4e9f9c9b475e53748e0"
+    },
+    {
+      "path": "src/ui/components/useScoreFocusClearance.ts",
+      "sha256": "7189b31f193b17e3e560a6722112966aa4cdcca16ca6c189aeed6fdfd0deebca"
+    },
+    {
+      "path": "src/ui/ReportCardReadinessPanel.tsx",
+      "sha256": "dd1f583c93fb2cb3a69ee976b06a1537eb170357c294932a281d9c8af7daaaee"
+    },
+    {
+      "path": "src/ui/theme/styles.css",
+      "sha256": "f25c3ad246a8aaafec95d66da7a2fa7b78949daeb747f8b1d275999340cd117b"
+    },
+    {
+      "path": "src-tauri/src/commands/learner_score.rs",
+      "sha256": "3cfd87f184b878060ec57ce1dce99fd3bc54c75c892a7d0ecc5d45f17a9d288c"
+    },
+    {
+      "path": "src-tauri/src/repository/learner_score.rs",
+      "sha256": "a6359ed086f5f9928b5a15cbc7359429bee61ecae9184cd6e6a1e88f6ef2317f"
+    },
+    {
+      "path": "src-tauri/Cargo.lock",
+      "sha256": "09d4e7263fdcfab0dda1382fef522eee5aa0d7cfe125425d19ead82a83b95dac"
+    }
+  ],
+  "browser": "Chrome headless shell155.0.8059.84/Linux synthetic repositories; viewport/touch emulation, NOT installed native device",
+  "baseline": {
+    "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
+    "checks": [
+      {
+        "check": "older acknowledgment preserves newer draft and focus",
+        "displayed": 19,
+        "fixturePersisted": 18,
+        "calls": 1
+      },
+      {
+        "check": "correction comparison and keyboard cancel without a write",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit correction saves exact score and lineage",
+        "result": "PASS"
+      },
+      {
+        "check": "rejected write retains draft and has no saved claim",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit keyboard retry saves retained value",
+        "result": "PASS"
+      },
+      {
+        "check": "native Tab exits at both score sequence boundaries",
+        "result": "PASS"
+      },
+      {
+        "check": "blank edit preserves recorded value and Escape restores it",
+        "result": "PASS"
+      },
+      {
+        "check": "focused correction clears fixed navigation after resize",
+        "top": 861.703125,
+        "bottom": 901.703125,
+        "navTop": 783,
+        "hit": false,
+        "focused": true
+      },
+      {
+        "check": "focus clearance light/efficient/1280",
+        "top": 848.921875,
+        "bottom": 882.921875,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/efficient/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/efficient/640",
+        "top": 1072.984375,
+        "bottom": 1106.984375,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/efficient/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/efficient/390",
+        "top": 1241.796875,
+        "bottom": 1275.796875,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/efficient/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/1280",
+        "top": 430.0625,
+        "bottom": 470.0625,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/comfortable/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/640",
+        "top": 625.390625,
+        "bottom": 665.390625,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/comfortable/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/390",
+        "top": 861.703125,
+        "bottom": 901.703125,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/comfortable/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/1280",
+        "top": 413.78125,
+        "bottom": 485.78125,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/guided/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/640",
+        "top": 744.71875,
+        "bottom": 816.71875,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/guided/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/390",
+        "top": 1244.5625,
+        "bottom": 1316.5625,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility light/guided/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/1280",
+        "top": 848.921875,
+        "bottom": 882.921875,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/efficient/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/640",
+        "top": 1072.984375,
+        "bottom": 1106.984375,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/efficient/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/390",
+        "top": 1241.796875,
+        "bottom": 1275.796875,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/efficient/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/1280",
+        "top": 430.0625,
+        "bottom": 470.0625,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/comfortable/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/640",
+        "top": 625.390625,
+        "bottom": 665.390625,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/comfortable/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/390",
+        "top": 861.703125,
+        "bottom": 901.703125,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/comfortable/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/1280",
+        "top": 413.78125,
+        "bottom": 485.78125,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/guided/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/640",
+        "top": 744.71875,
+        "bottom": 816.71875,
+        "navTop": 389,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/guided/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/390",
+        "top": 1244.5625,
+        "bottom": 1316.5625,
+        "navTop": 783,
+        "hit": false
+      },
+      {
+        "check": "render and accessibility dark/guided/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "touch-emulated Cancel restores recorded score without writing",
+        "result": "PASS",
+        "limit": "Browser emulation; not installed Android evidence"
+      },
+      {
+        "check": "640px reflow models a 1280px workspace at 200% CSS zoom",
+        "result": "PASS",
+        "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
+      }
+    ]
+  },
+  "candidate": {
+    "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
+    "checks": [
+      {
+        "check": "older acknowledgment preserves newer draft and focus",
+        "displayed": 19,
+        "fixturePersisted": 18,
+        "calls": 1
+      },
+      {
+        "check": "correction comparison and keyboard cancel without a write",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit correction saves exact score and lineage",
+        "result": "PASS"
+      },
+      {
+        "check": "rejected write retains draft and has no saved claim",
+        "result": "PASS"
+      },
+      {
+        "check": "explicit keyboard retry saves retained value",
+        "result": "PASS"
+      },
+      {
+        "check": "native Tab exits at both score sequence boundaries",
+        "result": "PASS"
+      },
+      {
+        "check": "blank edit preserves recorded value and Escape restores it",
+        "result": "PASS"
+      },
+      {
+        "check": "clean interior score reaches History via native Tab",
+        "result": "PASS"
+      },
+      {
+        "check": "focused correction clears fixed navigation after resize",
+        "top": 730.703125,
+        "bottom": 770.703125,
+        "navTop": 783,
+        "hit": true,
+        "focused": true
+      },
+      {
+        "check": "focus clearance light/efficient/1280",
+        "top": 857.296875,
+        "bottom": 891.296875,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/efficient/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/efficient/640",
+        "top": 347.46875,
+        "bottom": 381.46875,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/efficient/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/efficient/390",
+        "top": 445.5,
+        "bottom": 479.5,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/efficient/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/1280",
+        "top": 429.5625,
+        "bottom": 469.5625,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/comfortable/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/640",
+        "top": 336.890625,
+        "bottom": 376.890625,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/comfortable/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/comfortable/390",
+        "top": 512.703125,
+        "bottom": 552.703125,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/comfortable/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/1280",
+        "top": 414.453125,
+        "bottom": 486.453125,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/guided/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/640",
+        "top": 299.125,
+        "bottom": 371.125,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/guided/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance light/guided/390",
+        "top": 692.9375,
+        "bottom": 764.9375,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility light/guided/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/1280",
+        "top": 857.296875,
+        "bottom": 891.296875,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/efficient/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/640",
+        "top": 347.46875,
+        "bottom": 381.46875,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/efficient/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/efficient/390",
+        "top": 445.5,
+        "bottom": 479.5,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/efficient/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/1280",
+        "top": 429.5625,
+        "bottom": 469.5625,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/comfortable/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/640",
+        "top": 336.890625,
+        "bottom": 376.890625,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/comfortable/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/comfortable/390",
+        "top": 512.703125,
+        "bottom": 552.703125,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/comfortable/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/1280",
+        "top": 414.453125,
+        "bottom": 486.453125,
+        "navTop": 900,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/guided/1280",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/640",
+        "top": 299.125,
+        "bottom": 371.125,
+        "navTop": 389,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/guided/640",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "focus clearance dark/guided/390",
+        "top": 692.9375,
+        "bottom": 764.9375,
+        "navTop": 783,
+        "hit": true
+      },
+      {
+        "check": "render and accessibility dark/guided/390",
+        "overflow": false,
+        "violations": []
+      },
+      {
+        "check": "touch-emulated Cancel restores recorded score without writing",
+        "result": "PASS",
+        "limit": "Browser emulation; not installed Android evidence"
+      },
+      {
+        "check": "640px reflow models a 1280px workspace at 200% CSS zoom",
+        "result": "PASS",
+        "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
+      }
+    ]
+  },
+  "storage": {
+    "revision": "working-tree",
+    "evidence": "SQLite source-SQL fallback, NOT Rust/SQLCipher execution",
+    "literal_migrations_executed": 57,
+    "failed_correction_history_rows": 0,
+    "atomic_policy_present": true,
+    "assignment_sql_owner_outsider_reassignment": "PASS",
+    "normal_correction_identity_and_values": "PASS",
+    "history_rollback": "PASS"
+  },
+  "native_current_run": "PR148 Quality39137295517 FAIL Ubuntu database initialization in learner_management; Windows success; local cargo unavailable. No fresh local native PASS.",
+  "screenshot_delivery": "None; transient internal render inspection only",
+  "teacher_trial": "NOT RUN",
+  "final_local_checks": [
+    {
+      "name": "quality 1581 tests",
+      "status": "PASS",
+      "log_sha256": "9a201b06246c5514af370a4e88b8d0ca51ec2947ebfe567590f5537d70340758"
+    },
+    {
+      "name": "UI smoke",
+      "status": "PASS",
+      "log_sha256": "9b628cc102b563fddf0adc6a78727270f45e69377b03cd2657ddec3b8f1c963a"
+    },
+    {
+      "name": "recovery50 checks",
+      "status": "PASS",
+      "log_sha256": "a523aef93009dbfd0110a00d19dec5bd88c4b161552c2541502023bc09d7f902"
+    },
+    {
+      "name": "production build",
+      "status": "PASS",
+      "log_sha256": "98f175691b260147bde4910733e8b4210aa482486133b708d476ec9d5d012b20"
+    }
+  ]
+}

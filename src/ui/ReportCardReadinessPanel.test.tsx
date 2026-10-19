@@ -60,7 +60,13 @@ function setup(previewReportCard = vi.fn().mockResolvedValue(PREVIEW)) {
     { exportClassRecordReportCard: exportCall } as unknown as ExportRepository,
     { previewReportCard },
   );
-  const props = { service, classRecordId: "cr-1", revision: 0, disabled: false };
+  const props = {
+    service,
+    classRecordId: "cr-1",
+    revision: 0,
+    disabled: false,
+    pendingEdits: false,
+  };
   const view = (changes: Partial<typeof props> = {}) => (
     <ModeProvider>
       <ReportCardReadinessPanel {...props} {...changes} />
@@ -107,6 +113,17 @@ describe("ReportCardReadinessPanel", () => {
       await expectNoAccessibilityViolations(t.container);
     },
   );
+  it("discloses unsaved edits beside a saved-data snapshot without a write", async () => {
+    const t = setup();
+    await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+    await screen.findByText(/2 period learners:/);
+    t.rerender(t.view({ pendingEdits: true }));
+    expect(screen.getByText(/This item has pending edits/)).toBeVisible();
+    expect(screen.getByText(/Based on saved records on this device/)).toBeVisible();
+    expect(screen.getByText(/2 period learners:/)).toBeVisible();
+    expect(t.previewReportCard).toHaveBeenCalledTimes(1);
+    expect(t.exportCall).not.toHaveBeenCalled();
+  });
   it("handles missing, failure and retry without retaining an old success", async () => {
     const t = setup(
       vi

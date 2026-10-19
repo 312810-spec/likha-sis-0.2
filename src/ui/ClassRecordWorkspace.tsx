@@ -15,6 +15,7 @@ import type {
   LearnerScoreStatus,
 } from "../domain/learner-score";
 import type { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
+import { useScoreFocusClearance } from "./components/useScoreFocusClearance";
 import { ScoreSyncEvidence } from "./components/ScoreSyncEvidence";
 import { ScoreCorrectionHistory } from "./components/ScoreCorrectionHistory";
 import { Alert } from "./components/Alert";
@@ -58,6 +59,7 @@ export function ClassRecordWorkspace({
   exportService,
 }: ClassRecordWorkspaceProps) {
   const { mode } = useTeacherMode();
+  const scoreFocusRef = useScoreFocusClearance();
   const [syncCheckRevision, setSyncCheckRevision] = useState(0);
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
@@ -180,13 +182,9 @@ export function ClassRecordWorkspace({
   // An acknowledgment confirms the submitted value, not any input typed
   // while it was pending. Track edits independently of write generations.
   const scoreDraftRevisionRef = useRef<Map<string, number>>(new Map());
-  // Per-learner write "generation": incremented every time a new write
-  // starts for that learner, whether via the score input's commit path
-  // or the Excused/N/A exception buttons -- these are two separate call
-  // sites that don't otherwise guard each other. A write's response is
-  // applied only if it is still the latest generation for that learner
-  // when it settles, so an older, slower write (from either path) can
-  // never overwrite a newer one's result.
+  // Share a synchronous write guard across score and exception entry.
+  // Generation/context checks still reject replies from an obsolete roster.
+  const writeInFlightRef = useRef<Set<string>>(new Set());
   const writeGenerationRef = useRef<Map<string, number>>(new Map());
   // Request identity for the roster fetch: guards against an in-flight
   // fetch whose selected item has since changed from applying its result
@@ -535,6 +533,7 @@ export function ClassRecordWorkspace({
     scoreText: string | null,
   ): Promise<boolean> {
     if (
+      writeInFlightRef.current.has(learnerId) ||
       !selectedItemId ||
       !itemsReady ||
       rosterLoading ||
@@ -578,6 +577,7 @@ export function ClassRecordWorkspace({
     const draftRevision = scoreDraftRevisionRef.current.get(learnerId) ?? 0;
     const generation = (writeGenerationRef.current.get(learnerId) ?? 0) + 1;
     writeGenerationRef.current.set(learnerId, generation);
+    writeInFlightRef.current.add(learnerId);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
     try {
       const score = status === "scored" ? Number(scoreText) : null;
@@ -644,6 +644,7 @@ export function ClassRecordWorkspace({
       }));
       return false;
     } finally {
+      writeInFlightRef.current.delete(learnerId);
       if (
         writeGenerationRef.current.get(learnerId) === generation &&
         rosterRequestRef.current === rosterRequest
@@ -1173,10 +1174,14 @@ export function ClassRecordWorkspace({
                 </strong>{" "}
                 · {remainingCount} remaining
               </p>
-              <div className="score-entry-scroll">
+              <p className="field-hint" id="score-keyboard-help">
+                Enter or arrow keys save and move between scores. Tab saves a changed score;
+                otherwise it reaches row actions. Escape restores the recorded value.
+              </p>
+              <div className="score-entry-scroll" ref={scoreFocusRef}>
                 {teachingAssignmentId && learnerScoreSyncStatusService && (
                   <button type="button" onClick={() => setSyncCheckRevision((value) => value + 1)}>
-                    Refresh sync checks
+                    Refresh transfer status
                   </button>
                 )}
                 <table className="attendance-roster score-entry">
@@ -1254,6 +1259,7 @@ export function ClassRecordWorkspace({
                                     }
                                   }}
                                   onKeyDown={(event) => {
+                                    if (event.nativeEvent.isComposing) return;
                                     if (event.key === "Enter" || event.key === "ArrowDown") {
                                       event.preventDefault();
                                       void commitPendingCorrection(
@@ -1327,6 +1333,7 @@ export function ClassRecordWorkspace({
                                   aria-invalid={hasRowError}
                                   aria-describedby={
                                     [
+                                      "score-keyboard-help",
                                       hasRowError ? `score-error-${entry.learnerId}` : null,
                                       draft !== undefined && !isSaving
                                         ? `score-draft-${entry.learnerId}`
@@ -1354,6 +1361,7 @@ export function ClassRecordWorkspace({
                                     }));
                                   }}
                                   onKeyDown={(event) => {
+                                    if (event.nativeEvent.isComposing) return;
                                     if (event.key === "Enter" || event.key === "ArrowDown") {
                                       event.preventDefault();
                                       void commitScoreDraft(
@@ -1380,7 +1388,16 @@ export function ClassRecordWorkspace({
                                         entry.learnerId,
                                         event.shiftKey ? -1 : 1,
                                       );
-                                      if (neighbor) {
+                                      const text = draftScoreFor(
+                                        entry.learnerId,
+                                        entry.score,
+                                      ).trim();
+                                      const changed =
+                                        text !== "" &&
+                                        text !== (entry.score === null ? "" : String(entry.score));
+                                      // Clean/restored inputs use native traversal so every
+                                      // row's history and exception controls stay reachable.
+                                      if (neighbor && changed) {
                                         event.preventDefault();
                                         void commitScoreDraft(entry, neighbor);
                                       }
@@ -1487,7 +1504,7 @@ export function ClassRecordWorkspace({
                                   key={status}
                                   type="button"
                                   aria-pressed={entry.status === status}
-                                  disabled={Boolean(pending)}
+                                  disabled={Boolean(pending) || isSaving}
                                   onClick={() =>
                                     void handleRecord(entry.learnerId, status, null).then(
                                       (saved) => {
@@ -1518,6 +1535,9 @@ export function ClassRecordWorkspace({
             classRecordId={classRecordId}
             revision={reportingRevision}
             disabled={!itemsReady || savingLearnerIds.size > 0}
+            pendingEdits={
+              Object.keys(scoreDrafts).length > 0 || Object.keys(pendingCorrections).length > 0
+            }
           />
           <ReportCardDraftPanel
             key={`drafts-${classRecordId}`}

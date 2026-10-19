@@ -1,0 +1,52 @@
+{
+  "class": "Production UI with injected synthetic read-only roster; NOT native roster loading, persistence or measured throughput",
+  "checks": [
+    {
+      "count": 0,
+      "width": 1280,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    },
+    {
+      "count": 0,
+      "width": 640,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    },
+    {
+      "count": 0,
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    },
+    {
+      "count": 60,
+      "width": 1280,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    },
+    {
+      "count": 60,
+      "width": 640,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    },
+    {
+      "count": 60,
+      "width": 390,
+      "overflow": false,
+      "violations": [],
+      "writes": 0
+    }
+  ],
+  "checked_native_source": "e6f13fd48fb682d4f0d2bf704a4027a1d4a5eda9",
+  "ui_source_sha256": "aaf894109e799ab0c134dae57b21cc31233912e776a91a2d92e3bed52ae14d33",
+  "probe_sha256": "c503411bd725224dd4c10e14e650ad2b29353c2018b0b152393ba45b1e448e28",
+  "internal_render_review": "Empty and60-row phone view inspected; current focused row/actions and fixed navigation remain distinguishable. No screenshots delivered.",
+  "limits": "Only roster read replies enlarged/emptied; original fixture item counters remain. No native eligibility/count consistency or throughput acceptance inferred."
+}

@@ -862,6 +862,10 @@ label {
   font-size: 0.9em;
 }
 
+.score-snapshot-hint {
+  display: block;
+}
+
 /* CTOS M07: the correction-lineage review surface. Lives inside a score
    cell, so it is deliberately quieter than the row it documents — a teacher
    expanding it is asking "what was this before, and who changed it", and

@@ -1,9 +1,21 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-18 (Asia/Manila).
+Updated: 2026-10-19 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
-## Verified separate dependency maintenance — 2026-10-18
+## Current action
+
+Use `docs/assurance/scores-windows-trial-2026-10-19.md` for the pinned installer and
+`prepare-scores-trial.mjs` helper. It verifies the original ZIP and creates untested
+observations; it does not install or establish teacher/device acceptance.
+
+The latest Scores checkpoint ee2b781 passed Quality39158028481 and Security39158028370,
+including executed Ubuntu/Windows native gates. Receipt: `docs/assurance/scores-checkpoint-ci-2026-10-19.json`. Read `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+Remaining pilot acceptance requires the prepared teacher/disposable-device/manual checks;
+those observations are NOT RUN. No new runtime journey, merge or deployment is implied.
+Historical checkpoint instructions below do not reopen the repaired native/dependency work.
+
+## Earlier separate dependency maintenance — 2026-10-18
 
 Draft PR148, branch `forge/opener-dependency-maintenance-20261018`, depends on PR147.
 Read `docs/assurance/opener-maintenance-handoff-2026-10-18.md` and frozen O1–O6.
@@ -49,7 +61,49 @@ Teacher usability and installed-device acceptance remain pending. Do not widen
 this journey into dependency maintenance or unrelated M11 work. Resolve the
 recorded dependency-security blockers in a separate scope before merge.
 
-## Active continuation
+## Authorization carryover — 19 October 2026
+
+User explicitly approved the pending Scores branch push and dependent draft PR after
+reviewing the publication block, and requested continued automatic action. Continue routine
+project development and publication under the existing scope without repeated permission
+questions. This is scoped user authorization, not a platform approval-policy override;
+required checks, consequential-action boundaries and truthful acceptance states still apply.
+
+## Confirmed publication
+
+Scores pilot is published as dependent draft PR149:
+https://github.com/312810-spec/likha-sis-0.2/pull/149. Implementation commit
+`e87b3c11db78dff72a6a1f38fc23bd1cf5b27bb7` has exactly the reviewed local tree.
+The user resolved the previous publication authorization block. Quality/Security were
+running at the last check; verify their results before acceptance. No merge/deployment.
+
+## Verified native prerequisite and next acceptance
+
+Checked sourcee6f13fd /tree086de06e: Quality39155819896 and Security39155819934 PASS.
+1,526 Ubuntu /1,535 Windows native tests, new cold subprocess regression, previous
+learner-isolation failures, Rustfmt/Clippy, source provenance, private D-Bus and score
+negative controls PASS.1,581 frontend tests/UI/recovery50 PASS. Windows build/test
+installer artifact12147627096 is available for disposable-device testing only.
+Current receipts/next protocol: `docs/assurance/sqlcipher-startup-handoff-2026-10-19.md`.
+The SQLCipher initialization race is repaired with no key/schema/score changes.
+Additional zero/60-roster layout/focus checks PASS; native roster/throughput not inferred.
+
+Native repair is technically READY FOR REVIEW. Full Scores acceptance INCONCLUSIVE:
+teacher observation, installed Windows GUI/upgrade, actual Android, real two-device
+exchange and manual AT/OS zoom remain NOT RUN. No merge/deployment. Do not widen
+runtime scope; use the prepared protocol and exact test artifact for these gates.
+Evidence/probe-only checkpoint leaves tested application/native/workflow source unchanged.
+
+## Active Scores pilot — 19 October 2026
+
+User executed Prompt Master revision2. Current dependent branch `forge/scores-detail-20261019`
+starts from PR148 head237b7b5 → PR147 → PR146; main remains ac4c3ad. Detailed contract,
+control/token/effects specification and handoff: `docs/assurance/scores-detail-handoff-2026-10-19.md`.
+This explicitly selected Scores journey precedes the unrelated M11 continuation below.
+Do not mass-merge the old stack or claim deployment. Required teacher/device evidence and
+remaining acceptance gates stay unresolved; finish this pilot before activating another journey.
+
+## Previous continuation (parked during Scores pilot)
 
 PR144 required-subject applicability foundation is verified and merged as
 `1e6d2275499c8f7b4236126c557f6232670319b5`. Tested head `1fb7346`:

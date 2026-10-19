@@ -1,0 +1,309 @@
+{
+  "source": "ee2b7817df16c677ffb0a008176cc6b06a579915",
+  "tree": "cb0f5eb81dd4d1cf29a0b605589707593da98d84",
+  "qualityRun": 39158028481,
+  "securityRun": 39158028370,
+  "qualityJobs": [
+    {
+      "id": 117765214273,
+      "name": "Quality / classify affected work",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout full history for diff classification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Determine changed files",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify classifier behavior",
+          "conclusion": "success"
+        },
+        {
+          "name": "Classify affected work",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout full history for diff classification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117765249295,
+      "name": "Quality (Windows)",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Confirm Rust toolchain is present",
+          "conclusion": "success"
+        },
+        {
+          "name": "Update npm to current stable",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Node dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify spreadsheet compatibility source provenance",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify opener compatibility source provenance",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build the Windows-native Tauri application",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test native Windows behavior",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload Windows test installers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 117765249349,
+      "name": "Quality (Ubuntu)",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Update npm to current stable",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Node dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run documentation formatting gate",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Verify harness contract",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run JavaScript and TypeScript quality gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Chromium for deterministic UI verification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run UI workflow and accessibility smoke gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify UX recovery journeys",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload UI verification screenshots",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Tauri Linux build dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "Confirm Rust toolchain is present",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify spreadsheet compatibility source provenance",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify opener compatibility source provenance",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify cold SQLCipher initialization mechanism",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run native Rust quality gate",
+          "conclusion": "success"
+        },
+        {
+          "name": "Exercise opener compatibility on a private synthetic D-Bus",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify bounded score native baseline negative controls",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Node.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "securityJobs": [
+    {
+      "id": 117765213719,
+      "name": "Security / osv-scanner",
+      "conclusion": "success"
+    },
+    {
+      "id": 117765213827,
+      "name": "Security / cargo-deny",
+      "conclusion": "success"
+    },
+    {
+      "id": 117765213861,
+      "name": "Security / gitleaks",
+      "conclusion": "success"
+    }
+  ],
+  "ubuntu": {
+    "job": 117765249349,
+    "nativeTests": 1526,
+    "focusedLog": [
+      "2026-10-18T19:18:26.1640817Z \u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m158 passed\u001b[39m\u001b[22m\u001b[90m (158)\u001b[39m",
+      "2026-10-18T19:18:53.9399662Z quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-18T19:19:09.4880090Z quality:ui:recovery PASS — 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-18T19:19:52.7724367Z {\"checks\": 48, \"natural_failed_runs\": 0, \"amplified_negative_runs\": 4, \"initialized_failures\": 0}",
+      "2026-10-18T19:25:11.5583503Z test result: ok. 1312 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 150.55s",
+      "2026-10-18T19:25:11.5729697Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-18T19:25:13.4591369Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s",
+      "2026-10-18T19:25:17.6145207Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s",
+      "2026-10-18T19:25:19.5323920Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.91s",
+      "2026-10-18T19:25:19.8311003Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+      "2026-10-18T19:25:21.3646144Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s",
+      "2026-10-18T19:25:27.5314137Z test parallel_cold_database_startup_preserves_isolated_keyed_connections ... ok",
+      "2026-10-18T19:25:27.5314811Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.16s",
+      "2026-10-18T19:25:38.6998477Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.17s",
+      "2026-10-18T19:25:43.9422129Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.24s",
+      "2026-10-18T19:25:48.8843570Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.94s",
+      "2026-10-18T19:25:50.7501209Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s",
+      "2026-10-18T19:25:51.8895921Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s",
+      "2026-10-18T19:25:54.7144929Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.82s",
+      "2026-10-18T19:25:54.9060699Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+      "2026-10-18T19:25:55.8811529Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s",
+      "2026-10-18T19:26:00.1055639Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s",
+      "2026-10-18T19:26:04.5886992Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.48s",
+      "2026-10-18T19:26:05.3939273Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s",
+      "2026-10-18T19:26:08.5524272Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.16s",
+      "2026-10-18T19:26:11.4461595Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.89s",
+      "2026-10-18T19:26:11.4639724Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "2026-10-18T19:26:17.0255537Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.56s",
+      "2026-10-18T19:26:20.6261750Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.60s",
+      "2026-10-18T19:26:21.2712289Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-18T19:27:36.7904409Z SCORE_NATIVE_NEGATIVE_CONTROLS_JSON={\"baseline\": \"ac4c3add56fb7a0677f1a0f745bf1de816ea55ee\", \"evidence\": \"Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture\", \"source_restored\": true, \"results\": [{\"case\": \"command_rejects_unassigned_same_school_teacher_without_writing\", \"baseline_failed_as_expected\": true}, {\"case\": \"command_local_correction_failure_rolls_back_history\", \"baseline_failed_as_expected\": true}]}"
+    ]
+  },
+  "windows": {
+    "job": 117765249295,
+    "nativeTests": 1535,
+    "focusedLog": [
+      "2026-10-18T19:35:09.7331813Z test result: ok. 1321 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 243.96s\r",
+      "2026-10-18T19:35:09.7630384Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-18T19:35:12.8406830Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.06s\r",
+      "2026-10-18T19:35:19.9029450Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.05s\r",
+      "2026-10-18T19:35:23.0032485Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.08s\r",
+      "2026-10-18T19:35:24.0685309Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s\r",
+      "2026-10-18T19:35:27.2504129Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.16s\r",
+      "2026-10-18T19:35:35.1141472Z test parallel_cold_database_startup_preserves_isolated_keyed_connections ... ok\r",
+      "2026-10-18T19:35:35.1142464Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.85s\r",
+      "2026-10-18T19:35:52.5635152Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.43s\r",
+      "2026-10-18T19:35:59.0379481Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.46s\r",
+      "2026-10-18T19:36:07.2529305Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.19s\r",
+      "2026-10-18T19:36:10.5805992Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.31s\r",
+      "2026-10-18T19:36:12.6488946Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s\r",
+      "2026-10-18T19:36:16.9154522Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.25s\r",
+      "2026-10-18T19:36:17.1521720Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s\r",
+      "2026-10-18T19:36:18.5913895Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\r",
+      "2026-10-18T19:36:24.0176979Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.41s\r",
+      "2026-10-18T19:36:31.4711978Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.44s\r",
+      "2026-10-18T19:36:32.7298746Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s\r",
+      "2026-10-18T19:36:38.0884143Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s\r",
+      "2026-10-18T19:36:42.7876563Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.68s\r",
+      "2026-10-18T19:36:42.8306749Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\r",
+      "2026-10-18T19:36:50.7737243Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.93s\r",
+      "2026-10-18T19:36:56.1510159Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.36s\r",
+      "2026-10-18T19:36:57.6329888Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r"
+    ]
+  },
+  "installer": {
+    "id": 12148083473,
+    "node_id": "MDg6QXJ0aWZhY3QxMjE0ODA4MzQ3Mw==",
+    "name": "likha-sis-windows-test-installers",
+    "size_in_bytes": 22954811,
+    "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12148083473",
+    "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12148083473/zip",
+    "expired": false,
+    "digest": "sha256:74075c899a852cddfc662b243606c0974d5ea1c10f2269aa18c1348d24bb01d8",
+    "created_at": "2026-10-18T19:37:01Z",
+    "updated_at": "2026-10-18T19:37:01Z",
+    "expires_at": "2026-11-01T19:36:58Z"
+  },
+  "limits": [
+    "Installer archive digest is GitHub-reported; no local installer execution or independent binary checksum is claimed.",
+    "Teacher observation, installed Windows GUI/upgrade, actual Android, real two-device exchange and manual AT/OS zoom remain NOT RUN.",
+    "This receipt checkpoint changes documentation only. Application/native/workflow source is the checked ee2b781 source."
+  ]
+}
