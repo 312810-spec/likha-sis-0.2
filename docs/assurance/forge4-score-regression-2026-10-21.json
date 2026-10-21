@@ -1,0 +1,273 @@
+{
+  "evidence": "Browser production components; synthetic memory persistence; NOT native authorization/SQLite",
+  "checks": [
+    {
+      "check": "older acknowledgment preserves newer draft and focus",
+      "displayed": 19,
+      "fixturePersisted": 18,
+      "calls": 1
+    },
+    {
+      "check": "correction comparison and keyboard cancel without a write",
+      "result": "PASS"
+    },
+    {
+      "check": "explicit correction saves exact score and lineage",
+      "result": "PASS"
+    },
+    {
+      "check": "rejected write retains draft and has no saved claim",
+      "result": "PASS"
+    },
+    {
+      "check": "explicit keyboard retry saves retained value",
+      "result": "PASS"
+    },
+    {
+      "check": "native Tab exits at both score sequence boundaries",
+      "result": "PASS"
+    },
+    {
+      "check": "blank edit preserves recorded value and Escape restores it",
+      "result": "PASS"
+    },
+    {
+      "check": "clean interior score reaches History via native Tab",
+      "result": "PASS"
+    },
+    {
+      "check": "focused correction clears fixed navigation after resize",
+      "top": 730.703125,
+      "bottom": 770.703125,
+      "navTop": 783,
+      "hit": true,
+      "focused": true
+    },
+    {
+      "check": "focus clearance light/efficient/1280",
+      "top": 857.296875,
+      "bottom": 891.296875,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/efficient/640",
+      "top": 347.46875,
+      "bottom": 381.46875,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/efficient/390",
+      "top": 445.5,
+      "bottom": 479.5,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/1280",
+      "top": 429.5625,
+      "bottom": 469.5625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/640",
+      "top": 336.890625,
+      "bottom": 376.890625,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/390",
+      "top": 512.703125,
+      "bottom": 552.703125,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/1280",
+      "top": 414.453125,
+      "bottom": 486.453125,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/640",
+      "top": 299.125,
+      "bottom": 371.125,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/390",
+      "top": 692.9375,
+      "bottom": 764.9375,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/1280",
+      "top": 857.296875,
+      "bottom": 891.296875,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/640",
+      "top": 347.46875,
+      "bottom": 381.46875,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/390",
+      "top": 445.5,
+      "bottom": 479.5,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/1280",
+      "top": 429.5625,
+      "bottom": 469.5625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/640",
+      "top": 336.890625,
+      "bottom": 376.890625,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/390",
+      "top": 512.703125,
+      "bottom": 552.703125,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/1280",
+      "top": 414.453125,
+      "bottom": 486.453125,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/640",
+      "top": 299.125,
+      "bottom": 371.125,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/390",
+      "top": 692.9375,
+      "bottom": 764.9375,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "touch-emulated Cancel restores recorded score without writing",
+      "result": "PASS",
+      "limit": "Browser emulation; not installed Android evidence"
+    },
+    {
+      "check": "640px reflow models a 1280px workspace at 200% CSS zoom",
+      "result": "PASS",
+      "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
+    }
+  ]
+}

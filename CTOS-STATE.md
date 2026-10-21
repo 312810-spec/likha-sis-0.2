@@ -1,9 +1,34 @@
 # CTOS State
 
-Updated: 2026-10-19 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
-Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V3-ADAPTER.md`.
+Updated: 2026-10-21 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
+Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
-## Current prerequisite — legacy sole-account setup access
+## Latest publication / security gate — 21 October
+
+PR151 published at source9775b22/tree21bb3ce (exact local tree match).
+Initial OSV failed on three Vite8.3.2 advisories; scanner policy unchanged.
+Current follow-up pins verified stable8.3.5 and adds26 startup cases to CI.
+Local quality1,604/build/UI/recovery50/score47/startup26 reran PASS.
+Read current handoff and `forge4-vite-security-contract-2026-10-21.md`.
+Fresh exact-source CI is required before any gated merge; teacher/device
+acceptance and dependent PR146–150 remain separate. No main merge/deployment.
+
+## Current bounded redesign execution
+
+User-authorized FORGE 4 integration and tauri-ui-informed redesign on21 October.
+Branch `forge/tauri-ui-forge4-20261021`, base PR150 head
+`d5fa6dbd44ea4d8a932a326afef4a3cba19913b8`; no draft-chain merge.
+Early appearance prerequisite locally verified:1,604 frontend tests;
+13 dev +13 built startup cases; UI smoke; recovery50; score browser47; build.
+Exact hashes, limits and publication status:
+`docs/assurance/tauri-ui-forge4-handoff-2026-10-21.md` and evidence JSON.
+No new native/device or teacher acceptance. Full Scores pilot INCONCLUSIVE.
+Follow TASK's active slice. The installed-recovery prerequisite below stays pending.
+Local implementation commit `c4324a8`. User explicitly approved publication and
+future verification/sync/merge/push on21 October, superseding the prior approval
+block. Remote durability/draft PR/CI require actual receipts; see current handoff.
+
+## Retained prerequisite — legacy sole-account setup access
 
 Dependent draft PR150 repairs the roleless legacy sole-owner setup dead end.
 Checked source52a761c: Quality39338547483/Security39338547311 PASS,1,535 Ubuntu /
