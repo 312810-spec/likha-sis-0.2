@@ -1,0 +1,466 @@
+{
+  "mode": "candidate",
+  "scenario": "Synthetic assessment — A carefully reviewed solution with a long title for the same class",
+  "head": "a206308f8481c86d489819490f27f4a84dc8161f",
+  "source": {
+    "src/ui/ClassRecordWorkspace.tsx": "ae12c4b60123ece0199d1c2eaf7e9c45ab458f77a612314cb78ac8af3d607b8b",
+    "src/ui/theme/styles.css": "7097a7b5144491f811246daa42834433d8946ffc990e422053fbf1e512ffba13"
+  },
+  "browser": "156.0.8078.47",
+  "node": "v24.19.0",
+  "cases": [
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 776.578125,
+        "choiceHeight": 44,
+        "choiceWidth": 528,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1010.171875,
+        "choiceHeight": 44,
+        "choiceWidth": 616,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 390,
+      "bounds": {
+        "rosterY": 1108.203125,
+        "choiceHeight": 65,
+        "choiceWidth": 366,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 912.875,
+        "choiceHeight": 69.5,
+        "choiceWidth": 502,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1172.515625,
+        "choiceHeight": 47,
+        "choiceWidth": 604,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 390,
+      "bounds": {
+        "rosterY": 1348.328125,
+        "choiceHeight": 92,
+        "choiceWidth": 354,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 1322.84375,
+        "choiceHeight": 104,
+        "choiceWidth": 443,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1650.28125,
+        "choiceHeight": 78.5,
+        "choiceWidth": 586,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 390,
+      "bounds": {
+        "rosterY": 2070.15625,
+        "choiceHeight": 129.5,
+        "choiceWidth": 336,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(234, 236, 250)",
+        "text": "rgb(23, 32, 51)",
+        "focus": "rgb(23, 32, 51)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 776.578125,
+        "choiceHeight": 44,
+        "choiceWidth": 528,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1010.171875,
+        "choiceHeight": 44,
+        "choiceWidth": 616,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 390,
+      "bounds": {
+        "rosterY": 1108.203125,
+        "choiceHeight": 65,
+        "choiceWidth": 366,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "34px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 912.875,
+        "choiceHeight": 69.5,
+        "choiceWidth": 502,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1172.515625,
+        "choiceHeight": 47,
+        "choiceWidth": 604,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 390,
+      "bounds": {
+        "rosterY": 1348.328125,
+        "choiceHeight": 92,
+        "choiceWidth": 354,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "40px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 1280,
+      "bounds": {
+        "rosterY": 1322.84375,
+        "choiceHeight": 104,
+        "choiceWidth": 443,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 640,
+      "bounds": {
+        "rosterY": 1650.28125,
+        "choiceHeight": 78.5,
+        "choiceWidth": 586,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 390,
+      "bounds": {
+        "rosterY": 2070.15625,
+        "choiceHeight": 129.5,
+        "choiceWidth": 336,
+        "choiceOverflow": false,
+        "pageOverflow": false,
+        "controlHeight": "72px",
+        "background": "rgb(48, 53, 85)",
+        "text": "rgb(240, 242, 250)",
+        "focus": "rgb(240, 242, 250)",
+        "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"
+      },
+      "violations": [],
+      "status": "PASS"
+    }
+  ],
+  "limits": "Synthetic dev-preview teacher fixture. No installed/device/teacher-comprehension claim.",
+  "comparison": [
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 1280,
+      "rosterYDelta": 0.96875
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 640,
+      "rosterYDelta": -12.609375
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 390,
+      "rosterYDelta": -12.609375
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 1280,
+      "rosterYDelta": -12.25
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 640,
+      "rosterYDelta": -10.9375
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 390,
+      "rosterYDelta": -10.9375
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 1280,
+      "rosterYDelta": -25.9375
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 640,
+      "rosterYDelta": -6.109375
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 390,
+      "rosterYDelta": -6.109375
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 1280,
+      "rosterYDelta": 0.96875
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 640,
+      "rosterYDelta": -12.609375
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 390,
+      "rosterYDelta": -12.609375
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 1280,
+      "rosterYDelta": -12.25
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 640,
+      "rosterYDelta": -10.9375
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 390,
+      "rosterYDelta": -10.9375
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 1280,
+      "rosterYDelta": -25.9375
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 640,
+      "rosterYDelta": -6.109375
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 390,
+      "rosterYDelta": -6.109375
+    }
+  ]
+}

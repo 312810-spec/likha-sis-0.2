@@ -969,20 +969,13 @@ label {
   }
 }
 
-/* Same treatment as .attendance-roster's selected-toggle button --
-   without this, the currently-selected assessment item had no visual
-   cue at all beyond the heading appearing below it (WCAG 1.4.1: not
-   color alone, so a non-color ✓ cue too, same as .attendance-roster
-   and .mode-switcher use). */
+/* Quiet selection supports the roster. Visible Selected text and
+   aria-pressed preserve a cue independent of the accent color. */
 .assessment-item-list button[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
+  background: var(--color-primary-wash);
+  color: var(--color-text);
   border-color: var(--color-primary);
   font-weight: 700;
-}
-
-.assessment-item-list button[aria-pressed="true"]::before {
-  content: "✓ ";
 }
 
 /* Narrow (phone-width): each assessment item's own action row (select
@@ -3480,18 +3473,45 @@ label {
   margin-block: 16px 24px;
 }
 .assessment-item-list > li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--space-2);
   padding-block: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 .assessment-item-list > li > button {
-  flex: 1 1 240px;
+  min-width: 0;
+  padding-block: 0;
   text-align: start;
   white-space: normal;
   line-height: 1.5;
+}
+.assessment-choice-name,
+.assessment-choice-meta {
+  overflow-wrap: anywhere;
+}
+.assessment-choice-name {
+  font-weight: 600;
+}
+.assessment-choice-meta {
+  margin-inline-start: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.score-workspace-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin-block: var(--space-5) var(--space-3);
+}
+.score-workspace-heading h3,
+.score-workspace-heading .attendance-count {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 .assessment-item-list [role="group"],
 .item-edit-form > button {
@@ -3501,9 +3521,11 @@ label {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  max-inline-size: 20ch;
 }
 .item-edit-form {
   width: 100%;
+  grid-column: 1 / -1;
 }
 .score-entry tbody th {
   font-weight: 400;
@@ -3515,8 +3537,11 @@ label {
   margin-block: 16px;
 }
 @media (max-width: 640px) {
-  .assessment-item-list > li > button {
-    flex-basis: 100%;
+  .assessment-item-list > li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .assessment-item-list [role="group"] {
+    max-inline-size: none;
   }
   .assessment-composer:not([hidden]) {
     padding: var(--space-4);

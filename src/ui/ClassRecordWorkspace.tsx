@@ -1101,15 +1101,20 @@ export function ClassRecordWorkspace({
                   <>
                     <button
                       type="button"
+                      aria-label={`${item.categoryName} — ${item.name} (max ${item.maxScore})${item.totalEligible > 0 ? ` · ${item.recordedCount} of ${item.totalEligible} recorded` : ""}`}
                       aria-pressed={selectedItemId === item.id}
                       onClick={() => {
                         setError(null);
                         setSelectedItemId(item.id);
                       }}
                     >
-                      {item.categoryName} — {item.name} (max {item.maxScore})
-                      {item.totalEligible > 0 &&
-                        ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
+                      <span className="assessment-choice-name">{item.name}</span>
+                      <span className="assessment-choice-meta">
+                        {item.categoryName} · Max {item.maxScore}
+                        {item.totalEligible > 0 &&
+                          ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
+                        {selectedItemId === item.id && <span aria-hidden="true"> · Selected</span>}
+                      </span>
                     </button>
                     <div role="group" aria-label={`Actions for ${item.name}`}>
                       <button type="button" onClick={() => startEditingItem(item)}>
@@ -1151,7 +1156,17 @@ export function ClassRecordWorkspace({
 
       {selectedItem && (
         <>
-          <h3>{selectedItem.name} scores</h3>
+          <div className="score-workspace-heading">
+            <h3>{selectedItem.name} scores</h3>
+            {!rosterLoading && !rosterError && roster.length > 0 && (
+              <p className="attendance-count">
+                <strong>
+                  {recordedCount} of {roster.length} recorded
+                </strong>{" "}
+                · {remainingCount} remaining
+              </p>
+            )}
+          </div>
 
           {rosterError && (
             <Alert tone="error">
@@ -1168,12 +1183,6 @@ export function ClassRecordWorkspace({
             <EmptyState>No learners eligible for this item's grading period.</EmptyState>
           ) : (
             <>
-              <p className="attendance-count">
-                <strong>
-                  {recordedCount} of {roster.length} recorded
-                </strong>{" "}
-                · {remainingCount} remaining
-              </p>
               <p className="field-hint" id="score-keyboard-help">
                 Enter or arrow keys save and move between scores. Tab saves a changed score;
                 otherwise it reaches row actions. Escape restores the recorded value.

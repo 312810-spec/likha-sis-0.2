@@ -1,0 +1,17 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: roster moved lower: {"c":{"appearance":"light","density":"comfortable","width":640,"bounds":{"rosterY":1213.765625,"choiceHeight":88.25,"choiceWidth":604,"choiceOverflow":false,"pageOverflow":false,"controlHeight":"40px","background":"rgb(234, 236, 250)","text":"rgb(23, 32, 51)","focus":"rgb(23, 32, 51)","font":"\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif"},"violations":[],"status":"PASS"},"delta":30.3125}
+    at file:///workspace/scratch/2b4a6f776035/likha-sis/scripts/assurance/prompt-master-scores-browser.mjs:157:7
+    at Array.map (<anonymous>)
+    at file:///workspace/scratch/2b4a6f776035/likha-sis/scripts/assurance/prompt-master-scores-browser.mjs:150:32 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

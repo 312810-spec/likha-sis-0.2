@@ -1,7 +1,20 @@
 # Current task — CTOS / FORGE 4.0
 
-Updated: 2026-10-21 (Asia/Manila).
+Updated: 2026-10-22 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
+
+## Current Prompt Master execution — 22 October
+
+User executed the36-task UI prompt pack. Active child branch
+`forge/prompt-master-scores-layout-20261022` froma206308.
+PM-00 reconciled; PM-01 source register81/81 UI files and36/36 destinations.
+PM-02–04 /PM-12–13 bounded Scores selection/roster hierarchy implemented;
+matched baseline/candidate18 each PASS; quality1,612/161 files, build,
+UI/recovery50/Scores browser47 PASS. Remote CI/publication pending.
+Contract, registry, token/control decisions and next action:
+`docs/assurance/prompt-master-execution-handoff-2026-10-22.md`.
+Full task/role/state/runtime coverage and teacher/device/manual acceptance
+remain partial/pending. Preserve completed repairs and draft chain/main.
 
 ## Current bounded follow-up — Scores history
 
