@@ -3,6 +3,16 @@
 Updated: 2026-10-21 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Latest publication / security gate — 21 October
+
+PR151 published at source9775b22/tree21bb3ce (exact local tree match).
+Initial OSV failed on three Vite8.3.2 advisories; scanner policy unchanged.
+Current follow-up pins verified stable8.3.5 and adds26 startup cases to CI.
+Local quality1,604/build/UI/recovery50/score47/startup26 reran PASS.
+Read current handoff and `forge4-vite-security-contract-2026-10-21.md`.
+Fresh exact-source CI is required before any gated merge; teacher/device
+acceptance and dependent PR146–150 remain separate. No main merge/deployment.
+
 ## Current bounded redesign execution
 
 User-authorized FORGE 4 integration and tauri-ui-informed redesign on21 October.

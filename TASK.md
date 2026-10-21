@@ -3,6 +3,16 @@
 Updated: 2026-10-21 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
+## Latest publication / security gate — 21 October
+
+PR151 published at source9775b22/tree21bb3ce (exact local tree match).
+Initial OSV failed on three Vite8.3.2 advisories; scanner policy unchanged.
+Current follow-up pins verified stable8.3.5 and adds26 startup cases to CI.
+Local quality1,604/build/UI/recovery50/score47/startup26 reran PASS.
+Read current handoff and `forge4-vite-security-contract-2026-10-21.md`.
+Fresh exact-source CI is required before any gated merge; teacher/device
+acceptance and dependent PR146–150 remain separate. No main merge/deployment.
+
 ## Current action — FORGE 4 / tauri-ui bounded redesign
 
 Apply `docs/ctos/FORGE-V4-ADAPTER.md`. Branch

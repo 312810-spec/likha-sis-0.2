@@ -104,3 +104,25 @@ including future verification, sync, merge and push within this project's scope.
 This supersedes the earlier insufficient-authorization block; platform controls and
 required gates still apply. Do not infer official teacher/device acceptance or
 authorize unrelated historical branch merges. Actual publication/CI receipts follow.
+
+## Confirmed publication and dependency-security follow-up
+
+User approval superseded the prior publication block. Terminal push then failed
+for missing Git credentials, not an approval rejection. The connected GitHub tool
+published source9775b22ad7385ff381578d494adb49da1ae306c7 with tree
+21bb3ce7056ed5436a53b79a39abb8177c87c045, exactly matching local7237998.
+Draft PR151 targets `forge/legacy-setup-recovery-20261020`. Remote fetch/tree
+comparison succeeded. Local earlier history remains on
+`forge/tauri-ui-forge4-local-checkpoint-20261021`.
+
+Initial source CI merge26210574d95c186e7fdbeb0935a2fd6503a580db:
+Security39604170717 has gitleaks/cargo-deny PASS but OSV FAIL on three newly
+published Vite8.3.2 advisories. This blocks merge; no policy suppression added.
+See `forge4-vite-security-contract-2026-10-21.md` for the T7/T8 amendment.
+Updated to npm-registry current stable Vite8.3.5 and generated its lockfile;
+Vite's build-tool transitive updates are retained rather than hand-editing the lock.
+Quality1,604, build, dev13/built13, UI smoke, recovery50 and score47 all reran PASS.
+The workflow now executes the two startup probes and uploads their JSON receipts.
+Fresh candidate Security/Quality and T7/T8 remain pending publication/CI.
+New hashes/receipts: `forge4-vite-evidence-2026-10-21.json`. Prior8.3.2 results
+remain historical. No native/source-record modification, main merge or deployment.
