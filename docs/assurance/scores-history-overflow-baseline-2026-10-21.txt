@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"variant":"native","appearance":"light","density":"efficient","width":640,"geometry":{"pageOverflow":false,"panelOverflow":true,"selectable":"auto"}}
+
+true !== false
+
+    at file:///workspace/scratch/2b4a6f776035/likha-sis/scripts/assurance/score-history-comparison.mjs:260:18 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0
