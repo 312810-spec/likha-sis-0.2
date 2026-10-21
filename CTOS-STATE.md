@@ -3,15 +3,17 @@
 Updated: 2026-10-21 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
-## Latest publication / security gate — 21 October
+## Latest verified integration — 21 October
 
-PR151 published at source9775b22/tree21bb3ce (exact local tree match).
-Initial OSV failed on three Vite8.3.2 advisories; scanner policy unchanged.
-Current follow-up pins verified stable8.3.5 and adds26 startup cases to CI.
-Local quality1,604/build/UI/recovery50/score47/startup26 reran PASS.
-Read current handoff and `forge4-vite-security-contract-2026-10-21.md`.
-Fresh exact-source CI is required before any gated merge; teacher/device
-acceptance and dependent PR146–150 remain separate. No main merge/deployment.
+PR151 merged into `forge/legacy-setup-recovery-20261020` as252ce879 after
+Quality39605264979/Security39605264944 PASS on80a6ebf. Merge and CI trees
+match checked treed5f23996. Frontend1,604; Ubuntu1,535/Windows1,544 native;
+startup26; UI/recovery; packaging; source/SQLCipher/negative controls all PASS.
+Vite8.3.5 resolves the reported findings without changing scanner policy.
+Exact receipts: `docs/assurance/forge4-ci-merge-2026-10-21.json`.
+Next: same Scores pilot inventory/matched candidate experiment; KEEP_BASE
+without evidenced benefit. Actual teacher/device/manual acceptance remains
+INCONCLUSIVE. Main staysac4c3add; PR146–150 not mass-merged; no deployment.
 
 ## Current bounded redesign execution
 

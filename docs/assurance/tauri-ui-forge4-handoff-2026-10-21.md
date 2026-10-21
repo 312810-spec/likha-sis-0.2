@@ -1,5 +1,34 @@
 # FORGE 4 / tauri-ui — first execution checkpoint
 
+## Final verified integration — supersedes earlier pending/publication states
+
+PR151 merged into `forge/legacy-setup-recovery-20261020` as
+`252ce8791d34b9b11268db61fc9231cdd33b8df1` after exact-source
+Quality39605264979 and Security39605264944 passed. Remote fetch confirms the
+merge tree equals checked implementation80a6ebf and CI mergeba099d8:
+`d5f2399619f506d7e2c267440a7f5d1182e03fd8`. Main remainsac4c3add; no deployment.
+
+Executed CI: frontend1,604/161 files,26 startup cases, UI/recovery50, Ubuntu1,535
+and Windows1,544 native tests; Rustfmt/Clippy; both vendor provenance checks;
+SQLCipher mechanism; expected score negative controls with source restored;
+private D-Bus success/fallback/denied; Windows application/NSIS/MSI packaging.
+All3 Security scans pass under unchanged policy after Vite8.3.5 update.
+T1–T8 PASS within the bounded slice. Full Scores A1–A7 remains INCONCLUSIVE for
+required teacher/installed-device/Android/exchange/manual observations.
+
+Exact job steps, log excerpts and artifacts: `forge4-ci-merge-2026-10-21.json`.
+Windows test-installer ZIP artifact12348732545,22,973,823 bytes, expires
+2026-11-04T13:32:32Z; GitHub digest
+`67f5579bf7857a01799a152ea51649569626613da2d2de62649b92cb952acbd9`.
+Startup JSON receipt artifact12348003867. Do not treat an installer build as
+installed-device acceptance or replace the trial helper's older pin implicitly.
+
+Next: continue the existing Scores control/state inventory and matched candidate
+experiment for an evidenced gap; KEEP_BASE absent benefit. Preserve the pending
+actual sole-owner recovery/teacher-device trial. Do not mass-merge PR146–150.
+The following documentation checkpoint changes no application/test/workflow/lock
+bytes; original execution receipts remain bound to80a6ebf, not a claimed rerun.
+
 ## Outcome and source
 
 Applied the verified 20 October LIKHA-SIS FORGE 4.0 adapter and operating
