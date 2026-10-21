@@ -10,7 +10,10 @@ User executed the36-task UI prompt pack. Active child branch
 PM-00 reconciled; PM-01 source register81/81 UI files and36/36 destinations.
 PM-02–04 /PM-12–13 bounded Scores selection/roster hierarchy implemented;
 matched baseline/candidate18 each PASS; quality1,612/161 files, build,
-UI/recovery50/Scores browser47 PASS. Remote CI/publication pending.
+UI/recovery50/Scores browser47 PASS. PR153 gated/merged into parent asbe22758;
+Quality39694964133 /Security39694964101 PASS on62f32eb, treea9eb54d9.
+Runtime census72 pairs:34 fixture branches/17 placeholders/21 path-not-run.
+Exact receipt: docs/assurance/prompt-master-ci-merge-2026-10-22.json.
 Contract, registry, token/control decisions and next action:
 `docs/assurance/prompt-master-execution-handoff-2026-10-22.md`.
 Full task/role/state/runtime coverage and teacher/device/manual acceptance
