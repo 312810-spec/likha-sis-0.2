@@ -10,7 +10,9 @@ Correction-history retry/scope/author/reflow repairs and matched Base UI experim
 `docs/assurance/scores-history-handoff-2026-10-21.md`. Comparison43 PASS;
 KEEP_BASE for this control (candidate +6,754 gzip bytes without task benefit).
 Quality1,612 /161 files, build, UI, recovery50, Scores browser47 PASS.
-Publication/CI pending in that handoff.
+PR152 merged into parent as1e4164f; Quality39615019567 /Security39615019959 PASS
+on58a9fc0, same checked tree55af4a23. Exact receipt: scores-history-ci-merge JSON.
+Next: Scores inventory and pending teacher/device/manual observations; do not repeat this experiment.
 Teacher/device/manual acceptance remains INCONCLUSIVE. Preserve draft chain/main.
 
 ## Latest verified integration — 21 October
