@@ -1,9 +1,29 @@
-# Current task — CTOS v3
+# Current task — CTOS / FORGE 4.0
 
-Updated: 2026-10-19 (Asia/Manila).
+Updated: 2026-10-21 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
-## Current action
+## Current action — FORGE 4 / tauri-ui bounded redesign
+
+Apply `docs/ctos/FORGE-V4-ADAPTER.md`. Branch
+`forge/tauri-ui-forge4-20261021` starts at PR150 head
+`d5fa6dbd44ea4d8a932a326afef4a3cba19913b8`, preserving PR146–PR150.
+The user requested v4 integration and redesign execution on21 October.
+Early appearance initialization is implemented and locally verified; read
+`docs/assurance/tauri-ui-forge4-handoff-2026-10-21.md` for gates, publication
+and limits. Full score-pilot teacher/device/manual acceptance stays INCONCLUSIVE.
+Next: retain this slice, reconcile changed PR heads and continue the existing
+Scores control/state inventory and matched component comparison. KEEP_BASE
+until replacement benefit is evidenced. Gated push/sync/merge is authorized; no deployment is implied.
+Underlying setup-recovery/device action below remains pending; do not mark it
+complete or reopen verified native/dependency repairs.
+
+User approved publication on21 October, explicitly including future verification,
+sync, merge and push within scope. This supersedes the prior authorization block.
+Publish the reviewed branch and dependent draft PR; verify receipts/required CI.
+Keep installed recovery/full pilot acceptance separate. See handoff for evidence.
+
+## Retained prerequisite — actual legacy setup recovery
 
 Active prerequisite: sole-account legacy setup-role recovery, based on PR149 d78374f.
 Read `docs/assurance/legacy-setup-recovery-handoff-2026-10-20.md` and R1–R7.
