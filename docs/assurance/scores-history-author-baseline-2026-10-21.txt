@@ -1,0 +1,206 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 test
+> vitest run src/ui/components/ScoreCorrectionHistory.test.tsx
+
+
+ RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis
+
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx (14 tests | 2 failed) 2632ms
+   × keeps distinct author identities when display names are null 1026ms
+   × keeps distinct author identities when display names are Same display name 1018ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/components/ScoreCorrectionHistory.test.tsx > keeps distinct author identities when display names are null
+AssertionError: expected 'u-2 · Oct 6, 09:30 AM' to contain 'u-2 · was recorded by u-1'
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"score-correction-history"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"_r_3_"[39m
+          [33maria-expanded[39m=[32m"true"[39m
+          [33maria-label[39m=[32m"Correction history for Ana Cruz"[39m
+          [33mclass[39m=[32m"correction-history-toggle"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mHide history[0m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"correction-history-panel"[39m
+          [33mid[39m=[32m"_r_3_"[39m
+        [36m>[39m
+          [36m<p[39m
+            [33maria-atomic[39m=[32m"true"[39m
+            [33mclass[39m=[32m"field-hint"[39m
+            [33mrole[39m=[32m"status"[39m
+          [36m>[39m
+            [0mHistory snapshot; refresh to check again.[0m
+          [36m</p>[39m
+          [36m<ul[39m
+            [33mclass[39m=[32m"correction-history-list"[39m
+          [36m>[39m
+            [36m<li[39m
+              [33mclass[39m=[32m"correction-history-entry"[39m
+            [36m>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-change"[39m
+              [36m>[39m
+                [0m15[0m
+                [0m →[0m
+                [0m [0m
+                [36m<strong>[39m
+                  [0m19[0m
+                [36m</strong>[39m
+              [36m</p>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-reason"[39m
+              [36m>[39m
+                [0m“[0m
+                [0mRechecked after a recount of the written work[0m
+                [0m”[0m
+              [36m</p>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-meta"[39m
+              [36m>[39m
+                [0mu-2[0m
+                [0m [0m
+                [0m· [0m
+                [0mOct 6, 09:30 AM[0m
+              [36m</p>[39m
+            [36m</li>[39m
+          [36m</ul>[39m
+          [36m<button[39m
+            [33maria-disabled[39m=[32m"false"[39m
+            [33maria-label[39m=[32m"Refresh history for Ana Cruz"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mRefresh history[0m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+Expected: "u-2 · was recorded by u-1"
+Received: "u-2 · Oct 6, 09:30 AM"
+
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx:136:96
+    134|   const {container} = renderHistory(repo);
+    135|   await user.click(screen.getByRole("button", {name:/correction histor…
+    136|   await waitFor(() => expect(container.querySelector(".correction-hist…
+       |                                                                                                ^
+    137| });
+    138|
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/components/ScoreCorrectionHistory.test.tsx > keeps distinct author identities when display names are Same display name
+AssertionError: expected 'Same display name · Oct 6, 09:30 AM' to contain 'Same display name (u-2) · was recorde…'
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"score-correction-history"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"_r_4_"[39m
+          [33maria-expanded[39m=[32m"true"[39m
+          [33maria-label[39m=[32m"Correction history for Ana Cruz"[39m
+          [33mclass[39m=[32m"correction-history-toggle"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [0mHide history[0m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"correction-history-panel"[39m
+          [33mid[39m=[32m"_r_4_"[39m
+        [36m>[39m
+          [36m<p[39m
+            [33maria-atomic[39m=[32m"true"[39m
+            [33mclass[39m=[32m"field-hint"[39m
+            [33mrole[39m=[32m"status"[39m
+          [36m>[39m
+            [0mHistory snapshot; refresh to check again.[0m
+          [36m</p>[39m
+          [36m<ul[39m
+            [33mclass[39m=[32m"correction-history-list"[39m
+          [36m>[39m
+            [36m<li[39m
+              [33mclass[39m=[32m"correction-history-entry"[39m
+            [36m>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-change"[39m
+              [36m>[39m
+                [0m15[0m
+                [0m →[0m
+                [0m [0m
+                [36m<strong>[39m
+                  [0m19[0m
+                [36m</strong>[39m
+              [36m</p>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-reason"[39m
+              [36m>[39m
+                [0m“[0m
+                [0mRechecked after a recount of the written work[0m
+                [0m”[0m
+              [36m</p>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"correction-history-meta"[39m
+              [36m>[39m
+                [0mSame display name[0m
+                [0m [0m
+                [0m· [0m
+                [0mOct 6, 09:30 AM[0m
+              [36m</p>[39m
+            [36m</li>[39m
+          [36m</ul>[39m
+          [36m<button[39m
+            [33maria-disabled[39m=[32m"false"[39m
+            [33maria-label[39m=[32m"Refresh history for Ana Cruz"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [0mRefresh history[0m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</body>[39m
+[36m</html>[39m
+
+Expected: "Same display name (u-2) · was recorded by Same display name (u-1)"
+Received: "Same display name · Oct 6, 09:30 AM"
+
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx:136:96
+    134|   const {container} = renderHistory(repo);
+    135|   await user.click(screen.getByRole("button", {name:/correction histor…
+    136|   await waitFor(() => expect(container.querySelector(".correction-hist…
+       |                                                                                                ^
+    137| });
+    138|
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 passed (14)
+   Start at  09:04:35
+   Duration  3.79s (tests 73%, environment 18%, import 4%, transform 3%, setup 2%)
+

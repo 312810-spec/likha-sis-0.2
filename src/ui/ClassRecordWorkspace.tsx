@@ -1481,9 +1481,9 @@ export function ClassRecordWorkspace({
                                 {entry.status !== null && !isSaving && !hasRowError && (
                                   <ScoreCorrectionHistory
                                     // Keyed by saved-row identity so a fresh
-                                    // correction remounts the panel and the
-                                    // lineage it shows can never be stale —
-                                    // same reasoning as ScoreSyncEvidence.
+                                    // correction remounts the panel. The read
+                                    // component also binds scope/service and
+                                    // supports explicit refresh; it is a snapshot.
                                     key={`history-${selectedItem.id}-${entry.learnerId}-${entry.updatedAt}`}
                                     service={learnerScoreService}
                                     assessmentItemId={selectedItem.id}

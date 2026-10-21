@@ -1,0 +1,130 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 test
+> vitest run src/ui/components/ScoreCorrectionHistory.test.tsx
+
+
+ RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis
+
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx (11 tests | 3 failed) 452ms
+   × retries a failed read in one action and keeps focus through a guarded retry 38ms
+   × hides the previous service's snapshot immediately while a new service loads 25ms
+   × uses unique panel IDs for the same learner's separate assessment histories 40ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/components/ScoreCorrectionHistory.test.tsx > retries a failed read in one action and keeps focus through a guarded retry
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Retry history for Ana Cruz"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Correction history for Ana Cruz":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"correction-history-l-1"[39m
+    [33maria-expanded[39m=[32m"true"[39m
+    [33maria-label[39m=[32m"Correction history for Ana Cruz"[39m
+    [33mclass[39m=[32m"correction-history-toggle"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  alert:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"field-error"[39m
+    [33mrole[39m=[32m"alert"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"score-correction-history"[39m
+    [36m>[39m
+      [36m<button[39m
+        [33maria-controls[39m=[32m"correction-history-l-1"[39m
+        [33maria-expanded[39m=[32m"true"[39m
+        [33maria-label[39m=[32m"Correction history for Ana Cruz"[39m
+        [33mclass[39m=[32m"correction-history-toggle"[39m
+        [33mtype[39m=[32m"button"[39m
+      [36m>[39m
+        [0mHide history[0m
+      [36m</button>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"correction-history-panel"[39m
+        [33mid[39m=[32m"correction-history-l-1"[39m
+      [36m>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"field-error"[39m
+          [33mrole[39m=[32m"alert"[39m
+        [36m>[39m
+          [0mCould not load the correction history. Try opening it again.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx:181:24
+    179|   await user.click(screen.getByRole("button", { name: /correction hist…
+    180|   await screen.findByRole("alert");
+    181|   const retry = screen.getByRole("button", { name: "Retry history for …
+       |                        ^
+    182|   await user.tab();
+    183|   expect(retry).toHaveFocus();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/ui/components/ScoreCorrectionHistory.test.tsx > hides the previous service's snapshot immediately while a new service loads
+Error: expect(element).not.toBeInTheDocument()
+
+expected document not to contain element, found <p
+  class="correction-history-reason"
+>
+  “
+  Previous service snapshot
+  ”
+</p> instead
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx:214:63
+    212|   await screen.findByText(/Previous service snapshot/);
+    213|   rerender(<ScoreCorrectionHistory {...props} service={next} />);
+    214|   expect(screen.queryByText(/Previous service snapshot/)).not.toBeInTh…
+       |                                                               ^
+    215|   expect(screen.getByRole("status")).toHaveTextContent("Loading correc…
+    216|   await waitFor(() => expect(nextRepo.correctionHistory).toHaveBeenCal…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/ui/components/ScoreCorrectionHistory.test.tsx > uses unique panel IDs for the same learner's separate assessment histories
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ src/ui/components/ScoreCorrectionHistory.test.tsx:256:29
+    254|   await user.click(toggles[1]!);
+    255|   const ids = toggles.map((toggle) => toggle.getAttribute("aria-contro…
+    256|   expect(new Set(ids).size).toBe(2);
+       |                             ^
+    257|   for (const id of ids) expect(document.getElementById(id!)).toBeInThe…
+    258| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 8 passed (11)
+   Start at  08:49:45
+   Duration  1.66s (environment 47%, tests 30%, import 10%, transform 8%, setup 4%)
+

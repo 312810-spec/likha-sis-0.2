@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { LearnerScoreApplicationService } from "../../application/learner-score-service";
 import type { LearnerScoreCorrection, LearnerScoreStatus } from "../../domain/learner-score";
 
@@ -18,9 +18,10 @@ interface ScoreCorrectionHistoryProps {
  * no way to see any of it back. This is that surface.
  *
  * A snapshot, not a subscription. The owner keys this component by saved-row
- * identity (see `ClassRecordWorkspace`), so a new correction remounts it and
- * the lineage it shows is never stale — the same pattern
- * `ScoreSyncEvidence` uses. The fetch happens on expand, not on render: a
+ * identity (see `ClassRecordWorkspace`), so a new correction remounts it.
+ * Read receipts are also bound to service/item/learner/revision. Refresh is
+ * explicit; neither an old receipt nor a late response crosses that boundary.
+ * The fetch happens on expand, not on render: a
  * class of forty learners should not pay forty round trips to show a panel
  * nobody has opened. */
 export function ScoreCorrectionHistory({
@@ -30,36 +31,61 @@ export function ScoreCorrectionHistory({
   learnerName,
 }: ScoreCorrectionHistoryProps) {
   const [open, setOpen] = useState(false);
-  const [history, setHistory] = useState<LearnerScoreCorrection[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [snapshot, setSnapshot] = useState<{
+    service: LearnerScoreApplicationService;
+    identity: string;
+    revision: number;
+    entries: LearnerScoreCorrection[] | null;
+    failed: boolean;
+  } | null>(null);
+  const requestPending = useRef(false);
+  const panelId = useId();
+  const identity = JSON.stringify([assessmentItemId, learnerId]);
+  const current =
+    snapshot?.service === service &&
+    snapshot.identity === identity &&
+    snapshot.revision === revision
+      ? snapshot
+      : null;
+  const loading = open && current === null;
+  const history = current?.entries ?? null;
+  const error = Boolean(current?.failed);
+
+  function changeOpen(next: boolean) {
+    if (next) setRevision((value) => value + 1);
+    setOpen(next);
+  }
+
+  function refresh() {
+    if (loading || requestPending.current) return;
+    requestPending.current = true;
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    // The loading/error reset happens in the toggle handler rather than here:
-    // setState directly in an effect body is a lint error, and resetting at the
-    // moment of opening is also what gives the immediate feedback before the
-    // first await resolves.
+    requestPending.current = true;
     // Promise boundary also handles synchronous service validation failures.
     void Promise.resolve()
       .then(() => service.correctionHistory(assessmentItemId, learnerId))
       .then((entries) => {
-        if (!cancelled) setHistory(entries);
+        if (!cancelled) setSnapshot({ service, identity, revision, entries, failed: false });
       })
       .catch(() => {
         if (!cancelled) {
-          setHistory(null);
-          setError("Could not load the correction history. Try opening it again.");
+          setSnapshot({ service, identity, revision, entries: null, failed: true });
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) requestPending.current = false;
       });
     return () => {
       cancelled = true;
+      requestPending.current = false;
     };
-  }, [open, service, assessmentItemId, learnerId]);
+  }, [open, service, assessmentItemId, learnerId, identity, revision]);
 
   return (
     <div className="score-correction-history">
@@ -67,54 +93,81 @@ export function ScoreCorrectionHistory({
         type="button"
         className="correction-history-toggle"
         aria-expanded={open}
-        aria-controls={`correction-history-${learnerId}`}
+        aria-controls={panelId}
         aria-label={`Correction history for ${learnerName}`}
-        onClick={() => {
-          setOpen((current) => !current);
-          if (!open) {
-            setLoading(true);
-            setError(null);
-          }
-        }}
+        onClick={() => changeOpen(!open)}
       >
         {open ? "Hide history" : "History"}
       </button>
-      {open && (
-        <div id={`correction-history-${learnerId}`} className="correction-history-panel">
-          {loading ? (
-            <p className="field-hint">Loading corrections…</p>
-          ) : error ? (
-            <p className="field-error" role="alert">
-              {error}
+      <div id={panelId} className="correction-history-panel" hidden={!open}>
+        {open && (
+          <>
+            <p className="field-hint" role="status" aria-atomic="true">
+              {loading
+                ? "Loading corrections…"
+                : error
+                  ? "History not loaded."
+                  : "History snapshot; refresh to check again."}
             </p>
-          ) : history === null ? null : history.length === 0 ? (
-            <p className="field-hint">No corrections recorded for this score.</p>
-          ) : (
-            <ul className="correction-history-list">
-              {history.map((entry) => (
-                <li key={entry.id} className="correction-history-entry">
-                  <p className="correction-history-change">
-                    {describe(entry.previousStatus, entry.previousScore)} →{" "}
-                    <strong>{describe(entry.newStatus, entry.newScore)}</strong>
-                  </p>
-                  <p className="correction-history-reason">“{entry.reason}”</p>
-                  <p className="correction-history-meta">
-                    {entry.correctedByName ?? entry.correctedByUserId}
-                    {entry.previousRecordedByName === entry.correctedByName
-                      ? ""
-                      : ` · was recorded by ${
-                          entry.previousRecordedByName ?? entry.previousRecordedByUserId
-                        }`}{" "}
-                    · {formatCorrectionTime(entry.correctedAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+            {loading ? null : error ? (
+              <p className="field-error" role="alert">
+                Could not load the correction history. Retry to check again.
+              </p>
+            ) : history === null ? null : history.length === 0 ? (
+              <p className="field-hint">No corrections recorded for this score.</p>
+            ) : (
+              <ul className="correction-history-list">
+                {history.map((entry) => (
+                  <li key={entry.id} className="correction-history-entry">
+                    <p className="correction-history-change">
+                      {describe(entry.previousStatus, entry.previousScore)} →{" "}
+                      <strong>{describe(entry.newStatus, entry.newScore)}</strong>
+                    </p>
+                    <p className="correction-history-reason">“{entry.reason}”</p>
+                    <p className="correction-history-meta">
+                      {authorLabel(
+                        entry.correctedByName,
+                        entry.correctedByUserId,
+                        entry.previousRecordedByName,
+                        entry.previousRecordedByUserId,
+                      )}
+                      {entry.previousRecordedByUserId === entry.correctedByUserId
+                        ? ""
+                        : ` · was recorded by ${authorLabel(
+                            entry.previousRecordedByName,
+                            entry.previousRecordedByUserId,
+                            entry.correctedByName,
+                            entry.correctedByUserId,
+                          )}`}{" "}
+                      · {formatCorrectionTime(entry.correctedAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              aria-label={`${error ? "Retry" : "Refresh"} history for ${learnerName}`}
+              aria-disabled={loading}
+              onClick={refresh}
+            >
+              {loading ? "Checking history…" : error ? "Retry history" : "Refresh history"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
+}
+
+function authorLabel(
+  name: string | null,
+  userId: string,
+  peerName: string | null,
+  peerId: string,
+): string {
+  if (!name) return userId;
+  return name === peerName && userId !== peerId ? `${name} (${userId})` : name;
 }
 
 function describe(status: LearnerScoreStatus, score: number | null): string {

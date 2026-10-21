@@ -3,6 +3,16 @@
 Updated: 2026-10-21 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current bounded follow-up — Scores history
+
+Branch `forge/scores-component-comparison-20261021` from parent `7bea54ac`.
+Correction-history retry/scope/author/reflow repairs and matched Base UI experiment:
+`docs/assurance/scores-history-handoff-2026-10-21.md`. Comparison43 PASS;
+KEEP_BASE for this control (candidate +6,754 gzip bytes without task benefit).
+Quality1,612 /161 files, build, UI, recovery50, Scores browser47 PASS.
+Publication/CI pending in that handoff.
+Teacher/device/manual acceptance remains INCONCLUSIVE. Preserve draft chain/main.
+
 ## Latest verified integration — 21 October
 
 PR151 merged into `forge/legacy-setup-recovery-20261020` as252ce879 after

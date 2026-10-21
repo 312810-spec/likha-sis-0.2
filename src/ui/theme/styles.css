@@ -875,6 +875,8 @@ label {
 }
 
 .correction-history-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin-top: calc(var(--spacing-unit) * 0.25);
   padding-left: calc(var(--spacing-unit) * 0.5);
   border-left: 2px solid var(--color-border);
