@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current Scores state continuation — 22 October
+
+Active branch `forge/scores-grade-refresh-20261022` from290b574. PM-12/13/31 term-grade stale-response/failure repairs: three reproduced regressions, five added tests. Local quality1,617/161 files, UI, recovery50, Scores browser47, build/isolation PASS. Current state/contract/source owners and publication status: `docs/assurance/scores-grade-refresh-handoff-2026-10-22.md`. Changed-state matrix36 PASS with keyboard read-only retry/internal renders; CI/publication pending receipt. Preserve shared system and Scores pilot; teacher/device/manual A1–A7 still pending. Next: source-owned Scores states and existing external observation protocol.
+
 ## Current shared-system continuation — 22 October
 
 Branch `forge/design-system-contracts-20261022` from d002786. PM-03/04 shared catalog/specification: KEEP_BASE; production sources unchanged.36 configurations/108 reflows/2 provider interactions PASS; quality1,612 tests/161 files, build and fixture isolation PASS. Exact sources and limits: `docs/assurance/design-system-handoff-2026-10-22.md`; reusable specification and measured token/control profiles linked there. DS1–DS6 bounded scope complete; DS7 gated: PR154 merged into parent as6632a4d3; Quality39698546428 /Security39698546538 PASS onfee28f0, treea4b60053. Exact receipt: `docs/assurance/design-system-ci-merge-2026-10-22.json`. Full consumer/brand and Scores teacher/device/manual A1–A7 acceptance remain pending. Next: preserve Scores as the single runtime pilot; continue source-owned state inventory.

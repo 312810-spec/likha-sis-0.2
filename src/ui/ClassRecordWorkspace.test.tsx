@@ -1911,3 +1911,132 @@ describe("score decision status distinctions", () => {
     expect(repo.recordCalls).toHaveLength(0);
   });
 });
+
+describe("term-grade response continuity", () => {
+  async function open(user: ReturnType<typeof userEvent.setup>, name = "Quiz 1") {
+    await user.click(
+      await screen.findByRole("button", { name: `Written Works — ${name} (max 20)` }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+  }
+
+  it("replaces a stale grade with an explicit refresh failure and retries without replaying a score", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    const compute = vi
+      .spyOn(scoreRepo, "computeTermGrade")
+      .mockRejectedValueOnce(new Error("synthetic failed read"));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    expect(await screen.findByText("Could not refresh. Show term grades to retry.")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(screen.getByText(/Saved on this device/)).toBeVisible();
+    compute.mockRestore();
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+  });
+
+  it("discards a term-grade response after leaving its assessment roster", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository();
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(repo, "computeTermGrade").mockImplementation(
+      () =>
+        new Promise((r) => {
+          release = r;
+        }),
+    );
+    renderScreen({
+      scoreRepo: repo,
+      assessmentRepo: new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2", name: "Quiz 2" }]),
+    });
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await open(user, "Quiz 2");
+    await act(async () => release(repo.computeTermGradeResult));
+    expect(screen.queryByRole("table", { name: "Computed term grades" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show term grades" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+  });
+
+  it("does not let an older bulk computation replace a grade refreshed after a score save", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await open(user);
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            release = r;
+          }),
+      )
+      .mockResolvedValueOnce({ ...scoreRepo.computeTermGradeResult!, termGrade: 92 });
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    await screen.findByText("92");
+    await act(async () => release(scoreRepo.computeTermGradeResult));
+    expect(screen.getByText("92")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+  });
+});
+
+describe("term-grade refresh ordering and partial failure", () => {
+  it("keeps a newer explicit read when an older automatic refresh finishes later", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            release = r;
+          }),
+      )
+      .mockResolvedValueOnce({ ...scoreRepo.computeTermGradeResult!, termGrade: 92 });
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    expect(await screen.findByText("Updating grade…")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("92");
+    await act(async () => release(scoreRepo.computeTermGradeResult));
+    expect(screen.getByText("92")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+  });
+
+  it("shows independent success, unavailable and failed reads without hiding the successful rows", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      { ...ROSTER_ENTRY, learnerId: "l2", givenName: "Bo", familyName: "Reyes" },
+      { ...ROSTER_ENTRY, learnerId: "l3", givenName: "Ci", familyName: "Lim" },
+    ]);
+    vi.spyOn(repo, "computeTermGrade").mockImplementation(async (_record, learner) => {
+      if (learner === "l2") throw new Error("synthetic failed read");
+      return learner === "l3" ? null : repo.computeTermGradeResult;
+    });
+    renderScreen({ scoreRepo: repo });
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    const grades = await screen.findByRole("table", { name: "Computed term grades" });
+    expect(await within(grades).findByText("88")).toBeVisible();
+    expect(within(grades).getByText("Not yet available")).toBeVisible();
+    expect(within(grades).getByText("Could not refresh. Show term grades to retry.")).toBeVisible();
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+});
