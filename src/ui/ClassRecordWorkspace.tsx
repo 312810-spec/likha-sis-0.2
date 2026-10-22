@@ -68,6 +68,7 @@ export function ClassRecordWorkspace({
     [items, syncCheckRevision, weightPolicyName],
   );
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsRefreshing, setItemsRefreshing] = useState(false);
   const [itemsSource, setItemsSource] = useState<{
     service: AssessmentApplicationService;
     classId: string;
@@ -78,10 +79,9 @@ export function ClassRecordWorkspace({
     setId: string;
   } | null>(null);
   const [duplicateReview, setDuplicateReview] = useState(false);
-  const itemsReady =
-    !itemsLoading &&
-    itemsSource?.service === assessmentService &&
-    itemsSource.classId === classRecordId;
+  const itemsCurrent =
+    itemsSource?.service === assessmentService && itemsSource.classId === classRecordId;
+  const itemsReady = !itemsRefreshing && !itemsLoading && itemsCurrent;
   const activeSource = useRef({
     service: assessmentService,
     classId: classRecordId,
@@ -139,6 +139,8 @@ export function ClassRecordWorkspace({
     () => "",
   );
   const [savingEdit, setSavingEdit] = useState(false);
+  // Opening/cancelling is a new editing choice even for the same item/text.
+  const editDraftRef = useRef({ revision: 0, open: editingItemId !== null });
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
@@ -337,7 +339,8 @@ export function ClassRecordWorkspace({
     categoriesSource.setId === categorySetId &&
     categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
-    setItemsSource(null);
+    // Keep current editors mounted during a read; block writes until it finishes.
+    setItemsRefreshing(true);
     try {
       const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
       if (!isActiveSource()) return;
@@ -345,9 +348,12 @@ export function ClassRecordWorkspace({
       setItemsSource({ service: assessmentService, classId: classRecordId });
     } catch {
       if (!isActiveSource()) return;
+      setItemsSource(null);
       setError(
         "The change is saved, but the item list could not refresh. Reload items before making another change.",
       );
+    } finally {
+      if (isActiveSource()) setItemsRefreshing(false);
     }
   }
 
@@ -409,6 +415,8 @@ export function ClassRecordWorkspace({
   }
 
   function startEditingItem(item: AssessmentItemDetail) {
+    editDraftRef.current.revision += 1;
+    editDraftRef.current.open = true;
     setItemActionError(null);
     setConfirmingDeleteItemId(null);
     setEditingItemId(item.id);
@@ -435,6 +443,8 @@ export function ClassRecordWorkspace({
     )
       return;
     const isScored = item.recordedCount > 0;
+    const submittedRevision = editDraftRef.current.revision;
+    const submittedName = editName.trim();
     setSavingEdit(true);
     setItemActionError(null);
     try {
@@ -449,22 +459,37 @@ export function ClassRecordWorkspace({
       if (!isActiveSource()) return;
       if (updated === null) {
         setItemActionError(
-          isScored
-            ? "Could not rename this item."
-            : "Could not save changes — this item may already have recorded scores.",
+          `Could not save changes to “${submittedName}”. ${
+            isScored
+              ? "The item could not be renamed."
+              : "This item may already have recorded scores."
+          }`,
         );
       } else {
-        setEditingItemId(null);
-        setEditName("");
-        setEditCategoryId("");
-        setEditMaxScore("");
-        setConfirmation(`${updated.name} updated.`);
+        const hasNewerEdit = editDraftRef.current.revision !== submittedRevision;
+        if (!hasNewerEdit) {
+          editDraftRef.current.open = false;
+          setEditingItemId(null);
+          setEditName("");
+          setEditCategoryId("");
+          setEditMaxScore("");
+        }
+        setConfirmation(
+          `${updated.name} updated.${
+            hasNewerEdit && editDraftRef.current.open ? " Your newer item edits are retained." : ""
+          }`,
+        );
         await refreshItemsAfterWrite();
       }
     } catch (err) {
-      setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
+      if (!isActiveSource()) return;
+      setItemActionError(
+        `Could not save changes to “${submittedName}”. ${
+          err instanceof ValidationError ? err.message : "Try Save again when ready."
+        }`,
+      );
     } finally {
-      setSavingEdit(false);
+      if (isActiveSource()) setSavingEdit(false);
     }
   }
 
@@ -1053,7 +1078,7 @@ export function ClassRecordWorkspace({
 
       {itemsLoading ? (
         <Loading label="Loading items…" />
-      ) : !itemsReady ? (
+      ) : !itemsCurrent ? (
         <EmptyState>Reload items to review current records. Your draft is retained.</EmptyState>
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above.</EmptyState>
@@ -1081,7 +1106,10 @@ export function ClassRecordWorkspace({
                           id={`edit-name-${item.id}`}
                           type="text"
                           value={editName}
-                          onChange={(event) => setEditName(event.target.value)}
+                          onChange={(event) => {
+                            editDraftRef.current.revision += 1;
+                            setEditName(event.target.value);
+                          }}
                         />
                       </div>
                       {!isScored && (
@@ -1091,7 +1119,10 @@ export function ClassRecordWorkspace({
                             <select
                               id={`edit-category-${item.id}`}
                               value={editCategoryId}
-                              onChange={(event) => setEditCategoryId(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditCategoryId(event.target.value);
+                              }}
                             >
                               {categories.map((category) => (
                                 <option key={category.id} value={category.id}>
@@ -1113,7 +1144,10 @@ export function ClassRecordWorkspace({
                               type="number"
                               min="1"
                               value={editMaxScore}
-                              onChange={(event) => setEditMaxScore(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditMaxScore(event.target.value);
+                              }}
                             />
                           </div>
                         </>
@@ -1135,6 +1169,8 @@ export function ClassRecordWorkspace({
                     <button
                       type="button"
                       onClick={() => {
+                        editDraftRef.current.revision += 1;
+                        editDraftRef.current.open = false;
                         setEditingItemId(null);
                         setEditName("");
                         setEditCategoryId("");
