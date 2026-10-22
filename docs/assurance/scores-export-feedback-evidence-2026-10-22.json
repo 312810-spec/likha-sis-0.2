@@ -1,0 +1,2626 @@
+{
+  "project": "LIKHA-SIS",
+  "head": "c7c9d01dd5ff6a03ef425274128fa04fb87ecaf1",
+  "sources": {
+    "src/ui/ClassRecordWorkspace.tsx": "80a1e3e65fb19c6a2a7fca01e25c8a6d001e00c3f0a25a73ed3ef7b41a0df13a",
+    "src/ui/ClassRecordWorkspace.test.tsx": "b264742756c779731b1fdb88071ea736a8cffe33f57985fd01ba6f638a085c75",
+    "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+    "scripts/assurance/scores-export-feedback-browser.mjs": "d198354629badb8bb1a7ae2abfc2cd52cc31223aa9e41c84f8b48ba08893100a"
+  },
+  "node": "v24.19.0",
+  "browser": "156.0.8078.47",
+  "checks": [
+    {
+      "kind": "report",
+      "case": "pending removes previous result; duplicate keyboard activation guarded; failure/retry retains focus; named folder path; zero score writes",
+      "status": "PASS"
+    },
+    {
+      "kind": "summary",
+      "case": "pending removes previous result; duplicate keyboard activation guarded; failure/retry retains focus; named folder path; zero score writes",
+      "status": "PASS"
+    }
+  ],
+  "cases": [
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 1280,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 640,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 390,
+      "motion": "no-preference",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "efficient",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "comfortable",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "light",
+      "density": "guided",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 191,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 214,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 616,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "efficient",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 147,
+                "height": 34
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 366,
+                "height": 34
+              },
+              {
+                "name": "Open report card folder",
+                "width": 103,
+                "height": 34
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 215,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 241,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 604,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "comfortable",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 169,
+                "height": 40
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 354,
+                "height": 40
+              },
+              {
+                "name": "Open report card folder",
+                "width": 124,
+                "height": 40
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 1280,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 257,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 287,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 640,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 586,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "appearance": "dark",
+      "density": "guided",
+      "width": 390,
+      "motion": "reduce",
+      "states": [
+        {
+          "failed": "report",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open class summary folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        },
+        {
+          "failed": "summary",
+          "bounds": {
+            "pageOverflow": false,
+            "pathOverflow": false,
+            "actions": [
+              {
+                "name": "Show term grades",
+                "width": 205,
+                "height": 72
+              },
+              {
+                "name": "Export report card (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Export class summary (CSV)",
+                "width": 336,
+                "height": 72
+              },
+              {
+                "name": "Open report card folder",
+                "width": 152,
+                "height": 72
+              }
+            ]
+          },
+          "violations": [],
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    }
+  ],
+  "limits": [
+    "Virtual paths/results only; no native file created/opened",
+    "No official-form/file-byte fidelity claim",
+    "Full teacher/device/manual A1–A7 pending"
+  ],
+  "sourceBinding": "The browser HEAD is the precommit base; recorded SHA256 hashes identify the measured modified candidate. Subsequent documentation does not change those source bytes.",
+  "base": "c7c9d01dd5ff6a03ef425274128fa04fb87ecaf1",
+  "baselineFailureExcerpts": [
+    "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > removes the previous report card outcome during a new attempt and failure",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > removes the previous class summary outcome during a new attempt and failure",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > does not present a previous report card result after a null response",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > does not present a previous class summary result after a null response",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > keeps the other output confirmed with its named folder action",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > Scores CSV attempt feedback > retains the confirmed file if opening its folder fails without exporting again",
+    " Test Files  1 failed (1)",
+    "      Tests  6 failed | 74 passed (80)"
+  ],
+  "freshGates": {
+    "qualityTests": 1624,
+    "qualityFiles": 161,
+    "addedComponentCases": 7,
+    "baselineFailed": 6,
+    "baselinePassed": 74,
+    "ui": "PASS",
+    "recovery": 50,
+    "scoreJourney": 47,
+    "build": "PASS",
+    "fixtureIsolationFiles": 21,
+    "browserConfigurations": 36,
+    "browserFeedbackStates": 72,
+    "browserInteractionFlows": 2,
+    "internalRenders": "light comfortable desktop and dark guided phone inspected"
+  },
+  "logSha256": {
+    "export-restored-before.log": "611ca109abf9e77fe5074e08573e9c4460aef157c7f49c79fb4896e7e16fa528",
+    "export-quality.log": "774e52f212e5e258b2db002a3b67133bd2022b2933f4a931bdaadab9ddd8c6cb",
+    "export-browser.log": "87df494597cb00e85be65778bbaf5f7a0c988bef0dd4f0209ebbb749eff4de6b",
+    "export-ui.log": "9b628cc102b563fddf0adc6a78727270f45e69377b03cd2657ddec3b8f1c963a",
+    "export-recovery.log": "a523aef93009dbfd0110a00d19dec5bd88c4b161552c2541502023bc09d7f902",
+    "export-score-journey.log": "b3609e29e5aa20be4ba53a3b90b93202602035493cfcaa8eaa9ed140560daab4",
+    "export-build.log": "6096aeb1acb9d98bd6a0982473446265bb1fd66638fad72098f53087e2418d86",
+    "export-isolation.log": "be2003395758a470035c46eaf39f061a86bff0bb1adc5322ad214efc14f5e280"
+  }
+}

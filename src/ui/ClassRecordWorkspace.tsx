@@ -201,12 +201,14 @@ export function ClassRecordWorkspace({
   const [justUpdatedLearnerId, setJustUpdatedLearnerId] = useState<string | null>(null);
   const updateFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportCardResult, setReportCardResult] = useState<ReportCardExportResult | null>(null);
+  const [reportCardExportError, setReportCardExportError] = useState<string | null>(null);
   const [exportingReportCard, setExportingReportCard] = useState(false);
   const [revealingReportCard, setRevealingReportCard] = useState(false);
   const [revealReportCardError, setRevealReportCardError] = useState<string | null>(null);
   const [classSummaryResult, setClassSummaryResult] = useState<ClassSummaryExportResult | null>(
     null,
   );
+  const [classSummaryExportError, setClassSummaryExportError] = useState<string | null>(null);
   const [exportingClassSummary, setExportingClassSummary] = useState(false);
   const [revealingClassSummary, setRevealingClassSummary] = useState(false);
   const [revealClassSummaryError, setRevealClassSummaryError] = useState<string | null>(null);
@@ -806,18 +808,23 @@ export function ClassRecordWorkspace({
 
   async function handleExportReportCard() {
     if (exportingReportCard) return;
-    setError(null);
+    setReportCardExportError(null);
+    setReportCardResult(null);
     setRevealReportCardError(null);
     setExportingReportCard(true);
     try {
       const result = await exportService.exportClassRecordReportCard(classRecordId);
       if (result === null) {
-        setError("Could not export — this class record could not be found.");
+        setReportCardExportError(
+          "No report card export was returned. Check access to this class record and try again.",
+        );
       } else {
         setReportCardResult(result);
       }
     } catch (err) {
-      setError(err instanceof ValidationError ? err.message : "Could not export the report card.");
+      setReportCardExportError(
+        err instanceof ValidationError ? err.message : "Could not export the report card.",
+      );
     } finally {
       setExportingReportCard(false);
     }
@@ -838,18 +845,21 @@ export function ClassRecordWorkspace({
 
   async function handleExportClassSummary() {
     if (exportingClassSummary) return;
-    setError(null);
+    setClassSummaryExportError(null);
+    setClassSummaryResult(null);
     setRevealClassSummaryError(null);
     setExportingClassSummary(true);
     try {
       const result = await exportService.exportClassRecordSummary(classRecordId);
       if (result === null) {
-        setError("Could not export — this class record could not be found.");
+        setClassSummaryExportError(
+          "No class summary export was returned. Check access to this class record and try again.",
+        );
       } else {
         setClassSummaryResult(result);
       }
     } catch (err) {
-      setError(
+      setClassSummaryExportError(
         err instanceof ValidationError ? err.message : "Could not export the class summary.",
       );
     } finally {
@@ -1673,14 +1683,35 @@ export function ClassRecordWorkspace({
                 </button>
               </div>
 
+              {reportCardExportError && (
+                <Alert tone="error">
+                  <h3>Report card export not confirmed</h3>
+                  <p>{reportCardExportError}</p>
+                  <p>Use Export report card (CSV) to try again.</p>
+                </Alert>
+              )}
+              {classSummaryExportError && (
+                <Alert tone="error">
+                  <h3>Class summary export not confirmed</h3>
+                  <p>{classSummaryExportError}</p>
+                  <p>Use Export class summary (CSV) to try again.</p>
+                </Alert>
+              )}
               {classSummaryResult && (
                 <Alert tone="success">
+                  <h3>Class summary exported</h3>
+                  <p className="field-hint">
+                    Exported snapshot of saved records. Later changes are not included; export again
+                    for current saved records.
+                  </p>
                   <p>
-                    Saved to <code>{classSummaryResult.filePath}</code>.
+                    Saved to{" "}
+                    <code className="score-export-path">{classSummaryResult.filePath}</code>.
                   </p>
                   <button
                     type="button"
                     aria-disabled={revealingClassSummary}
+                    aria-label="Open class summary folder"
                     onClick={handleRevealClassSummary}
                   >
                     {revealingClassSummary ? "Opening…" : "Open folder"}
@@ -1702,12 +1733,18 @@ export function ClassRecordWorkspace({
 
               {reportCardResult && (
                 <Alert tone="success">
+                  <h3>Report card exported</h3>
+                  <p className="field-hint">
+                    Exported snapshot of saved records. Later changes are not included; export again
+                    for current saved records.
+                  </p>
                   <p>
-                    Saved to <code>{reportCardResult.filePath}</code>.
+                    Saved to <code className="score-export-path">{reportCardResult.filePath}</code>.
                   </p>
                   <button
                     type="button"
                     aria-disabled={revealingReportCard}
+                    aria-label="Open report card folder"
                     onClick={handleRevealReportCard}
                   >
                     {revealingReportCard ? "Opening…" : "Open folder"}

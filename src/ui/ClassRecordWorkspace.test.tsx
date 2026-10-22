@@ -1147,7 +1147,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
     await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false });
 
-    await user.click(screen.getByRole("button", { name: "Open folder" }));
+    await user.click(screen.getByRole("button", { name: "Open report card folder" }));
 
     await waitFor(() =>
       expect(exportRepo.revealCalls).toEqual([
@@ -1185,7 +1185,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
     await screen.findByText("ClassSummary_Mabini_Science_1st_Term.csv", { exact: false });
 
-    await user.click(screen.getByRole("button", { name: "Open folder" }));
+    await user.click(screen.getByRole("button", { name: "Open class summary folder" }));
 
     await waitFor(() =>
       expect(exportRepo.revealCalls).toEqual([
@@ -2038,5 +2038,109 @@ describe("term-grade refresh ordering and partial failure", () => {
     expect(within(grades).getByText("Not yet available")).toBeVisible();
     expect(within(grades).getByText("Could not refresh. Show term grades to retry.")).toBeVisible();
     expect(repo.recordCalls).toHaveLength(0);
+  });
+});
+
+describe("Scores CSV attempt feedback", () => {
+  const variants = [
+    { label: "report card", method: "exportClassRecordReportCard", result: "reportCardResult" },
+    { label: "class summary", method: "exportClassRecordSummary", result: "classSummaryResult" },
+  ] as const;
+  async function open(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+  }
+  it.each(variants)(
+    "removes the previous $label outcome during a new attempt and failure",
+    async ({ label, method, result }) => {
+      const user = userEvent.setup();
+      const { exportRepo } = renderScreen();
+      await open(user);
+      const action = screen.getByRole("button", { name: `Export ${label} (CSV)` });
+      await user.click(action);
+      await screen.findByText(exportRepo[result]!.filePath);
+      let reject!: (e: Error) => void;
+      vi.spyOn(exportRepo, method).mockImplementationOnce(
+        () =>
+          new Promise((_resolve, fail) => {
+            reject = fail;
+          }),
+      );
+      await user.click(action);
+      expect(screen.queryByText(exportRepo[result]!.filePath)).not.toBeInTheDocument();
+      await act(async () => reject(new Error("synthetic failure")));
+      expect(await screen.findByText(`Could not export the ${label}.`)).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Reload items" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: `Export ${label} (CSV)` }));
+      await screen.findByText(exportRepo[result]!.filePath);
+      expect(screen.queryByText(`Could not export the ${label}.`)).not.toBeInTheDocument();
+    },
+  );
+  it.each(variants)(
+    "does not present a previous $label result after a null response",
+    async ({ label, method, result }) => {
+      const user = userEvent.setup();
+      const { exportRepo } = renderScreen();
+      await open(user);
+      const action = screen.getByRole("button", { name: `Export ${label} (CSV)` });
+      await user.click(action);
+      await screen.findByText(exportRepo[result]!.filePath);
+      vi.spyOn(exportRepo, method).mockResolvedValueOnce(null);
+      await user.click(action);
+      expect(
+        await screen.findByText(
+          `No ${label} export was returned. Check access to this class record and try again.`,
+        ),
+      ).toBeVisible();
+      expect(screen.queryByText(exportRepo[result]!.filePath)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reload items" })).not.toBeInTheDocument();
+    },
+  );
+  it("keeps the other output confirmed with its named folder action", async () => {
+    const user = userEvent.setup();
+    const { exportRepo, scoreRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+    await screen.findByRole("button", { name: "Open report card folder" });
+    await screen.findByRole("button", { name: "Open class summary folder" });
+    vi.spyOn(exportRepo, "exportClassRecordSummary").mockRejectedValueOnce(
+      new Error("synthetic failure"),
+    );
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+    await screen.findByText("Could not export the class summary.");
+    expect(screen.getByText(exportRepo.reportCardResult!.filePath)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Open report card folder" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Open class summary folder" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Exported snapshot of saved records/)).toBeVisible();
+    expect(scoreRepo.recordCalls).toHaveLength(0);
+  });
+  it("guards duplicate class-summary export while pending", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await open(user);
+    exportRepo.classSummaryPending = true;
+    const action = screen.getByRole("button", { name: "Export class summary (CSV)" });
+    await user.click(action);
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    await user.click(action);
+    expect(exportRepo.classSummaryCalls).toHaveLength(1);
+  });
+  it("retains the confirmed file if opening its folder fails without exporting again", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    const folder = await screen.findByRole("button", { name: "Open report card folder" });
+    exportRepo.revealShouldThrow = true;
+    await user.click(folder);
+    expect(await screen.findByText("Could not open the folder for this file.")).toBeVisible();
+    expect(screen.getByText(exportRepo.reportCardResult!.filePath)).toBeVisible();
+    expect(exportRepo.reportCardCalls).toHaveLength(1);
+    expect(exportRepo.revealCalls).toEqual([exportRepo.reportCardResult!.filePath]);
   });
 });

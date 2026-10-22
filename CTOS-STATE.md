@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current Scores CSV feedback continuation — 22 October
+
+Active branch `forge/scores-export-feedback-20261022` from c7c9d01. PM-12/13/31 bounded CSV attempt/error/snapshot/folder/path feedback repair. Restored after workspace maintenance; fresh baseline6 FAIL/74 PASS, seven added cases. Current contract/state ledger/checks/publication: `docs/assurance/scores-export-feedback-handoff-2026-10-22.md`. Fresh quality1,624/161 files, UI/recovery50/Scores47/build/isolation and browser36 configurations/72 feedback states PASS; internal renders inspected. CI/publication pending receipt. Preserve all merged repairs; Scores remains the single runtime pilot. Teacher/device/manual A1–A7 remain pending.
+
 ## Current Scores state continuation — 22 October
 
 Active branch `forge/scores-grade-refresh-20261022` from290b574. PM-12/13/31 term-grade stale-response/failure repairs: three reproduced regressions, five added tests. Local quality1,617/161 files, UI, recovery50, Scores browser47, build/isolation PASS. Current state/contract/source owners and publication status: `docs/assurance/scores-grade-refresh-handoff-2026-10-22.md`. Changed-state matrix36 PASS with keyboard read-only retry/internal renders; PR155 gated/merged into parent as689abb8c; Quality39699949146 /Security39699949148 PASS onb15a91a; checked/CI/actual merge treea7912280. Exact receipt: `docs/assurance/scores-grade-refresh-ci-merge-2026-10-22.json`. Preserve shared system and Scores pilot; teacher/device/manual A1–A7 still pending. Next: source-owned Scores states and existing external observation protocol.
