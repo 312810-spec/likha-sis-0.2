@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current PM-13 roster refresh continuation — 22 October
+
+Branch forge/scores-roster-refresh-20261022 from21e91fe. Current task pack read; full PM-13 prompt shown first. Baseline4 FAIL/106 PASS. Same canonical class/item/category/max/service roster survives unrelated assessment check while writes remain blocked; preserve newer inputs, correction reason/errors/focus and dispatched acknowledgment. Independent grade context and item score revision protect derived results/progress. Focused118 and full quality1,687/161 PASS;12 added cases. Browser36 configurations/72 states PASS with hit/viewport/footer clearance; four current renders inspected. UI/recovery50/Scores47/build/isolation/probe lint PASS. CI/publication pending in scores-roster-refresh-handoff-2026-10-22.md and evidence. Full PM-12/13/A1–A7 partial. Next remaining Scores category/period and completeness/report readiness coverage plus teacher/device observations.
+
 ## Current PM-12 deletion/validation continuation — 22 October
 
 Branch forge/assessment-delete-state-20261022 from6d9c7122. Full task-pack PM-12 prompt shown first. Baseline11 FAIL/121 PASS; focus and read-order follow-up failures reproduced. Per-ID pending/duplicate guards, confirmation/selection preservation, truthful non-cancellable pending state, refused/unconfirmed distinction, explicit reload without replay, read-generation/reload latch and removed-row focus implemented. Final focused155/3 and quality1,675/161 PASS;23 added cases. Final browser72 +2 flows/build/isolation PASS; four internal renders inspected. UI/recovery50/Scores47 PASS. PR159 gated/merged as27660efd; Quality39791476198/Security39791476193 PASS on9c6ad148; checked/CI/merge tree660348bb. Exact receipt assessment-delete-ci-merge-2026-10-22.json; handoff assessment-delete-handoff-2026-10-22.md. Full PM-12/A1–A7 partial. Next source-owned Scores category/period and roster-refresh coverage plus external teacher/device observations.
