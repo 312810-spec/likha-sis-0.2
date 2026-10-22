@@ -191,7 +191,12 @@ export function ClassRecordWorkspace({
   // to the now-current item.
   const rosterRequestRef = useRef(0);
 
-  const [termGrades, setTermGrades] = useState<Record<string, ComputedTermGrade | null>>({});
+  const [termGrades, setTermGrades] = useState<
+    Record<string, ComputedTermGrade | null | "refreshing" | "error">
+  >({});
+  const termGradesRequestedRef = useRef(false);
+  const termGradeGenerationRef = useRef<Map<string, number>>(new Map());
+  const termGradeBulkInFlightRef = useRef(false);
   const [termGradesLoading, setTermGradesLoading] = useState(false);
   const [justUpdatedLearnerId, setJustUpdatedLearnerId] = useState<string | null>(null);
   const updateFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -287,6 +292,11 @@ export function ClassRecordWorkspace({
     const requestId = ++rosterRequestRef.current;
     setRosterLoading(true);
     setRosterError(null);
+    setTermGrades({});
+    setTermGradesLoading(false);
+    termGradesRequestedRef.current = false;
+    termGradeBulkInFlightRef.current = false;
+    termGradeGenerationRef.current.clear();
     learnerScoreService
       .rosterForItem(selectedItemId)
       .then((result) => {
@@ -494,29 +504,34 @@ export function ClassRecordWorkspace({
     return scoreDrafts[learnerId] ?? (currentScore === null ? "" : String(currentScore));
   }
 
-  /** After grades have been shown at least once this session, keep the
-   * one affected learner's grade from silently going stale when their
-   * score changes -- cheap (one round trip for one learner, not the
-   * whole roster) and safe (compute_term_grade is deterministic). If
-   * grades were never shown, there is nothing to keep fresh, so this is
-   * a genuine no-op, not a hidden background cost every score-entry
-   * teacher pays. See ADR-0034 for the full reasoning. */
-  function maybeRefreshTermGrade(learnerId: string) {
-    if (Object.keys(termGrades).length === 0) return;
-    void learnerScoreService
-      .computeTermGrade(classRecordId, learnerId)
-      .then((grade) => {
-        setTermGrades((current) => ({ ...current, [learnerId]: grade }));
+  // Every grade read belongs to a roster generation and a learner revision.
+  // A successful score save invalidates the displayed number immediately;
+  // failed reads never leave an older number looking current.
+  async function refreshTermGrade(learnerId: string) {
+    const rosterRequest = rosterRequestRef.current;
+    const generation = (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1;
+    termGradeGenerationRef.current.set(learnerId, generation);
+    const isCurrent = () =>
+      rosterRequestRef.current === rosterRequest &&
+      termGradeGenerationRef.current.get(learnerId) === generation;
+    setTermGrades((current) => ({ ...current, [learnerId]: "refreshing" }));
+    try {
+      const grade = await learnerScoreService.computeTermGrade(classRecordId, learnerId);
+      if (!isCurrent()) return;
+      setTermGrades((current) => ({ ...current, [learnerId]: grade }));
+      if (grade) {
         setJustUpdatedLearnerId(learnerId);
         if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
         updateFlashTimeoutRef.current = setTimeout(() => setJustUpdatedLearnerId(null), 2500);
-      })
-      .catch(() => {
-        // Best-effort background refresh -- a failure here must not
-        // surface as a page-level error over an otherwise-successful
-        // score save. The teacher can always click "Show term grades"
-        // again for an explicit retry.
-      });
+      }
+    } catch {
+      if (isCurrent()) setTermGrades((current) => ({ ...current, [learnerId]: "error" }));
+    }
+  }
+
+  function maybeRefreshTermGrade(learnerId: string) {
+    // An initial bulk read may still be pending when the score is saved.
+    if (termGradesRequestedRef.current) void refreshTermGrade(learnerId);
   }
 
   /** Saves one learner's status/score. Errors are surfaced inline on that
@@ -774,20 +789,18 @@ export function ClassRecordWorkspace({
    * Once shown, an individual score change afterward keeps just that one
    * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
-    if (termGradesLoading) return;
+    if (termGradeBulkInFlightRef.current || rosterLoading || rosterError || !itemsReady) return;
+    const rosterRequest = rosterRequestRef.current;
+    termGradeBulkInFlightRef.current = true;
+    termGradesRequestedRef.current = true;
     setTermGradesLoading(true);
     try {
-      const entries = await Promise.all(
-        roster.map(async (entry) => {
-          const grade = await learnerScoreService.computeTermGrade(classRecordId, entry.learnerId);
-          return [entry.learnerId, grade] as const;
-        }),
-      );
-      setTermGrades(Object.fromEntries(entries));
-    } catch {
-      setError("Could not compute term grades.");
+      await Promise.all(roster.map((entry) => refreshTermGrade(entry.learnerId)));
     } finally {
-      setTermGradesLoading(false);
+      if (rosterRequestRef.current === rosterRequest) {
+        termGradeBulkInFlightRef.current = false;
+        setTermGradesLoading(false);
+      }
     }
   }
 
@@ -1572,9 +1585,9 @@ export function ClassRecordWorkspace({
                 <p className="field-hint">
                   Term grade uses the weighting above (DepEd Order No. 015, s. 2026) across every
                   category in this class record, not just the item selected above. A learner shows
-                  "Not yet available" until every category has at least one scored item — this app
-                  never estimates a grade from incomplete scores. Once shown, correcting a score
-                  keeps that learner's grade current automatically.
+                  "Not yet available" when a current grade cannot be returned. Once requested,
+                  saving a score checks that learner's grade again. A failed check hides the older
+                  grade; choose Show term grades to retry.
                 </p>
               )}
               {Object.keys(termGrades).length > 0 && (
@@ -1595,7 +1608,15 @@ export function ClassRecordWorkspace({
                             {entry.givenName} {entry.familyName}
                           </th>
                           <td>
-                            {grade === undefined ? (
+                            {grade === "refreshing" ? (
+                              <span className="field-hint" role="status">
+                                Updating grade…
+                              </span>
+                            ) : grade === "error" ? (
+                              <span className="field-error" role="alert">
+                                Could not refresh. Show term grades to retry.
+                              </span>
+                            ) : grade === undefined ? (
                               "—"
                             ) : grade === null ? (
                               "Not yet available"
