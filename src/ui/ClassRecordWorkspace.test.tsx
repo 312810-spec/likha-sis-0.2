@@ -2986,6 +2986,8 @@ describe("PM-13 saved-grade readiness with unsaved work", () => {
     fireEvent.change(x.input, { target: { value: "19" } });
     await act(async () => x.fail()(new Error("synthetic denied save")));
     expect(x.input).toHaveValue(19);
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save was not confirmed/)).toBeVisible();
     expect(screen.getByText("Could not save this score.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Show term grades" })).toHaveAttribute(
       "aria-disabled",
@@ -3012,5 +3014,26 @@ describe("PM-13 saved-grade readiness with unsaved work", () => {
     expect(screen.queryByText(/This item has unsaved score work/)).not.toBeInTheDocument();
     expect(note).toBeVisible();
     expect(x.record).not.toHaveBeenCalled();
+  });
+  it("rejects a pre-save grade reply that arrives after the score failure until an explicit fresh check", async () => {
+    const x = await begin();
+    let old!: (r: ComputedTermGrade | null) => void;
+    x.compute.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          old = done;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await x.startSave();
+    await act(async () => x.fail()(new Error("synthetic unknown write outcome")));
+    await act(async () => old({ ...x.scoreRepo.computeTermGradeResult!, termGrade: 99 }));
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("99")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save was not confirmed/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    expect(await within(grades).findByText("88")).toBeVisible();
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
   });
 });

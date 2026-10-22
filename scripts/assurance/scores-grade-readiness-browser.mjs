@@ -55,7 +55,7 @@ try {
             body += `
    window.__gradeAudit={writes:[],reads:[],release:null,saved:null};
    export class FixtureLearnerScoreRepository extends BaseFixtureLearnerScoreRepository{
-    async record(...args){const a=window.__gradeAudit;a.writes.push(args);await new Promise(r=>a.release=r);const s=await super.record(...args);a.saved=s;return s;}
+    async record(...args){const a=window.__gradeAudit;a.writes.push(args);await new Promise(r=>a.release=r);if(a.fail)throw new Error("synthetic denied correction");const s=await super.record(...args);a.saved=s;return s;}
     async computeTermGrade(...args){window.__gradeAudit.reads.push(args);return super.computeTermGrade(...args);}
    }
    window.__gradeAudit.roster=id=>new BaseFixtureLearnerScoreRepository().rosterForItem(id);
@@ -222,7 +222,46 @@ try {
           assert.equal(receipt.saved.score, 18);
           assert.equal(receipt.saved.assessmentItemId, receipt.writes[0][0]);
           assert.equal(receipt.roster.find((r) => r.learnerId === "l1").score, 18);
+          await input.fill("19");
+          await input.press("Enter");
+          await reason.fill("Synthetic explicit correction failure");
+          await page.evaluate(() => {
+            window.__gradeAudit.fail = true;
+          });
+          await page.getByRole("button", { name: "Save correction", exact: true }).click();
+          await page.waitForFunction(() => window.__gradeAudit.writes.length === 2);
+          await table.getByText(/Score save pending/).waitFor();
+          await page.evaluate(() => window.__gradeAudit.release());
+          const unconfirmed = table.getByText(/Score save was not confirmed/);
+          await unconfirmed.waitFor();
+          assert.equal(await ana.getByText("90", { exact: true }).count(), 0);
+          assert.equal(await reason.inputValue(), "Synthetic explicit correction failure");
+          const unconfirmedStyle = await style(unconfirmed);
+          const draftStyle = await style(page.getByText(/This item has unsaved score work/));
+          const failureViolations = await audit();
+          assert.deepEqual(failureViolations, []);
+          if (representative)
+            await page.screenshot({ path: output + `/unconfirmed-${width}.png`, fullPage: true });
+          await button.click();
+          await ana.getByText("90", { exact: true }).waitFor();
+          const afterFailure = await page.evaluate(async () => {
+            const a = window.__gradeAudit;
+            return { writes: a.writes, reads: a.reads, roster: await a.roster(a.writes[0][0]) };
+          });
+          assert.equal(afterFailure.writes.length, 2);
+          assert.deepEqual(afterFailure.writes[1], [
+            receipt.writes[0][0],
+            "l1",
+            "scored",
+            19,
+            "Synthetic explicit correction failure",
+          ]);
+          assert.equal(afterFailure.roster.find((r) => r.learnerId === "l1").score, 18);
           cases.push({
+            afterFailure,
+            unconfirmedStyle,
+            draftStyle,
+            failureViolations,
             appearance,
             density,
             width,
@@ -271,7 +310,7 @@ try {
     ) + "\n",
   );
   console.log(
-    JSON.stringify({ configurations: cases.length, states: cases.length * 2, status: "PASS" }),
+    JSON.stringify({ configurations: cases.length, states: cases.length * 3, status: "PASS" }),
   );
 } finally {
   await browser?.close();

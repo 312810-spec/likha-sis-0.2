@@ -34,3 +34,7 @@ Verification and export: Reproduce a remaining defect before editing. Run zero/m
 
 E — Deliver the task-specific contract and bounded implementation where called for, actual commands/results, remaining limits, source-bound receipts and one next action. Update the surface/task coverage register. Preserve prepared/attempted/confirmed action distinctions and the shared readiness rules; no unsupported whole-app or device claim.
 ```
+
+## C4 counterexample clarification — before failure-path repair
+
+After the first candidate passed its original cases, final source review required explicitly testing a pre-write grade restored after a failed acknowledgment and a pre-write reply arriving after failure. Follow-up baseline2 FAIL/3 PASS/118 skipped confirmed both. C4 is strengthened without dropping the original criteria: keep grade outcome unconfirmed after null/exception save results until a fresh read succeeds, invalidate pre-write grade replies at dispatch, preserve draft/error/reason, and perform no score replay. Final browser scope includes pending save, confirmed save with newer draft, and unconfirmed save (36×3=108 state audits). Initial candidate CI/source evidence is superseded by this affected source change.

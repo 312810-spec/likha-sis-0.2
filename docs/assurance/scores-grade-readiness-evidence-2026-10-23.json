@@ -4317,5 +4317,12 @@
     "Both resolved appearances; System provider evidence separate",
     "Full PM-13/A1\u2013A7 partial; manual AT, OS zoom and physical IME not run",
     "Overall Scores A1\u2013A7 and teacher/device/manual acceptance remain partial; SRC-AUTH-1 blocks broader assignment-boundary acceptance"
-  ]
+  ],
+  "superseded": {
+    "initialHead": "34391d79ad8a2afc30a2ad2908df13bde91b2fe0",
+    "reason": "Failure-path strengthening changes production/test/probe source. These initial receipts are historical; final source-bound replacement required before acceptance.",
+    "followUpBaseline": "2 FAIL /3 PASS /118 skipped",
+    "finalFocused": "123 PASS",
+    "remaining": "Final full quality/browser36\u00d73/UI/recovery/journey and CI pending"
+  }
 }

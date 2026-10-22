@@ -202,7 +202,7 @@ export function ClassRecordWorkspace({
   const termGradeContextRef = useRef(0);
 
   const [termGrades, setTermGrades] = useState<
-    Record<string, ComputedTermGrade | null | "refreshing" | "error">
+    Record<string, ComputedTermGrade | null | "refreshing" | "error" | "unconfirmed">
   >({});
   const termGradesRequestedRef = useRef(false);
   const termGradeGenerationRef = useRef<Map<string, number>>(new Map());
@@ -697,6 +697,15 @@ export function ClassRecordWorkspace({
     writeGenerationRef.current.set(learnerId, generation);
     writeInFlightRef.current.add(learnerId);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
+    // A read started before this write cannot establish its saved outcome.
+    termGradeGenerationRef.current.set(
+      learnerId,
+      (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1,
+    );
+    function markGradeUnconfirmed() {
+      if (termGradesRequestedRef.current)
+        setTermGrades((current) => ({ ...current, [learnerId]: "unconfirmed" }));
+    }
     try {
       const score = status === "scored" ? Number(scoreText) : null;
       const recorded = await learnerScoreService.recordScore(
@@ -716,6 +725,7 @@ export function ClassRecordWorkspace({
       )
         return false;
       if (recorded === null) {
+        markGradeUnconfirmed();
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
         return false;
       }
@@ -760,6 +770,7 @@ export function ClassRecordWorkspace({
         rosterRequestRef.current !== rosterRequest
       )
         return false;
+      markGradeUnconfirmed();
       setRowErrors((current) => ({
         ...current,
         [learnerId]: err instanceof ValidationError ? err.message : "Could not save this score.",
@@ -1815,6 +1826,11 @@ export function ClassRecordWorkspace({
                             {savingLearnerIds.has(entry.learnerId) ? (
                               <span className="field-hint" role="status">
                                 Score save pending. Check term grades after it finishes.
+                              </span>
+                            ) : grade === "unconfirmed" ? (
+                              <span className="field-hint" role="status">
+                                Score save was not confirmed. Show term grades to check saved
+                                records.
                               </span>
                             ) : grade === "refreshing" ? (
                               <span className="field-hint" role="status">
