@@ -451,7 +451,8 @@ mod tests {
     #[test]
     fn grade_read_rejects_unassigned_same_school_teacher() {
         let (conn, school, record, learner, _) = grade_fixture();
-        let outsider = user::create_user(&conn, "grade.outsider", "password", "Other Teacher").unwrap();
+        let outsider =
+            user::create_user(&conn, "grade.outsider", "password", "Other Teacher").unwrap();
         user::add_school_membership(&conn, &outsider.id, &school).unwrap();
         let sessions = grade_session(&conn, &school, &outsider.id);
         let before = grade_data_counts(&conn);
@@ -495,7 +496,8 @@ mod tests {
     #[test]
     fn grade_read_rechecks_school_head_role_revocation() {
         let (conn, school, record, learner, _) = grade_fixture();
-        let head = user::create_user(&conn, "grade.head", "password", "Synthetic School Head").unwrap();
+        let head =
+            user::create_user(&conn, "grade.head", "password", "Synthetic School Head").unwrap();
         user::add_school_membership(&conn, &head.id, &school).unwrap();
         crate::repository::role::grant(
             &conn,
