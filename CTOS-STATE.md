@@ -5,7 +5,7 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current PM-13 native grade access continuation — 23 October
 
-Branch forge/scores-grade-access-20261023 fromde3c691d. Full current PM-13 prompt shown first; frozen G1–G5. SRC-AUTH-1 baseline native reproduction in progress using behavior-preserving command seam and five synthetic DB/session tests. Local cargo unavailable; existing CI runners required. Assignment guard not yet added; baseline checkpoint intentionally unmergeable. Existing report_readiness::authorized_record is the preferred established authority if gap confirms. Exact status in scores-grade-access-handoff-2026-10-23.md. Preserve prior UI/grade/draft/history fixes and full A1–A7 limits; parent PR150 draft on149.
+Branch forge/scores-grade-access-20261023 fromde3c691d; PR162 draft. Full current PM-13 prompt shown first; frozen G1–G5. Native pre-guard CI39873544705 reproduced3 actual denial assertion failures/1315 passes on6f580f0, including a computable grade exposed to an unassigned teacher. Candidate reuses established report_readiness::authorized_record and adds exact section/subject, foreign-learner and expiry coverage (seven native tests), plus three pinned grade negative controls alongside two existing write controls. Local quality1692/161, Python compile and diff check PASS; cargo absent. Candidate native/Windows/Security gates pending: do not merge yet. Exact status in scores-grade-access-handoff-2026-10-23.md and evidence JSON. Prior UI/draft/history/math unchanged; full A1–A7/device/teacher acceptance partial. Parent PR150 stays draft on149.
 
 ## Current PM-13 saved-grade readiness continuation — 23 October
 

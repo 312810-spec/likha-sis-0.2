@@ -266,12 +266,10 @@ fn parse_sync_uuid(value: &str, field_name: &str) -> AppResult<Uuid> {
         .map_err(|e| AppError::key_store(format!("invalid {field_name} for sync: {e}")))
 }
 
-/// `class_record_id`/`learner_id` are client-supplied the same legitimate
-/// way `assessment_item_id` already is above — `grading_computation::compute_term_grade`
-/// resolves `class_record_id` within the caller's school first and returns
-/// `None` for a foreign/unknown id or a not-yet-computable grade (see that
-/// function's doc comment for what "not yet computable" means). `school_id`
-/// comes only from the session.
+/// Actor and school come only from the active session. Grade reads use the
+/// established report-readiness authority: current section/subject assignment
+/// or school-head role. Unknown/foreign records and uncomputable grades return
+/// `None`; grading arithmetic remains in the canonical repository.
 #[tauri::command]
 pub fn compute_learner_term_grade(
     db: State<'_, Mutex<Connection>>,
@@ -283,14 +281,23 @@ pub fn compute_learner_term_grade(
     compute_term_grade_for_session(&conn, &sessions, &class_record_id, &learner_id)
 }
 
-// Command seam: session validation and grade read stay together in native tests.
+// Shared native command core: validate current session and record authority on every read.
 fn compute_term_grade_for_session(
     conn: &Connection,
     sessions: &SessionManager,
     class_record_id: &str,
     learner_id: &str,
 ) -> AppResult<Option<ComputedTermGrade>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let record = crate::repository::report_readiness::authorized_record(
+        conn,
+        &user_id,
+        &school_id,
+        class_record_id,
+    )?;
+    if record.is_none() {
+        return Ok(None);
+    }
     grading_computation::compute_term_grade(conn, &school_id, class_record_id, learner_id)
 }
 
@@ -461,6 +468,17 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "unexpected grade read: {result:?}"
         );
+        crate::repository::role::grant(
+            &conn,
+            &outsider.id,
+            &school,
+            crate::repository::role::REGISTRAR,
+        )
+        .unwrap();
+        assert!(matches!(
+            compute_term_grade_for_session(&conn, &sessions, &record, &learner),
+            Err(AppError::Unauthorized)
+        ));
         assert_eq!(grade_data_counts(&conn), before);
     }
 
@@ -523,6 +541,61 @@ mod tests {
             compute_term_grade_for_session(&conn, &sessions, &record, &learner),
             Err(AppError::Unauthorized)
         ));
+    }
+
+    #[test]
+    fn grade_read_requires_the_exact_section_and_subject_pair() {
+        let (conn, school, record, learner, _) = grade_fixture();
+        let outsider = user::create_user(&conn, "grade.partial", "password", "Partial").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &school).unwrap();
+        let detail = class_record::find_detail_by_id_in_school(&conn, &school, &record)
+            .unwrap()
+            .unwrap();
+        let other_subject = subject::create(&conn, &school, "Synthetic Other Subject").unwrap();
+        let other_section = section::create(&conn, &school, "2026-2027", "7", "Other").unwrap();
+        let sessions = grade_session(&conn, &school, &outsider.id);
+        let before = grade_data_counts(&conn);
+        for (section_id, subject_id) in [
+            (&detail.section_id, &other_subject.id),
+            (&other_section.id, &detail.subject_id),
+        ] {
+            crate::repository::teaching_assignment::create(
+                &conn,
+                &school,
+                &outsider.id,
+                section_id,
+                subject_id,
+            )
+            .unwrap()
+            .unwrap();
+            assert!(matches!(
+                compute_term_grade_for_session(&conn, &sessions, &record, &learner),
+                Err(AppError::Unauthorized)
+            ));
+        }
+        assert_eq!(grade_data_counts(&conn), before);
+    }
+
+    #[test]
+    fn grade_read_keeps_foreign_learner_and_expired_session_closed() {
+        let (conn, school, record, _, teacher) = grade_fixture();
+        let sessions = grade_session(&conn, &school, &teacher);
+        let other = school::create(&conn, "Synthetic Foreign Learner School").unwrap();
+        let foreign = learner::create(&conn, &other.id, "Foreign", "Learner", None, None).unwrap();
+        let before = grade_data_counts(&conn);
+        assert!(
+            compute_term_grade_for_session(&conn, &sessions, &record, &foreign.id)
+                .unwrap()
+                .is_none()
+        );
+        let mut expired = sessions.current().unwrap();
+        expired.expires_at = std::time::SystemTime::UNIX_EPOCH;
+        sessions.set(expired);
+        assert!(matches!(
+            compute_term_grade_for_session(&conn, &sessions, &record, &foreign.id),
+            Err(AppError::Unauthorized)
+        ));
+        assert_eq!(grade_data_counts(&conn), before);
     }
 
     #[test]
