@@ -2679,3 +2679,235 @@ it("retains a later selected item when an older selected deletion completes", as
   await act(async () => resolve(true));
   expect(screen.getByRole("heading", { name: "Quiz 2 scores" })).toBeVisible();
 });
+
+describe("PM-13 roster preservation across assessment checks", () => {
+  const second = { ...ITEM, id: "ai-2", name: "Quiz 2" };
+  async function begin(entry: LearnerScoreRosterEntry = ROSTER_ENTRY) {
+    const assessmentRepo = new FakeAssessmentRepository([ITEM, second]);
+    const scoreRepo = new FakeLearnerScoreRepository([entry]);
+    const roster = vi.spyOn(scoreRepo, "rosterForItem");
+    renderScreen({ assessmentRepo, scoreRepo });
+    await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    let read!: (items: AssessmentItemDetail[]) => void;
+    let readFail!: (error: Error) => void;
+    vi.spyOn(assessmentRepo, "listItemsByClassRecord").mockImplementationOnce(
+      () =>
+        new Promise((done, fail) => {
+          read = done;
+          readFail = fail;
+        }),
+    );
+    let remove!: (result: boolean) => void;
+    vi.spyOn(assessmentRepo, "deleteItem").mockImplementationOnce(
+      () => new Promise((done) => (remove = done)),
+    );
+    const group = screen.getByRole("group", { name: "Actions for Quiz 2" });
+    await userEvent.click(within(group).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(group).getByRole("button", { name: "Confirm delete" }));
+    return {
+      assessmentRepo,
+      scoreRepo,
+      input,
+      read: () => read,
+      readFail: () => readFail,
+      remove: () => remove,
+      roster,
+    };
+  }
+
+  it("keeps a newer score input mounted and focused while an unrelated assessment read is pending", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(await screen.findByText(/Checking assessment items/)).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    await act(async () => x.read()([ITEM]));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveFocus();
+    expect(x.input).toHaveValue(19);
+    expect(x.roster).toHaveBeenCalledTimes(1);
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+
+  it("accepts an already-dispatched score acknowledgment during the check and preserves newer work", async () => {
+    const x = await begin();
+    let save!: (result: LearnerScore | null) => void;
+    const record = vi
+      .spyOn(x.scoreRepo, "record")
+      .mockImplementationOnce(() => new Promise((done) => (save = done)));
+    fireEvent.change(x.input, { target: { value: "18" } });
+    await userEvent.click(x.input);
+    await userEvent.keyboard("{Enter}");
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => save(x.scoreRepo.recordResult));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(await screen.findByText(/On this device: 18 \/ 20/)).toBeVisible();
+    await act(async () => x.read()([ITEM]));
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(record).toHaveBeenCalledExactlyOnceWith("ai-1", "l1", "scored", 18, null);
+    expect(screen.getByRole("button", { name: /Quiz 1 \(max 20\) · 1 of/ })).toBeVisible();
+  });
+
+  it("preserves a reasoned correction and its comparison during the item check", async () => {
+    const x = await begin({ ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "old" });
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    const reason = await screen.findByRole("textbox", {
+      name: "Reason for changing Ana Cruz's recorded score",
+    });
+    fireEvent.change(reason, { target: { value: "Rechecked paper" } });
+    reason.focus();
+    await act(async () => x.remove()(true));
+    expect(reason).toBeVisible();
+    expect(reason).toHaveValue("Rechecked paper");
+    expect(reason).toHaveFocus();
+    expect(screen.getByText("Recorded: 15 / 20")).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    await act(async () => x.read()([ITEM]));
+    expect(reason).toHaveFocus();
+    expect(reason).toHaveValue("Rechecked paper");
+  });
+
+  it("retains a row validation error until the teacher corrects the draft", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "21" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    const error = await screen.findByText(/Score must be between 0 and 20/);
+    await act(async () => x.remove()(true));
+    expect(error).toBeVisible();
+    expect(x.input).toHaveValue(21);
+    await act(async () => x.read()([ITEM]));
+    expect(error).toBeVisible();
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+  it.each(["maximum", "category", "removed"])(
+    "invalidates the roster when its selected %s contract changes",
+    async (kind) => {
+      const x = await begin();
+      fireEvent.change(x.input, { target: { value: "19" } });
+      await act(async () => x.remove()(true));
+      await act(async () =>
+        x.read()(
+          kind === "removed"
+            ? []
+            : [{ ...ITEM, ...(kind === "maximum" ? { maxScore: 15 } : { categoryId: "cat-2" }) }],
+        ),
+      );
+      if (kind === "removed")
+        expect(screen.queryByLabelText("Score for Ana Cruz")).not.toBeInTheDocument();
+      else {
+        const next = await screen.findByLabelText("Score for Ana Cruz");
+        expect(x.roster).toHaveBeenCalledTimes(2);
+        expect(next).toHaveValue(19);
+        if (kind === "maximum") {
+          expect(next).toHaveAttribute("max", "15");
+          next.focus();
+          await userEvent.keyboard("{Enter}");
+          expect(await screen.findByText(/Score must be between 0 and 15/)).toBeVisible();
+        }
+      }
+      expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    },
+  );
+
+  it("withholds the roster on list-read failure and restores its draft only after explicit reload", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => x.readFail()(new Error("synthetic denied list read")));
+    expect(screen.queryByLabelText("Score for Ana Cruz")).not.toBeInTheDocument();
+    const reload = await screen.findByRole("button", { name: "Reload items" });
+    await userEvent.click(reload);
+    expect(await screen.findByLabelText("Score for Ana Cruz")).toHaveValue(19);
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+
+  it("preserves the roster for a selected-item rename that keeps its score contract", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => x.read()([{ ...ITEM, name: "Quiz 1 revised" }]));
+    expect(screen.getByRole("heading", { name: "Quiz 1 revised scores" })).toBeVisible();
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveFocus();
+    expect(x.input).toHaveValue(0);
+    expect(x.roster).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates displayed derived grades without resetting the active zero draft", async () => {
+    const x = await begin();
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    fireEvent.change(x.input, { target: { value: "0" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(x.input).toHaveValue(0);
+    expect(x.input).toHaveFocus();
+    await act(async () => x.read()([ITEM]));
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(x.scoreRepo.computeTermGradeCalls).toHaveLength(1);
+  });
+
+  it("rejects an old grade reply and its bulk finally while a newer grade request is pending", async () => {
+    const x = await begin();
+    let old!: (grade: ComputedTermGrade | null) => void;
+    let next!: (grade: ComputedTermGrade | null) => void;
+    const compute = vi
+      .spyOn(x.scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(() => new Promise((done) => (old = done)))
+      .mockImplementationOnce(() => new Promise((done) => (next = done)));
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await act(async () => x.remove()(true));
+    await act(async () => x.read()([ITEM]));
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await act(async () => old({ ...x.scoreRepo.computeTermGradeResult!, termGrade: 99 }));
+    expect(screen.queryByText("99")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Computing…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await act(async () => next(x.scoreRepo.computeTermGradeResult));
+    expect(await screen.findByText("88")).toBeVisible();
+    expect(compute).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains a newer draft after an in-flight score fails during the check and retries only explicitly", async () => {
+    const x = await begin();
+    let fail!: (error: Error) => void;
+    const record = vi
+      .spyOn(x.scoreRepo, "record")
+      .mockImplementationOnce(() => new Promise((_done, reject) => (fail = reject)))
+      .mockResolvedValueOnce({ ...x.scoreRepo.recordResult!, score: 19 });
+    fireEvent.change(x.input, { target: { value: "18" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    fireEvent.change(x.input, { target: { value: "19" } });
+    await act(async () => x.remove()(true));
+    await act(async () => fail(new Error("synthetic failed score")));
+    expect(await screen.findByText("Could not save this score.")).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    await act(async () => x.read()([ITEM]));
+    expect(record).toHaveBeenCalledTimes(1);
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(record).toHaveBeenLastCalledWith("ai-1", "l1", "scored", 19, null);
+    await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(19));
+  });
+});

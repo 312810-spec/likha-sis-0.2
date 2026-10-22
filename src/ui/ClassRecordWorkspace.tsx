@@ -198,6 +198,8 @@ export function ClassRecordWorkspace({
   // fetch whose selected item has since changed from applying its result
   // to the now-current item.
   const rosterRequestRef = useRef(0);
+  const itemScoreRevisionsRef = useRef(new Map<string, number>());
+  const termGradeContextRef = useRef(0);
 
   const [termGrades, setTermGrades] = useState<
     Record<string, ComputedTermGrade | null | "refreshing" | "error">
@@ -301,15 +303,28 @@ export function ClassRecordWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentService, categorySetId, itemsAttempt]);
 
-  function loadRoster() {
-    if (!selectedItemId || !itemsReady || !items.some((item) => item.id === selectedItemId)) return;
-    const requestId = ++rosterRequestRef.current;
-    setRosterLoading(true);
-    setRosterError(null);
+  const rosterItem = itemsCurrent ? items.find((item) => item.id === selectedItemId) : undefined;
+  // A temporary write lock is not a new learner/assessment context.
+  const rosterIdentity = rosterItem
+    ? JSON.stringify([classRecordId, rosterItem.id, rosterItem.categoryId, rosterItem.maxScore])
+    : null;
+
+  function invalidateTermGrades() {
+    termGradeContextRef.current += 1;
     setTermGrades({});
     setTermGradesLoading(false);
     termGradesRequestedRef.current = false;
     termGradeBulkInFlightRef.current = false;
+    setJustUpdatedLearnerId(null);
+    if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
+  }
+
+  function loadRoster() {
+    if (!selectedItemId || !rosterIdentity) return;
+    const requestId = ++rosterRequestRef.current;
+    setRosterLoading(true);
+    setRosterError(null);
+    invalidateTermGrades();
     termGradeGenerationRef.current.clear();
     learnerScoreService
       .rosterForItem(selectedItemId)
@@ -340,23 +355,32 @@ export function ClassRecordWorkspace({
       rosterRequestRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnerScoreService, selectedItemId, itemsReady]);
+  }, [learnerScoreService, rosterIdentity]);
 
   const categoryReady =
     categoriesSource?.service === assessmentService &&
     categoriesSource.setId === categorySetId &&
     categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
+    invalidateTermGrades();
     // An uncertain deletion requires explicit reload, even if another write completes.
     if (itemsRequireReloadRef.current) return;
     const generation = ++itemReadGenerationRef.current;
+    const scoreRevisions = new Map(itemScoreRevisionsRef.current);
     const isCurrentRead = () => isActiveSource() && itemReadGenerationRef.current === generation;
     // Keep current editors mounted during a read; block writes until it finishes.
     setItemsRefreshing(true);
     try {
       const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
       if (!isCurrentRead()) return;
-      setItems(refreshed);
+      setItems((current) =>
+        refreshed.map((item) => {
+          const newer = current.find((candidate) => candidate.id === item.id);
+          return newer && scoreRevisions.get(item.id) !== itemScoreRevisionsRef.current.get(item.id)
+            ? { ...item, recordedCount: newer.recordedCount, totalEligible: newer.totalEligible }
+            : item;
+        }),
+      );
       setItemsSource({ service: assessmentService, classId: classRecordId });
     } catch {
       if (!isCurrentRead()) return;
@@ -586,10 +610,12 @@ export function ClassRecordWorkspace({
   // failed reads never leave an older number looking current.
   async function refreshTermGrade(learnerId: string) {
     const rosterRequest = rosterRequestRef.current;
+    const gradeContext = termGradeContextRef.current;
     const generation = (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1;
     termGradeGenerationRef.current.set(learnerId, generation);
     const isCurrent = () =>
       rosterRequestRef.current === rosterRequest &&
+      termGradeContextRef.current === gradeContext &&
       termGradeGenerationRef.current.get(learnerId) === generation;
     setTermGrades((current) => ({ ...current, [learnerId]: "refreshing" }));
     try {
@@ -696,6 +722,10 @@ export function ClassRecordWorkspace({
       // The correction is written; the held change and its reason are no
       // longer pending.
       clearPendingCorrection(learnerId);
+      itemScoreRevisionsRef.current.set(
+        selectedItemId,
+        (itemScoreRevisionsRef.current.get(selectedItemId) ?? 0) + 1,
+      );
       setRoster((current) =>
         current.map((entry) =>
           entry.learnerId === learnerId
@@ -868,13 +898,17 @@ export function ClassRecordWorkspace({
   async function handleShowTermGrades() {
     if (termGradeBulkInFlightRef.current || rosterLoading || rosterError || !itemsReady) return;
     const rosterRequest = rosterRequestRef.current;
+    const gradeContext = termGradeContextRef.current;
     termGradeBulkInFlightRef.current = true;
     termGradesRequestedRef.current = true;
     setTermGradesLoading(true);
     try {
       await Promise.all(roster.map((entry) => refreshTermGrade(entry.learnerId)));
     } finally {
-      if (rosterRequestRef.current === rosterRequest) {
+      if (
+        rosterRequestRef.current === rosterRequest &&
+        termGradeContextRef.current === gradeContext
+      ) {
         termGradeBulkInFlightRef.current = false;
         setTermGradesLoading(false);
       }
@@ -955,7 +989,7 @@ export function ClassRecordWorkspace({
     }
   }
 
-  const selectedItem = itemsReady ? items.find((i) => i.id === selectedItemId) : undefined;
+  const selectedItem = rosterItem;
   const recordedCount = roster.filter((entry) => entry.status !== null).length;
   const remainingCount = roster.length - recordedCount;
 
@@ -1312,6 +1346,13 @@ export function ClassRecordWorkspace({
             )}
           </div>
 
+          {itemsRefreshing && (
+            <p className="field-hint" id="score-assessment-check" role="status">
+              Checking assessment items. Your draft is retained; new score saves wait until the
+              check finishes.
+            </p>
+          )}
+
           {rosterError && (
             <Alert tone="error">
               <p>{rosterError}</p>
@@ -1393,7 +1434,7 @@ export function ClassRecordWorkspace({
                                   placeholder="Reason for the change"
                                   readOnly={isSaving}
                                   aria-invalid={hasRowError}
-                                  aria-describedby={`score-review-${entry.learnerId}${hasRowError ? ` score-error-${entry.learnerId}` : ""}`}
+                                  aria-describedby={`score-review-${entry.learnerId}${hasRowError ? ` score-error-${entry.learnerId}` : ""}${itemsRefreshing ? " score-assessment-check" : ""}`}
                                   value={correctionReasons[entry.learnerId] ?? ""}
                                   onChange={(event) => {
                                     setCorrectionReasons((current) => ({
@@ -1487,6 +1528,7 @@ export function ClassRecordWorkspace({
                                   aria-describedby={
                                     [
                                       "score-keyboard-help",
+                                      itemsRefreshing ? "score-assessment-check" : null,
                                       hasRowError ? `score-error-${entry.learnerId}` : null,
                                       draft !== undefined && !isSaving
                                         ? `score-draft-${entry.learnerId}`
