@@ -1,0 +1,476 @@
+{
+  "project": "LIKHA-SIS",
+  "date": "2026-10-22",
+  "timezone": "Asia/Manila",
+  "scope": "PM-12 edit/rename acknowledgment preservation; full PM-12/A1\u2013A7 partial",
+  "base": "e4c92cdd2c03bc7fa6c40543cba27edb16ecdc51",
+  "localImplementation": "9ee0ff20b37a8541113d514aaff30cf8349ac708",
+  "checkedHead": "bf8fb342c465295e351b3d5c096d6cc894f92252",
+  "checkedTree": "cf3833cfb02f2d07dbb7b646c7d37e2344e5ae2f",
+  "ciMerge": "7cd567ff1fca0edb0c7bfb73a6a42e69d486dc01",
+  "actualMerge": {
+    "sha": "d57fe421036327665e11851ffca4580a43f0d744",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "ciRuns": {
+    "workflow_runs": [
+      {
+        "id": 39770794690,
+        "name": "Security Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1598,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39770794690/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39770794690/logs",
+        "workflow_id": 342872406
+      },
+      {
+        "id": 39770794816,
+        "name": "Quality Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1098,
+        "jobs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39770794816/jobs",
+        "logs_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/runs/39770794816/logs",
+        "workflow_id": 342524866
+      }
+    ]
+  },
+  "qualityJobs": {
+    "jobs": [
+      {
+        "id": 119797512702,
+        "name": "Quality / classify affected work",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39770794816,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout full history for diff classification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Determine changed files",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Verify classifier behavior",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Classify affected work",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Post Checkout full history for diff classification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          }
+        ]
+      },
+      {
+        "id": 119797581300,
+        "name": "Quality (Ubuntu)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39770794816,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Update npm to current stable",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Install Node dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Run documentation formatting gate",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 6
+          },
+          {
+            "name": "Verify harness contract",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 7
+          },
+          {
+            "name": "Run JavaScript and TypeScript quality gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Install Chromium for deterministic UI verification",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          },
+          {
+            "name": "Run UI workflow and accessibility smoke gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Verify UX recovery journeys",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          },
+          {
+            "name": "Verify pre-React appearance in development and production",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12
+          },
+          {
+            "name": "Upload appearance startup verification receipts",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13
+          },
+          {
+            "name": "Upload UI verification screenshots",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Install Tauri Linux build dependencies",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 15
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 16
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 17
+          },
+          {
+            "name": "Verify opener compatibility source provenance",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 18
+          },
+          {
+            "name": "Verify cold SQLCipher initialization mechanism",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 19
+          },
+          {
+            "name": "Run native Rust quality gate",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 20
+          },
+          {
+            "name": "Exercise opener compatibility on a private synthetic D-Bus",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 21
+          },
+          {
+            "name": "Verify bounded score native baseline negative controls",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 22
+          },
+          {
+            "name": "Post Set up Node.js",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 43
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 44
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 45
+          }
+        ]
+      },
+      {
+        "id": 119797583677,
+        "name": "Quality (Windows)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "run_id": 39770794816,
+        "logs_url": null,
+        "steps": null
+      }
+    ]
+  },
+  "securityJobs": {
+    "jobs": [
+      {
+        "id": 119797511903,
+        "name": "Security / gitleaks",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39770794690,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout (full history)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run gitleaks",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Post Checkout (full history)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          }
+        ]
+      },
+      {
+        "id": 119797512154,
+        "name": "Security / osv-scanner",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39770794690,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Download and verify osv-scanner v2.6.0 (linux_amd64)",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run osv-scanner",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          }
+        ]
+      },
+      {
+        "id": 119797512213,
+        "name": "Security / cargo-deny",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 39770794690,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Build EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run cargo-deny",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Post Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          }
+        ]
+      }
+    ]
+  },
+  "logExcerpts": [
+    "2026-10-22T11:28:21.3101687Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +7cd567ff1fca0edb0c7bfb73a6a42e69d486dc01:refs/remotes/pull/158/merge",
+    "2026-10-22T11:28:22.5355781Z  * [new ref]         7cd567ff1fca0edb0c7bfb73a6a42e69d486dc01 -> pull/158/merge",
+    "2026-10-22T11:28:22.6762989Z 7cd567ff1fca0edb0c7bfb73a6a42e69d486dc01",
+    "2026-10-22T11:30:01.4552682Z  Test Files  161 passed (161)",
+    "2026-10-22T11:30:01.4561388Z       Tests  1652 passed (1652)",
+    "2026-10-22T11:30:41.1760974Z quality:ui PASS \u2014 assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances \u00d7 three densities \u00d7 four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+    "2026-10-22T11:30:57.9000012Z quality:ui:recovery PASS \u2014 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+    "2026-10-22T11:30:57.9895237Z node scripts/assurance/appearance-startup-browser.mjs",
+    "2026-10-22T11:30:57.9895536Z node scripts/assurance/appearance-startup-browser.mjs --built",
+    "2026-10-22T11:31:02.7854428Z PASS: 13/13 production startup cases.",
+    "2026-10-22T11:31:03.1356676Z   name: likha-sis-appearance-startup-verification",
+    "2026-10-22T11:31:03.1356957Z   path: .cache/appearance-startup/*.json",
+    "2026-10-22T11:31:03.4926958Z Uploading artifact: likha-sis-appearance-startup-verification.zip",
+    "2026-10-22T11:31:04.2540171Z Artifact likha-sis-appearance-startup-verification successfully finalized. Artifact ID 12423000049",
+    "2026-10-22T11:31:04.2540742Z Artifact likha-sis-appearance-startup-verification has been successfully uploaded! Final size is 1332 bytes. Artifact ID is 12423000049"
+  ],
+  "classifierExcerpts": [
+    "2026-10-22T11:28:14.8990372Z   \"full\": false,",
+    "2026-10-22T11:28:14.8990767Z   \"docsOnly\": false,",
+    "2026-10-22T11:28:14.8991125Z   \"harness\": false,",
+    "2026-10-22T11:28:14.8991404Z   \"javascript\": true,",
+    "2026-10-22T11:28:14.8991638Z   \"ui\": true,",
+    "2026-10-22T11:28:14.8991852Z   \"native\": false,",
+    "2026-10-22T11:28:14.8992081Z   \"windows\": false,"
+  ],
+  "artifacts": {
+    "artifacts": [
+      {
+        "id": 12423000049,
+        "name": "likha-sis-appearance-startup-verification",
+        "size_in_bytes": 1332,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12423000049",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12423000049/zip",
+        "expired": false,
+        "created_at": "2026-10-22T11:31:03Z",
+        "expires_at": "2026-10-29T11:31:03Z",
+        "updated_at": "2026-10-22T11:31:03Z",
+        "digest": "sha256:57b00f9afbe4d6ac464838002299ca62c8511862b084bffab9691d51aeaba430",
+        "workflow_run": {
+          "id": 39770794816,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/assessment-edit-ack-20261022",
+          "head_sha": "bf8fb342c465295e351b3d5c096d6cc894f92252"
+        }
+      },
+      {
+        "id": 12421529050,
+        "name": "likha-sis-ui-verification",
+        "size_in_bytes": 930444,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12421529050",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12421529050/zip",
+        "expired": false,
+        "created_at": "2026-10-22T11:31:05Z",
+        "expires_at": "2026-10-29T11:31:04Z",
+        "updated_at": "2026-10-22T11:31:05Z",
+        "digest": "sha256:2a6992dd7b1cf337583b6aa10ba048843b3477a05bf2505ace521980e9b5837b",
+        "workflow_run": {
+          "id": 39770794816,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/assessment-edit-ack-20261022",
+          "head_sha": "bf8fb342c465295e351b3d5c096d6cc894f92252"
+        }
+      }
+    ]
+  },
+  "limits": [
+    "Only child PR158 gated and merged into existing integration parent. Parent PR150 remains draft on PR149.",
+    "Native/Windows skipped for affected UI delta, not fresh native or installed-device proof.",
+    "Manual teacher/device/assistive evidence and remaining PM-12 states stay pending.",
+    "Documentation-only receipt follow-up preserves the checked production/test/probe/style/lock/workflow/native bytes."
+  ],
+  "actualMergeTree": "cf3833cfb02f2d07dbb7b646c7d37e2344e5ae2f"
+}
