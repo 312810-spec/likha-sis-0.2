@@ -2144,3 +2144,130 @@ describe("Scores CSV attempt feedback", () => {
     expect(exportRepo.revealCalls).toEqual([exportRepo.reportCardResult!.filePath]);
   });
 });
+
+describe("assessment creation acknowledgment continuity", () => {
+  it.each([false, true])(
+    "retains a newer creation draft and focus, including returned original text: %s",
+    async (returned) => {
+      const user = userEvent.setup();
+      const repo = new FakeAssessmentRepository();
+      const create = repo.createItem.bind(repo);
+      let release!: () => Promise<void>;
+      const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+        (...args) =>
+          new Promise((resolve) => {
+            release = async () => resolve(await create(...args));
+          }),
+      );
+      renderScreen({ assessmentRepo: repo });
+      await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+      await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+      const name = screen.getByLabelText("Item name"),
+        max = screen.getByLabelText("Max score");
+      await user.type(name, "Quiz 2");
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+      await user.clear(name);
+      await user.type(name, returned ? "Quiz 2" : "Quiz 3");
+      if (!returned) {
+        await user.clear(max);
+        await user.type(max, "10");
+      } else await user.click(max);
+      await act(async () => release());
+      expect(name).toBeVisible();
+      expect(name).toHaveValue(returned ? "Quiz 2" : "Quiz 3");
+      expect(max).toHaveValue(returned ? 20 : 10);
+      expect(max).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Close item editor" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith("cr-1", "cat-1", "Quiz 2", 20);
+      expect(screen.getByText(/Quiz 2 added\./)).toBeVisible();
+    },
+  );
+});
+
+describe("assessment creation draft boundaries", () => {
+  it("retains a max-only change without clearing the submitted name", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(max);
+    await user.type(max, "10");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 2");
+    expect(name).toBeVisible();
+    expect(max).toHaveValue(10);
+    expect(max).toHaveFocus();
+    expect(repo.createCalls).toEqual([
+      { classRecordId: "cr-1", categoryId: "cat-1", name: "Quiz 2", maxScore: 20 },
+    ]);
+  });
+  it("retains a newer workspace draft after a failed create without retrying it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    let reject!: (e: Error) => void;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(await screen.findByText("Could not create this item.")).toBeVisible();
+    expect(name).toHaveValue("Quiz 3");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("first assessment creation draft continuity", () => {
+  it("keeps an implicitly open empty-record composer open for newer work", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository([]);
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    const name = await screen.findByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Close item editor" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+});

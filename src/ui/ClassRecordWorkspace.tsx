@@ -115,6 +115,8 @@ export function ClassRecordWorkspace({
   const [itemName, setItemName] = useSessionDraft(`${classRecordId}:record:itemName`, () => "");
   const [maxScore, setMaxScore] = useSessionDraft(`${classRecordId}:record:maxScore`, () => "20");
   const [creatingItem, setCreatingItem] = useState(false);
+  // User edits belong to a newer draft even if its text returns to the submitted value.
+  const createDraftRevisionRef = useRef(0);
   const composerToggleRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const [composerOpen, setComposerOpen] = useSessionDraft<boolean | null>(
@@ -366,6 +368,7 @@ export function ClassRecordWorkspace({
     setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
+    const submittedDraftRevision = createDraftRevisionRef.current;
     setCreatingItem(true);
     try {
       const created = await assessmentService.createItem(
@@ -378,15 +381,24 @@ export function ClassRecordWorkspace({
       if (created === null) {
         setError("Could not create this item — check the category and class record.");
       } else {
-        setItemName("");
-        setComposerOpen(false);
-        if (
-          composerRef.current?.contains(document.activeElement) &&
-          !composerRef.current.closest("[hidden]")
-        ) {
-          composerToggleRef.current?.focus();
+        const hasNewerDraft = createDraftRevisionRef.current !== submittedDraftRevision;
+        if (hasNewerDraft) {
+          // An empty record opens implicitly; retain that intent once the first item exists.
+          // Preserve an explicit close while the request was pending.
+          setComposerOpen((open) => open ?? true);
+        } else {
+          setItemName("");
+          setComposerOpen(false);
+          if (
+            composerRef.current?.contains(document.activeElement) &&
+            !composerRef.current.closest("[hidden]")
+          ) {
+            composerToggleRef.current?.focus();
+          }
         }
-        setConfirmation(`${created.name} added.`);
+        setConfirmation(
+          `${created.name} added.${hasNewerDraft ? " Your newer item draft is retained." : ""}`,
+        );
         await refreshItemsAfterWrite();
       }
     } catch (err) {
@@ -956,7 +968,10 @@ export function ClassRecordWorkspace({
               id="workspace-category-set"
               aria-describedby={mode === "guided" ? "workspace-category-set-hint" : undefined}
               value={categorySetId}
-              onChange={(event) => setCategorySetId(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setCategorySetId(event.target.value);
+              }}
             >
               <option value="" disabled>
                 Select a current category set
@@ -981,7 +996,10 @@ export function ClassRecordWorkspace({
               id="workspace-category"
               aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setCategoryId(event.target.value);
+              }}
             >
               <option value="" disabled>
                 Select a current category
@@ -1000,7 +1018,10 @@ export function ClassRecordWorkspace({
               type="text"
               placeholder="e.g. Quiz 1"
               value={itemName}
-              onChange={(event) => setItemName(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setItemName(event.target.value);
+              }}
             />
           </div>
           <div className="field">
@@ -1010,7 +1031,10 @@ export function ClassRecordWorkspace({
               type="number"
               min="1"
               value={maxScore}
-              onChange={(event) => setMaxScore(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setMaxScore(event.target.value);
+              }}
             />
           </div>
         </div>

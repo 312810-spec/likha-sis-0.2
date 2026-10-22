@@ -1,6 +1,6 @@
 import { SessionDraftProvider } from "./SessionDraftProvider";
 import { clearSessionDrafts } from "./session-draft-store";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
@@ -315,5 +315,128 @@ describe("authoring draft continuity", () => {
     expect(screen.getByLabelText("Item name")).toHaveValue("Unfinished quiz");
     expect(repo.createCalls).toHaveLength(0);
     clearSessionDrafts();
+  });
+});
+
+describe("assessment creation acknowledgment continuity", () => {
+  it("retains the next Studio item and focused field while the previous creation finishes", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await user.clear(max);
+    await user.type(max, "10");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(max).toHaveValue(10);
+    expect(max).toHaveFocus();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("cr-1", "cat-1", "Quiz 2", 20);
+    expect(screen.getByText(/Quiz 2 added\./)).toBeVisible();
+  });
+  it("does not steal focus after a late list refresh while the next name is being prepared", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const original = repo.listItemsByClassRecord.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "listItemsByClassRecord").mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = async () => resolve(await original());
+        }),
+    );
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await screen.findByText(/Quiz 2 added\./);
+    await user.type(name, "Quiz 3");
+    await user.click(max);
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(max).toHaveFocus();
+  });
+  it("does not create an item for an IME composition Enter", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const spy = vi.spyOn(repo, "createItem");
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    fireEvent.keyDown(name, { key: "Enter", code: "Enter", isComposing: true });
+    expect(spy).not.toHaveBeenCalled();
+    expect(name).toHaveValue("Quiz 2");
+  });
+});
+
+describe("Studio creation draft boundaries", () => {
+  it("retains a category-only change while acknowledging the submitted category", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue([
+      CATEGORY,
+      { ...CATEGORY, id: "cat-2", name: "Synthetic second category" },
+    ]);
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name"),
+      category = screen.getByLabelText("Category", { exact: true });
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.selectOptions(category, "cat-2");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 2");
+    expect(category).toHaveValue("cat-2");
+    expect(category).toHaveFocus();
+    expect(repo.createCalls).toEqual([
+      { classRecordId: "cr-1", categoryId: "cat-1", name: "Quiz 2", maxScore: 20 },
+    ]);
+  });
+  it("retains a newer Studio draft after a failed create without retrying it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    let reject!: (e: Error) => void;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(await screen.findByText("Could not add this item.")).toBeVisible();
+    expect(name).toHaveValue("Quiz 3");
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

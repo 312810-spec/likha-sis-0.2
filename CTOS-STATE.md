@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current PM-12 creation acknowledgment continuation — 22 October
+
+Active branch `forge/assessment-draft-ack-20261022` from82dd88f. Task-pack PM-12 prompt shown before execution. Preserve newer creation drafts/focus across delayed acknowledgment in workspace/Studio; prevent composing Enter submission; retain implicit empty-record editor for newer work. Baseline5 FAIL/91 PASS; additional implicit-open regression reproduced. Ten added component cases; local quality1,634/161 files and build/isolation PASS; browser72/UI/recovery50/Scores47 PASS; four renders inspected. CI/publication pending receipt. Current prompt/contract/elements/before-after/limits: `docs/assurance/assessment-draft-handoff-2026-10-22.md`. Full PM-12 and Scores A1–A7 remain partial/pending. Next: remaining Scores authoring states and external observations.
+
 ## Current Scores CSV feedback continuation — 22 October
 
 Active branch `forge/scores-export-feedback-20261022` from c7c9d01. PM-12/13/31 bounded CSV attempt/error/snapshot/folder/path feedback repair. Restored after workspace maintenance; fresh baseline6 FAIL/74 PASS, seven added cases. Current contract/state ledger/checks/publication: `docs/assurance/scores-export-feedback-handoff-2026-10-22.md`. Fresh quality1,624/161 files, UI/recovery50/Scores47/build/isolation and browser36 configurations/72 feedback states PASS; internal renders inspected. PR156 gated/merged into parent asfb47e9f1; Quality39735201256 /Security39735201237 PASS on3a34cd9; checked/CI/actual merge tree1e1b32da. Exact receipt: `docs/assurance/scores-export-feedback-ci-merge-2026-10-22.json`. Preserve all merged repairs; Scores remains the single runtime pilot. Teacher/device/manual A1–A7 remain pending.

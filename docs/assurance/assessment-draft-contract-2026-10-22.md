@@ -1,0 +1,13 @@
+# PM-12 assessment creation acknowledgment contract
+
+22 October 2026, Asia/Manila. Base82dd88f32fd73d6153a1b7ecdc56024d4141a803. Apply the retrieved PM-12 task prompt and shared element/assurance contracts; retain existing A1–A7. This bounded continuation targets the two creation composers in the Scores pilot, not every remaining PM-12 editing/deletion state.
+
+| ID  | Required outcome                                                                                                                                                        | Verification                                                                         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| P1  | A delayed create acknowledges only the submitted class/category/name/max; newer name/category/set/max edits survive and are not automatically submitted                 | Deferred component tests and actual synthetic browser request arguments              |
+| P2  | A workspace composer with newer work remains available; confirmation names the saved item and distinguishes a retained newer draft                                      | Component/browser assertions                                                         |
+| P3  | Unchanged creation preserves existing clear/collapse or add-and-continue behavior; edits that return to the original text still count as newer work                     | Existing regressions and ABA revision test                                           |
+| P4  | A late Studio acknowledgment/list refresh cannot steal focus from newer work; IME composition Enter cannot create an item                                               | Deferred focus and composition tests; browser keyboard checks                        |
+| P5  | Failed creation preserves the current draft; duplicate guards and read-only list recovery remain; relevant existing invalid/duplicate/scored-item protection tests pass | Focused tests, quality/UI/recovery/journey/browser/build/isolation and applicable CI |
+
+Source leads: both create handlers unconditionally clear the name after success; workspace collapses its composer and Studio focuses the name after a delayed list read. Studio's name Enter handler does not check composition. Reproduce before treating them as defects. Use existing native controls/tokens; no new animation, category/rule, dependency, native boundary or official-output change. Existing edit/rename/cancel/delete behavior outside creation is protected, not newly certified. Teacher/device/manual acceptance stays pending.
