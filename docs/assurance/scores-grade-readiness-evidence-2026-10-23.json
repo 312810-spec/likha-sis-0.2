@@ -3,20 +3,96 @@
   "date": "2026-10-23",
   "timezone": "Asia/Manila",
   "base": "05e885c6fe0e449082325bffd3eecf6c4da04026",
+  "checkedHead": "5f83f388192a2f1cf31cf90a4f72840dbf9e8198",
+  "checkedTree": "3150b27bf22d8112273bdc64e8a847ebdb40e775",
   "scope": "PM-13 saved-grade feedback and unsaved-work readiness, C1\u2013C6",
   "browser": {
     "project": "LIKHA-SIS",
-    "head": "05e885c6fe0e449082325bffd3eecf6c4da04026",
+    "head": "5f83f388192a2f1cf31cf90a4f72840dbf9e8198",
     "node": "v24.19.0",
     "browser": "156.0.8078.47",
     "sources": {
-      "src/ui/ClassRecordWorkspace.tsx": "2d6a5a6e9aeaa5e4b2c19c5b2a6a28da4ff8482aac046d299713f1063fbdceb0",
-      "src/ui/ClassRecordWorkspace.test.tsx": "f016427030017db2d9acdce34d62d113cc2c5dd4d039be1c9e01fd7b1be53acb",
+      "src/ui/ClassRecordWorkspace.tsx": "2520abee273a9ef17cca4b5db17c367985767a7315809f01a8d31bfd0d9dfa4b",
+      "src/ui/ClassRecordWorkspace.test.tsx": "77c9df4d6e2b44b94fd79c92b80a44f3ed92ceb92960d64ef223dfb91d2d00c0",
       "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
-      "scripts/assurance/scores-grade-readiness-browser.mjs": "292c7babf008af5422ffa52dbd28b1daa4e92431c363e3b49e82fd22517c53e8"
+      "scripts/assurance/scores-grade-readiness-browser.mjs": "c1eba5525fd9a2dbc1dc0f8c2312a7c2b1c23419f9be365b5338ac970c573fc6"
     },
     "cases": [
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:40:53.394Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 1280,
@@ -37,8 +113,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:22:52.520Z",
-            "updatedAt": "2026-10-22T22:22:52.520Z"
+            "recordedAt": "2026-10-22T22:40:53.394Z",
+            "updatedAt": "2026-10-22T22:40:53.394Z"
           },
           "roster": [
             {
@@ -47,7 +123,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:22:52.520Z"
+              "updatedAt": "2026-10-22T22:40:53.394Z"
             },
             {
               "learnerId": "l2",
@@ -128,6 +204,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:01.883Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 1280,
@@ -148,8 +298,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:22:58.364Z",
-            "updatedAt": "2026-10-22T22:22:58.364Z"
+            "recordedAt": "2026-10-22T22:41:01.883Z",
+            "updatedAt": "2026-10-22T22:41:01.883Z"
           },
           "roster": [
             {
@@ -158,7 +308,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:22:58.364Z"
+              "updatedAt": "2026-10-22T22:41:01.883Z"
             },
             {
               "learnerId": "l2",
@@ -239,6 +389,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:10.549Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 640,
@@ -259,8 +483,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:04.207Z",
-            "updatedAt": "2026-10-22T22:23:04.207Z"
+            "recordedAt": "2026-10-22T22:41:10.549Z",
+            "updatedAt": "2026-10-22T22:41:10.549Z"
           },
           "roster": [
             {
@@ -269,7 +493,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:04.207Z"
+              "updatedAt": "2026-10-22T22:41:10.549Z"
             },
             {
               "learnerId": "l2",
@@ -350,6 +574,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:19.162Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 640,
@@ -370,8 +668,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:10.567Z",
-            "updatedAt": "2026-10-22T22:23:10.567Z"
+            "recordedAt": "2026-10-22T22:41:19.162Z",
+            "updatedAt": "2026-10-22T22:41:19.162Z"
           },
           "roster": [
             {
@@ -380,7 +678,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:10.567Z"
+              "updatedAt": "2026-10-22T22:41:19.162Z"
             },
             {
               "learnerId": "l2",
@@ -461,6 +759,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:27.827Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 341,
+          "height": 36,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 390,
@@ -481,8 +853,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:16.470Z",
-            "updatedAt": "2026-10-22T22:23:16.470Z"
+            "recordedAt": "2026-10-22T22:41:27.827Z",
+            "updatedAt": "2026-10-22T22:41:27.827Z"
           },
           "roster": [
             {
@@ -491,7 +863,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:16.470Z"
+              "updatedAt": "2026-10-22T22:41:27.827Z"
             },
             {
               "learnerId": "l2",
@@ -572,6 +944,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:36.539Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 341,
+          "height": 36,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "efficient",
         "width": 390,
@@ -592,8 +1038,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:22.113Z",
-            "updatedAt": "2026-10-22T22:23:22.113Z"
+            "recordedAt": "2026-10-22T22:41:36.539Z",
+            "updatedAt": "2026-10-22T22:41:36.539Z"
           },
           "roster": [
             {
@@ -602,7 +1048,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:22.113Z"
+              "updatedAt": "2026-10-22T22:41:36.539Z"
             },
             {
               "learnerId": "l2",
@@ -683,6 +1129,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:45.189Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 408,
+          "height": 38.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 1280,
@@ -703,8 +1223,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:27.849Z",
-            "updatedAt": "2026-10-22T22:23:27.849Z"
+            "recordedAt": "2026-10-22T22:41:45.189Z",
+            "updatedAt": "2026-10-22T22:41:45.189Z"
           },
           "roster": [
             {
@@ -713,7 +1233,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:27.849Z"
+              "updatedAt": "2026-10-22T22:41:45.189Z"
             },
             {
               "learnerId": "l2",
@@ -794,6 +1314,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:41:54.391Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 408,
+          "height": 38.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 1280,
@@ -814,8 +1408,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:33.438Z",
-            "updatedAt": "2026-10-22T22:23:33.438Z"
+            "recordedAt": "2026-10-22T22:41:54.391Z",
+            "updatedAt": "2026-10-22T22:41:54.391Z"
           },
           "roster": [
             {
@@ -824,7 +1418,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:33.438Z"
+              "updatedAt": "2026-10-22T22:41:54.391Z"
             },
             {
               "learnerId": "l2",
@@ -905,6 +1499,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:03.206Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 463,
+          "height": 16,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 640,
@@ -925,8 +1593,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:39.111Z",
-            "updatedAt": "2026-10-22T22:23:39.111Z"
+            "recordedAt": "2026-10-22T22:42:03.206Z",
+            "updatedAt": "2026-10-22T22:42:03.206Z"
           },
           "roster": [
             {
@@ -935,7 +1603,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:39.111Z"
+              "updatedAt": "2026-10-22T22:42:03.206Z"
             },
             {
               "learnerId": "l2",
@@ -1016,6 +1684,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:12.169Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 463,
+          "height": 16,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 640,
@@ -1036,8 +1778,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:44.519Z",
-            "updatedAt": "2026-10-22T22:23:44.519Z"
+            "recordedAt": "2026-10-22T22:42:12.169Z",
+            "updatedAt": "2026-10-22T22:42:12.169Z"
           },
           "roster": [
             {
@@ -1046,7 +1788,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:44.519Z"
+              "updatedAt": "2026-10-22T22:42:12.169Z"
             },
             {
               "learnerId": "l2",
@@ -1127,6 +1869,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:20.928Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 327,
+          "height": 38.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 390,
@@ -1147,8 +1963,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:50.102Z",
-            "updatedAt": "2026-10-22T22:23:50.102Z"
+            "recordedAt": "2026-10-22T22:42:20.928Z",
+            "updatedAt": "2026-10-22T22:42:20.928Z"
           },
           "roster": [
             {
@@ -1157,7 +1973,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:50.102Z"
+              "updatedAt": "2026-10-22T22:42:20.928Z"
             },
             {
               "learnerId": "l2",
@@ -1238,6 +2054,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:29.731Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 327,
+          "height": 38.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "comfortable",
         "width": 390,
@@ -1258,8 +2148,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:23:57.852Z",
-            "updatedAt": "2026-10-22T22:23:57.852Z"
+            "recordedAt": "2026-10-22T22:42:29.731Z",
+            "updatedAt": "2026-10-22T22:42:29.731Z"
           },
           "roster": [
             {
@@ -1268,7 +2158,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:23:57.852Z"
+              "updatedAt": "2026-10-22T22:42:29.731Z"
             },
             {
               "learnerId": "l2",
@@ -1349,6 +2239,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:38.587Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 357,
+          "height": 43.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 1280,
@@ -1369,8 +2333,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:05.535Z",
-            "updatedAt": "2026-10-22T22:24:05.535Z"
+            "recordedAt": "2026-10-22T22:42:38.587Z",
+            "updatedAt": "2026-10-22T22:42:38.587Z"
           },
           "roster": [
             {
@@ -1379,7 +2343,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:05.535Z"
+              "updatedAt": "2026-10-22T22:42:38.587Z"
             },
             {
               "learnerId": "l2",
@@ -1460,6 +2424,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:47.260Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 357,
+          "height": 43.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 1280,
@@ -1480,8 +2518,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:13.834Z",
-            "updatedAt": "2026-10-22T22:24:13.834Z"
+            "recordedAt": "2026-10-22T22:42:47.260Z",
+            "updatedAt": "2026-10-22T22:42:47.260Z"
           },
           "roster": [
             {
@@ -1490,7 +2528,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:13.834Z"
+              "updatedAt": "2026-10-22T22:42:47.260Z"
             },
             {
               "learnerId": "l2",
@@ -1571,6 +2609,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:42:56.084Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 533,
+          "height": 18,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 640,
@@ -1591,8 +2703,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:21.682Z",
-            "updatedAt": "2026-10-22T22:24:21.682Z"
+            "recordedAt": "2026-10-22T22:42:56.084Z",
+            "updatedAt": "2026-10-22T22:42:56.084Z"
           },
           "roster": [
             {
@@ -1601,7 +2713,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:21.682Z"
+              "updatedAt": "2026-10-22T22:42:56.084Z"
             },
             {
               "learnerId": "l2",
@@ -1682,6 +2794,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:05.016Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 533,
+          "height": 18,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 640,
@@ -1702,8 +2888,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:29.183Z",
-            "updatedAt": "2026-10-22T22:24:29.183Z"
+            "recordedAt": "2026-10-22T22:43:05.016Z",
+            "updatedAt": "2026-10-22T22:43:05.016Z"
           },
           "roster": [
             {
@@ -1712,7 +2898,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:29.183Z"
+              "updatedAt": "2026-10-22T22:43:05.016Z"
             },
             {
               "learnerId": "l2",
@@ -1793,6 +2979,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:18.905Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 265,
+          "height": 43.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 390,
@@ -1813,8 +3073,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:36.715Z",
-            "updatedAt": "2026-10-22T22:24:36.715Z"
+            "recordedAt": "2026-10-22T22:43:18.905Z",
+            "updatedAt": "2026-10-22T22:43:18.905Z"
           },
           "roster": [
             {
@@ -1823,7 +3083,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:36.715Z"
+              "updatedAt": "2026-10-22T22:43:18.905Z"
             },
             {
               "learnerId": "l2",
@@ -1904,6 +3164,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:32.354Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 265,
+          "height": 43.5,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "light",
         "density": "guided",
         "width": 390,
@@ -1924,8 +3258,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:44.176Z",
-            "updatedAt": "2026-10-22T22:24:44.176Z"
+            "recordedAt": "2026-10-22T22:43:32.354Z",
+            "updatedAt": "2026-10-22T22:43:32.354Z"
           },
           "roster": [
             {
@@ -1934,7 +3268,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:44.176Z"
+              "updatedAt": "2026-10-22T22:43:32.354Z"
             },
             {
               "learnerId": "l2",
@@ -2015,6 +3349,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:40.903Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 1280,
@@ -2035,8 +3443,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:51.734Z",
-            "updatedAt": "2026-10-22T22:24:51.734Z"
+            "recordedAt": "2026-10-22T22:43:40.903Z",
+            "updatedAt": "2026-10-22T22:43:40.903Z"
           },
           "roster": [
             {
@@ -2045,7 +3453,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:51.734Z"
+              "updatedAt": "2026-10-22T22:43:40.903Z"
             },
             {
               "learnerId": "l2",
@@ -2126,6 +3534,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:49.297Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 1280,
@@ -2146,8 +3628,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:24:58.460Z",
-            "updatedAt": "2026-10-22T22:24:58.460Z"
+            "recordedAt": "2026-10-22T22:43:49.297Z",
+            "updatedAt": "2026-10-22T22:43:49.297Z"
           },
           "roster": [
             {
@@ -2156,7 +3638,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:24:58.460Z"
+              "updatedAt": "2026-10-22T22:43:49.297Z"
             },
             {
               "learnerId": "l2",
@@ -2237,6 +3719,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:43:57.935Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 640,
@@ -2257,8 +3813,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:04.225Z",
-            "updatedAt": "2026-10-22T22:25:04.225Z"
+            "recordedAt": "2026-10-22T22:43:57.935Z",
+            "updatedAt": "2026-10-22T22:43:57.935Z"
           },
           "roster": [
             {
@@ -2267,7 +3823,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:04.225Z"
+              "updatedAt": "2026-10-22T22:43:57.935Z"
             },
             {
               "learnerId": "l2",
@@ -2348,6 +3904,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:06.685Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 430,
+          "height": 15,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 640,
@@ -2368,8 +3998,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:09.619Z",
-            "updatedAt": "2026-10-22T22:25:09.619Z"
+            "recordedAt": "2026-10-22T22:44:06.685Z",
+            "updatedAt": "2026-10-22T22:44:06.685Z"
           },
           "roster": [
             {
@@ -2378,7 +4008,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:09.619Z"
+              "updatedAt": "2026-10-22T22:44:06.685Z"
             },
             {
               "learnerId": "l2",
@@ -2459,6 +4089,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:15.261Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 341,
+          "height": 36,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 390,
@@ -2479,8 +4183,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:15.134Z",
-            "updatedAt": "2026-10-22T22:25:15.134Z"
+            "recordedAt": "2026-10-22T22:44:15.261Z",
+            "updatedAt": "2026-10-22T22:44:15.261Z"
           },
           "roster": [
             {
@@ -2489,7 +4193,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:15.134Z"
+              "updatedAt": "2026-10-22T22:44:15.261Z"
             },
             {
               "learnerId": "l2",
@@ -2570,6 +4274,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:23.690Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 341,
+          "height": 36,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 37.78125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "efficient",
         "width": 390,
@@ -2590,8 +4368,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:20.712Z",
-            "updatedAt": "2026-10-22T22:25:20.712Z"
+            "recordedAt": "2026-10-22T22:44:23.690Z",
+            "updatedAt": "2026-10-22T22:44:23.690Z"
           },
           "roster": [
             {
@@ -2600,7 +4378,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:20.712Z"
+              "updatedAt": "2026-10-22T22:44:23.690Z"
             },
             {
               "learnerId": "l2",
@@ -2681,6 +4459,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:32.201Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 408,
+          "height": 38.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 1280,
@@ -2701,8 +4553,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:26.160Z",
-            "updatedAt": "2026-10-22T22:25:26.160Z"
+            "recordedAt": "2026-10-22T22:44:32.201Z",
+            "updatedAt": "2026-10-22T22:44:32.201Z"
           },
           "roster": [
             {
@@ -2711,7 +4563,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:26.160Z"
+              "updatedAt": "2026-10-22T22:44:32.201Z"
             },
             {
               "learnerId": "l2",
@@ -2792,6 +4644,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:40.773Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 408,
+          "height": 38.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 1280,
@@ -2812,8 +4738,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:31.994Z",
-            "updatedAt": "2026-10-22T22:25:31.994Z"
+            "recordedAt": "2026-10-22T22:44:40.773Z",
+            "updatedAt": "2026-10-22T22:44:40.773Z"
           },
           "roster": [
             {
@@ -2822,7 +4748,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:31.994Z"
+              "updatedAt": "2026-10-22T22:44:40.773Z"
             },
             {
               "learnerId": "l2",
@@ -2903,6 +4829,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:49.338Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 463,
+          "height": 16,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 640,
@@ -2923,8 +4923,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:39.070Z",
-            "updatedAt": "2026-10-22T22:25:39.070Z"
+            "recordedAt": "2026-10-22T22:44:49.338Z",
+            "updatedAt": "2026-10-22T22:44:49.338Z"
           },
           "roster": [
             {
@@ -2933,7 +4933,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:39.070Z"
+              "updatedAt": "2026-10-22T22:44:49.338Z"
             },
             {
               "learnerId": "l2",
@@ -3014,6 +5014,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:44:57.929Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 463,
+          "height": 16,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 640,
@@ -3034,8 +5108,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:46.715Z",
-            "updatedAt": "2026-10-22T22:25:46.715Z"
+            "recordedAt": "2026-10-22T22:44:57.929Z",
+            "updatedAt": "2026-10-22T22:44:57.929Z"
           },
           "roster": [
             {
@@ -3044,7 +5118,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:46.715Z"
+              "updatedAt": "2026-10-22T22:44:57.929Z"
             },
             {
               "learnerId": "l2",
@@ -3125,6 +5199,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:06.489Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 327,
+          "height": 38.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 390,
@@ -3145,8 +5293,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:52.278Z",
-            "updatedAt": "2026-10-22T22:25:52.278Z"
+            "recordedAt": "2026-10-22T22:45:06.489Z",
+            "updatedAt": "2026-10-22T22:45:06.489Z"
           },
           "roster": [
             {
@@ -3155,7 +5303,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:52.278Z"
+              "updatedAt": "2026-10-22T22:45:06.489Z"
             },
             {
               "learnerId": "l2",
@@ -3236,6 +5384,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:15.277Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 327,
+          "height": 38.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 256,
+          "height": 60.75,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "comfortable",
         "width": 390,
@@ -3256,8 +5478,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:25:57.763Z",
-            "updatedAt": "2026-10-22T22:25:57.763Z"
+            "recordedAt": "2026-10-22T22:45:15.277Z",
+            "updatedAt": "2026-10-22T22:45:15.277Z"
           },
           "roster": [
             {
@@ -3266,7 +5488,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:25:57.763Z"
+              "updatedAt": "2026-10-22T22:45:15.277Z"
             },
             {
               "learnerId": "l2",
@@ -3347,6 +5569,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:23.677Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 357,
+          "height": 43.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 1280,
@@ -3367,8 +5663,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:03.166Z",
-            "updatedAt": "2026-10-22T22:26:03.166Z"
+            "recordedAt": "2026-10-22T22:45:23.677Z",
+            "updatedAt": "2026-10-22T22:45:23.677Z"
           },
           "roster": [
             {
@@ -3377,7 +5673,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:03.166Z"
+              "updatedAt": "2026-10-22T22:45:23.677Z"
             },
             {
               "learnerId": "l2",
@@ -3458,6 +5754,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:32.206Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 357,
+          "height": 43.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 1280,
@@ -3478,8 +5848,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:08.668Z",
-            "updatedAt": "2026-10-22T22:26:08.668Z"
+            "recordedAt": "2026-10-22T22:45:32.206Z",
+            "updatedAt": "2026-10-22T22:45:32.206Z"
           },
           "roster": [
             {
@@ -3488,7 +5858,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:08.668Z"
+              "updatedAt": "2026-10-22T22:45:32.206Z"
             },
             {
               "learnerId": "l2",
@@ -3569,6 +5939,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:40.980Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 533,
+          "height": 18,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 640,
@@ -3589,8 +6033,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:14.700Z",
-            "updatedAt": "2026-10-22T22:26:14.700Z"
+            "recordedAt": "2026-10-22T22:45:40.980Z",
+            "updatedAt": "2026-10-22T22:45:40.980Z"
           },
           "roster": [
             {
@@ -3599,7 +6043,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:14.700Z"
+              "updatedAt": "2026-10-22T22:45:40.980Z"
             },
             {
               "learnerId": "l2",
@@ -3680,6 +6124,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:49.643Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 533,
+          "height": 18,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 640,
@@ -3700,8 +6218,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:21.455Z",
-            "updatedAt": "2026-10-22T22:26:21.455Z"
+            "recordedAt": "2026-10-22T22:45:49.643Z",
+            "updatedAt": "2026-10-22T22:45:49.643Z"
           },
           "roster": [
             {
@@ -3710,7 +6228,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:21.455Z"
+              "updatedAt": "2026-10-22T22:45:49.643Z"
             },
             {
               "learnerId": "l2",
@@ -3791,6 +6309,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:45:58.105Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 265,
+          "height": 43.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 390,
@@ -3811,8 +6403,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:26.884Z",
-            "updatedAt": "2026-10-22T22:26:26.884Z"
+            "recordedAt": "2026-10-22T22:45:58.105Z",
+            "updatedAt": "2026-10-22T22:45:58.105Z"
           },
           "roster": [
             {
@@ -3821,7 +6413,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:26.884Z"
+              "updatedAt": "2026-10-22T22:45:58.105Z"
             },
             {
               "learnerId": "l2",
@@ -3902,6 +6494,80 @@
         "status": "PASS"
       },
       {
+        "afterFailure": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic explicit correction failure"]
+          ],
+          "reads": [
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l1"],
+            ["cr-fixture-4", "l2"],
+            ["cr-fixture-4", "l3"]
+          ],
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-22T22:46:06.587Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "unconfirmedStyle": {
+          "width": 265,
+          "height": 43.5,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "draftStyle": {
+          "width": 288,
+          "height": 68.8125,
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "failureViolations": [],
         "appearance": "dark",
         "density": "guided",
         "width": 390,
@@ -3922,8 +6588,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-22T22:26:32.282Z",
-            "updatedAt": "2026-10-22T22:26:32.282Z"
+            "recordedAt": "2026-10-22T22:46:06.587Z",
+            "updatedAt": "2026-10-22T22:46:06.587Z"
           },
           "roster": [
             {
@@ -3932,7 +6598,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-22T22:26:32.282Z"
+              "updatedAt": "2026-10-22T22:46:06.587Z"
             },
             {
               "learnerId": "l2",
@@ -4020,9 +6686,10 @@
     ]
   },
   "baseline": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\nstderr | src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > does not read a term-grade snapshot while a score write is unresolved\nAn update to ClassRecordWorkspace inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act\nAn update to ClassRecordWorkspace inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act\n\nstderr | src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > does not read a term-grade snapshot while a score write is unresolved\nAn update to ClassRecordWorkspace inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act\n\n \u276f src/ui/ClassRecordWorkspace.test.tsx (122 tests | 4 failed) 16947ms\n   \u276f PM-13 saved-grade readiness with unsaved work (4)\n     \u00d7 does not read a term-grade snapshot while a score write is unresolved 117ms\n     \u00d7 withholds a displayed grade during saving then refreshes saved evidence while retaining a newer zero draft 124ms\n     \u00d7 does not expose an older grade reply during saving and keeps the newer draft after failure 120ms\n     \u00d7 labels computed completeness as saved-only with an unsaved zero, and Escape removes only the warning 106ms\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 4 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > does not read a term-grade snapshot while a score write is unresolved\nAssertionError: expected \"computeTermGrade\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st computeTermGrade call:\n\n    Array [\n      \"cr-1\",\n      \"l1\",\n    ]\n\n\nNumber of calls: 1\n\n \u276f src/ui/ClassRecordWorkspace.test.tsx:2940:27\n    2938|     const button = screen.getByRole(\"button\", { name: \"Show term grade\u2026\n    2939|     fireEvent.click(button); fireEvent.click(button);\n    2940|     expect(x.compute).not.toHaveBeenCalled();\n       |                           ^\n    2941|     expect(button).toHaveAttribute(\"aria-disabled\", \"true\");\n    2942|     expect(button).toHaveAccessibleDescription(/A score save is pendin\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/4]\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > withholds a displayed grade during saving then refreshes saved evidence while retaining a newer zero draft\nError: expect(element).not.toBeInTheDocument()\n\nexpected document not to contain element, found <td>\n  88\n  <span\n    class=\"field-hint\"\n    role=\"status\"\n  >\n     \n    (just updated)\n  </span>\n</td> instead\n \u276f src/ui/ClassRecordWorkspace.test.tsx:2956:50\n    2954|     await x.startSave();\n    2955|     const grades = screen.getByRole(\"table\", { name: \"Computed term gr\u2026\n    2956|     expect(within(grades).queryByText(\"88\")).not.toBeInTheDocument();\n       |                                                  ^\n    2957|     expect(within(grades).getByText(/Score save pending/)).toBeVisible\u2026\n    2958|     fireEvent.change(x.input, { target: { value: \"0\" } });\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[2/4]\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > does not expose an older grade reply during saving and keeps the newer draft after failure\nError: expect(element).not.toBeInTheDocument()\n\nexpected document not to contain element, found <td>\n  88\n  <span\n    class=\"field-hint\"\n    role=\"status\"\n  >\n     \n    (just updated)\n  </span>\n</td> instead\n \u276f src/ui/ClassRecordWorkspace.test.tsx:2975:50\n    2973|     await act(async () => grade(x.scoreRepo.computeTermGradeResult));\n    2974|     const grades = screen.getByRole(\"table\", { name: \"Computed term gr\u2026\n    2975|     expect(within(grades).queryByText(\"88\")).not.toBeInTheDocument();\n       |                                                  ^\n    2976|     fireEvent.change(x.input, { target: { value: \"19\" } });\n    2977|     await act(async () => x.fail()(new Error(\"synthetic denied save\"))\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[3/4]\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > labels computed completeness as saved-only with an unsaved zero, and Escape removes only the warning\nTestingLibraryElementError: Unable to find an element with the text: /Term grades use saved records on this device/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.\n\nIgnored nodes: comments, script, style\n<body>\n  <div>\n    <section\n      aria-label=\"Class Record Workspace\"\n      class=\"page\"\n    >\n      <div\n        class=\"page-header\"\n      >\n        <h2\n          tabindex=\"-1\"\n        >\n          Class Record Workspace\n        </h2>\n      </div>\n      <div\n        class=\"assessment-toolbar\"\n      >\n        <h3>\n          Assessment items\n        </h3>\n        <button\n          aria-controls=\"assessment-composer\"\n          aria-expanded=\"false\"\n          id=\"assessment-composer-toggle\"\n          type=\"button\"\n        >\n          Add assessment item\n        </button>\n      </div>\n      <div\n        class=\"assessment-composer\"\n        hidden=\"\"\n        id=\"assessment-composer\"\n      >\n        <div\n          class=\"form-row\"\n        >\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"workspace-category-set\"\n            >\n              Category set\n            </label>\n            <select\n              id=\"workspace-category-set\"\n            >\n              <option\n                disabled=\"\"\n                value=\"\"\n              >\n                Select a current category set\n              </option>\n              <option\n                value=\"set-1\"\n              >\n                DepEd Classroom Assessment (DO 015, s. 2026)\n                 (default)\n              </option>\n            </select>\n          </div>\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"workspace-category\"\n            >\n              Category\n            </label>\n            <select\n              id=\"workspace-category\"\n            >\n              <option\n                disabled=\"\"\n                value=\"\"\n              >\n                Select a current category\n              </option>\n              <option\n                value=\"cat-1\"\n              >\n                Written Works\n              </option>\n            </select>\n          </div>\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"workspace-item-name\"\n            >\n              Item name\n            </label>\n            <input\n              id=\"workspace-item-name\"\n              placeholder=\"e.g. Quiz 1\"\n              type=\"text\"\n              value=\"\"\n            />\n          </div>\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"workspace-max-score\"\n            >\n              Max score\n            </label>\n            <input\n              id=\"workspace-max-score\"\n              min=\"1\"\n              type=\"number\"\n              value=\"20\"\n            />\n          </div>\n        </div>\n        <button\n          aria-disabled=\"true\"\n          type=\"button\"\n        >\n          Add item\n        </button>\n      </div>\n      <ul\n        class=\"assessment-item-list\"\n      >\n        <li>\n          <button\n            aria-label=\"Written Works \u2014 Quiz 1 (max 20)\"\n            aria-pressed=\"true\"\n            type=\"button\"\n          >\n            <span\n              class=\"assessment-choice-name\"\n            >\n              Quiz 1\n            </span>\n            <span\n              class=\"assessment-choice-meta\"\n            >\n              Written Works\n               \u00b7 Max \n              20\n              <span\n                aria-hidden=\"true\"\n              >\n                 \u00b7 Selected\n              </span>\n            </span>\n          </button>\n          <div\n            aria-label=\"Actions for Quiz 1\"\n            role=\"group\"\n          >\n            <button\n              aria-disabled=\"false\"\n              type=\"button\"\n            >\n              Edit\n            </button>\n            <button\n              type=\"button\"\n            >\n              Delete\n            </button>\n          </div>\n        </li>\n      </ul>\n      <div\n        class=\"score-workspace-heading\"\n      >\n        <h3>\n          Quiz 1\n           scores\n        </h3>\n        <p\n          class=\"attendance-count\"\n        >\n          <strong>\n            0\n             of \n            1\n             recorded\n          </strong>\n           \n          \u00b7 \n          1\n           remaining\n        </p>\n      </div>\n      <p\n        class=\"field-hint\"\n        id=\"score-keyboard-help\"\n      >\n        Enter or arrow keys save and move between scores. Tab saves a changed score; otherwise it reaches row actions. Escape restores the recorded value.\n      </p>\n      <div\n        class=\"score-entry-scroll\"\n      >\n        <table\n          class=\"attendance-roster score-entry\"\n        >\n          <thead>\n            <tr>\n              <th\n                scope=\"col\"\n              >\n                Learner\n              </th>\n              <th\n                scope=\"col\"\n              >\n                Score\n              </th>\n              <th\n                scope=\"col\"\n              >\n                Exception\n              </th>\n            </tr>\n          </thead>\n          <tbody>\n            <tr>\n              <th\n                scope=\"row\"\n              >\n                Ana\n                 \n                Cruz\n              </th>\n              <td>\n                <label\n                  class=\"visually-hidden\"\n                  for=\"score-l1\"\n                >\n                  Score for \n                  Ana\n                   \n                  Cruz\n                </label>\n                <input\n                  aria-describedby=\"score-keyboard-help score-draft-l1\"\n                  aria-invalid=\"false\"\n                  class=\"score-entry-input\"\n                  id=\"score-l1\"\n                  inputmode=\"decimal\"\n                  max=\"20\"\n                  min=\"0\"\n                  placeholder=\"\u2014\"\n                  type=\"number\"\n                  value=\"0\"\n                />\n                <p\n                  class=\"score-draft-note\"\n                  id=\"score-draft-l1\"\n                >\n                  <strong>\n                    Not saved.\n                  </strong>\n                   \n                  On this device: \n                  Not recorded\n                  .\n                   \n                  Press Enter to save; Escape to restore.\n                </p>\n                <span\n                  class=\"status-chip status-chip-neutral\"\n                >\n                  Not recorded\n                </span>\n              </td>\n              <td>\n                <div\n                  aria-label=\"Exception status for Ana Cruz\"\n                  role=\"group\"\n                >\n                  <button\n                    aria-pressed=\"false\"\n                    type=\"button\"\n                  >\n                    Excused\n                  </button>\n                  <button\n                    aria-pressed=\"false\"\n                    type=\"button\"\n                  >\n                    N/A\n                  </button>\n                </div>\n              </td>\n            </tr>\n          </tbody>\n        </table>\n      </div>\n      <section\n        aria-label=\"Reporting preparation preview\"\n      >\n        <h3>\n          Reporting preparation preview\n        </h3>\n        <p\n          class=\"muted\"\n        >\n          Read-only check for the full grading-period roster. It does not export a file, approve grades or issue an official form. Refresh after external roster or record changes.\n        </p>\n        <p\n          class=\"field-hint\"\n        >\n          Based on saved records on this device. Unsaved input is excluded.\n        </p>\n        <p\n          class=\"score-draft-note\"\n          role=\"status\"\n        >\n          This item has pending edits. Save or cancel them, then run the check again to review the saved result.\n        </p>\n        <button\n          type=\"button\"\n        >\n          Check reporting preparation\n        </button>\n      </section>\n      <section\n        aria-label=\"Retained reporting drafts\"\n        class=\"report-draft-evidence\"\n      >\n        <h3>\n          Retained reporting drafts\n        </h3>\n        <p\n          class=\"muted\"\n          id=\"_r_44_\"\n        >\n          Capture current device data as an immutable preparation draft. It may differ from an earlier preview. Each capture creates a separate draft; it does not approve, issue, export or send a form.\n        </p>\n        <label>\n          <input\n            aria-describedby=\"_r_44_\"\n            type=\"checkbox\"\n          />\n          I understand this retains current data as a draft only.\n        </label>\n        <button\n          disabled=\"\"\n          type=\"button\"\n        >\n          Capture preparation draft\n        </button>\n        <button\n          type=\"button\"\n        >\n          Load recent drafts\n        </button>\n      </section>\n      <div\n        class=\"term-grades\"\n      >\n        <p\n          class=\"field-hint\"\n        >\n          Grading weighting: \n          <strong>\n            DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)\n          </strong>\n        </p>\n        <button\n          aria-disabled=\"false\"\n          type=\"button\"\n        >\n          Show term grades\n        </button>\n        <table\n          class=\"attendance-roster\"\n        >\n          <caption\n            class=\"visually-hidden\"\n          >\n            Computed term grades\n          </caption>\n          <thead>\n            <tr>\n              <th\n                scope=\"col\"\n              >\n                Learner\n              </th>\n              <th\n                scope=\"col\"\n              >\n                Term Grade\n              </th>\n            </tr>\n          </thead>\n          <tbody>\n            <tr>\n              <th\n                scope=\"row\"\n              >\n                Ana\n                 \n                Cruz\n              </th>\n              <td>\n                88\n                <span\n                  class=\"field-hint\"\n                  role=\"status\"\n                >\n                   \n                  (just updated)\n                </span>\n              </td>\n            </tr>\n          </tbody>\n        </table>\n        <p\n          class=\"field-hint\"\n        >\n          This export uses the \n          <strong>\n            DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)\n          </strong>\n           weighting chosen for this class record. Only two DepEd weighting groups are available so far \u2014 if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is DepEd-compliant for it yet.\n        </p>\n        <div\n          class=\"worksheet-actions\"\n        >\n          <button\n            aria-disabled=\"false\"\n            class=\"button-primary\"\n            type=\"button\"\n          >\n            Export report card (CSV)\n          </button>\n          <button\n            aria-disabled=\"false\"\n            type=\"button\"\n          >\n            Export class summary (CSV)\n          </button>\n        </div>\n      </div>\n    </section>\n  </div>\n</body>\n \u276f Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:76:38\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:52:17\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:95:19\n \u276f src/ui/ClassRecordWorkspace.test.tsx:2992:25\n    2990|     fireEvent.click(screen.getByRole(\"button\", { name: \"Show term grad\u2026\n    2991|     await screen.findByText(\"88\");\n    2992|     const note = screen.getByText(/Term grades use saved records on th\u2026\n       |                         ^\n    2993|     expect(note).toHaveTextContent(/Unsaved input is excluded/);\n    2994|     expect(note).toHaveTextContent(/computed completeness is not repor\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[4/4]\u23af\n\n\n Test Files  1 failed (1)\n      Tests  4 failed | 118 passed (122)\n   Start at  23:20:59\n   Duration  18.90s (tests 91%, environment 5%, transform 3%, import 1%, setup 1%)\n\n",
-  "focused": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n\n Test Files  1 passed (1)\n      Tests  122 passed (122)\n   Start at  23:21:41\n   Duration  19.41s (tests 90%, environment 5%, transform 3%, import 1%, setup 1%)\n\n",
-  "quality": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality\n> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 typecheck\n> node node_modules/typescript-compiler/bin/tsc -b --noEmit\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 lint\n> eslint .\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 format:check\n> prettier --check .\n\nChecking formatting...\nAll matched files use Prettier code style!\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed: no restricted imports found.\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:deadcode\n> knip\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test:batch-runner\n> node --test scripts/ctos/verify-batches.node-test.mjs\n\n\u2714 a successful executed check passes (110.205004ms)\n\u2714 failure cannot be reported as pass (101.84544ms)\n\u2714 missing execution capability stays not run (3.956766ms)\n\u2714 timeout cannot be reported as completed (33.399084ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 373.22217\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test\n> vitest run\n\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n\n Test Files  161 passed (161)\n      Tests  1691 passed (1691)\n   Start at  23:23:49\n   Duration  68.42s (environment 46%, tests 39%, import 6%, setup 6%, transform 3%, worker 1%)\n\nEnvironment  jsdom was created 161 times \u00b7 195.57s total, 46% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n",
-  "build": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 build\n> node node_modules/typescript-compiler/bin/tsc -b && vite build\n\nvite v8.3.5 building client environment for production...\ntransforming...\n\u2713 195 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                                 1.29 kB \u2502 gzip:   0.65 kB\ndist/assets/public-sans-vietnamese-600-normal-P4BtCUdw.woff2    4.50 kB\ndist/assets/public-sans-vietnamese-700-normal-D97ShjGS.woff2    4.51 kB\ndist/assets/public-sans-vietnamese-400-normal-TxZB8OSn.woff2    4.52 kB\ndist/assets/public-sans-vietnamese-700-normal-Dq5VrXjD.woff     5.93 kB\ndist/assets/public-sans-vietnamese-400-normal-BO1meqcx.woff     5.94 kB\ndist/assets/public-sans-vietnamese-600-normal-CcnAzmUX.woff     5.94 kB\ndist/assets/public-sans-latin-ext-400-normal-mk90oQqJ.woff2    10.45 kB\ndist/assets/public-sans-latin-ext-600-normal-DchWdWJ_.woff2    10.52 kB\ndist/assets/public-sans-latin-ext-700-normal-CgolUQuG.woff2    10.53 kB\ndist/assets/public-sans-latin-ext-700-normal-jWHjnMgZ.woff     14.18 kB\ndist/assets/public-sans-latin-ext-400-normal-B02wwOdZ.woff     14.20 kB\ndist/assets/public-sans-latin-ext-600-normal-DfkbVac2.woff     14.26 kB\ndist/assets/public-sans-latin-600-normal-Fru-LXNs.woff2        14.59 kB\ndist/assets/public-sans-latin-700-normal-BqJmxWdE.woff2        14.60 kB\ndist/assets/public-sans-latin-400-normal-8Rpg0ruU.woff2        14.63 kB\ndist/assets/public-sans-latin-400-normal-SBbinRkI.woff         18.48 kB\ndist/assets/public-sans-latin-600-normal-BR59oU-I.woff         18.55 kB\ndist/assets/public-sans-latin-700-normal-Dm-oTPSL.woff         18.65 kB\ndist/assets/index-x7MzrU_b.css                                 71.60 kB \u2502 gzip:  11.91 kB\ndist/assets/index-CZOqW27o.js                                 691.76 kB \u2502 gzip: 180.04 kB\n\n\u2713 built in 473ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n",
+  "failurePathBaseline": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n \u276f src/ui/ClassRecordWorkspace.test.tsx (123 tests | 2 failed | 118 skipped) 1193ms\n   \u276f PM-13 saved-grade readiness with unsaved work (5)\n     \u00d7 does not expose an older grade reply during saving and keeps the newer draft after failure 166ms\n     \u00d7 rejects a pre-save grade reply that arrives after the score failure until an explicit fresh check 162ms\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 2 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > does not expose an older grade reply during saving and keeps the newer draft after failure\nError: expect(element).not.toBeInTheDocument()\n\nexpected document not to contain element, found <td>\n  88\n  <span\n    class=\"field-hint\"\n    role=\"status\"\n  >\n     \n    (just updated)\n  </span>\n</td> instead\n \u276f src/ui/ClassRecordWorkspace.test.tsx:2989:50\n    2987|     await act(async () => x.fail()(new Error(\"synthetic denied save\"))\u2026\n    2988|     expect(x.input).toHaveValue(19);\n    2989|     expect(within(grades).queryByText(\"88\")).not.toBeInTheDocument();\n       |                                                  ^\n    2990|     expect(within(grades).getByText(/Score save was not confirmed/)).t\u2026\n    2991|     expect(screen.getByText(\"Could not save this score.\")).toBeVisible\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/2]\u23af\n\n FAIL  src/ui/ClassRecordWorkspace.test.tsx > PM-13 saved-grade readiness with unsaved work > rejects a pre-save grade reply that arrives after the score failure until an explicit fresh check\nError: expect(element).not.toBeInTheDocument()\n\nexpected document not to contain element, found <td>\n  99\n  <span\n    class=\"field-hint\"\n    role=\"status\"\n  >\n     \n    (just updated)\n  </span>\n</td> instead\n \u276f src/ui/ClassRecordWorkspace.test.tsx:3027:50\n    3025|     await act(async () => old({ ...x.scoreRepo.computeTermGradeResult!\u2026\n    3026|     const grades = screen.getByRole(\"table\", { name: \"Computed term gr\u2026\n    3027|     expect(within(grades).queryByText(\"99\")).not.toBeInTheDocument();\n       |                                                  ^\n    3028|     expect(within(grades).getByText(/Score save was not confirmed/)).t\u2026\n    3029|     fireEvent.click(screen.getByRole(\"button\", { name: \"Show term grad\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[2/2]\u23af\n\n\n Test Files  1 failed (1)\n      Tests  2 failed | 3 passed | 118 skipped (123)\n   Start at  23:32:13\n   Duration  2.90s (tests 44%, environment 26%, transform 17%, import 9%, setup 3%)\n\n",
+  "focused": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n\n Test Files  1 passed (1)\n      Tests  123 passed (123)\n   Start at  23:32:41\n   Duration  18.21s (tests 90%, environment 4%, transform 4%, import 1%, setup 1%)\n\n",
+  "quality": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality\n> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 typecheck\n> node node_modules/typescript-compiler/bin/tsc -b --noEmit\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 lint\n> eslint .\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 format:check\n> prettier --check .\n\nChecking formatting...\nAll matched files use Prettier code style!\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed: no restricted imports found.\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:deadcode\n> knip\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test:batch-runner\n> node --test scripts/ctos/verify-batches.node-test.mjs\n\n\u2714 a successful executed check passes (84.16516ms)\n\u2714 failure cannot be reported as pass (92.456545ms)\n\u2714 missing execution capability stays not run (3.667783ms)\n\u2714 timeout cannot be reported as completed (33.551423ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 323.629746\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test\n> vitest run\n\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n\n Test Files  161 passed (161)\n      Tests  1692 passed (1692)\n   Start at  23:39:45\n   Duration  63.34s (environment 47%, tests 38%, import 6%, setup 6%, transform 3%, worker 1%)\n\nEnvironment  jsdom was created 161 times \u00b7 181.93s total, 47% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n",
+  "build": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 build\n> node node_modules/typescript-compiler/bin/tsc -b && vite build\n\nvite v8.3.5 building client environment for production...\ntransforming...\n\u2713 195 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                                 1.29 kB \u2502 gzip:   0.64 kB\ndist/assets/public-sans-vietnamese-600-normal-P4BtCUdw.woff2    4.50 kB\ndist/assets/public-sans-vietnamese-700-normal-D97ShjGS.woff2    4.51 kB\ndist/assets/public-sans-vietnamese-400-normal-TxZB8OSn.woff2    4.52 kB\ndist/assets/public-sans-vietnamese-700-normal-Dq5VrXjD.woff     5.93 kB\ndist/assets/public-sans-vietnamese-400-normal-BO1meqcx.woff     5.94 kB\ndist/assets/public-sans-vietnamese-600-normal-CcnAzmUX.woff     5.94 kB\ndist/assets/public-sans-latin-ext-400-normal-mk90oQqJ.woff2    10.45 kB\ndist/assets/public-sans-latin-ext-600-normal-DchWdWJ_.woff2    10.52 kB\ndist/assets/public-sans-latin-ext-700-normal-CgolUQuG.woff2    10.53 kB\ndist/assets/public-sans-latin-ext-700-normal-jWHjnMgZ.woff     14.18 kB\ndist/assets/public-sans-latin-ext-400-normal-B02wwOdZ.woff     14.20 kB\ndist/assets/public-sans-latin-ext-600-normal-DfkbVac2.woff     14.26 kB\ndist/assets/public-sans-latin-600-normal-Fru-LXNs.woff2        14.59 kB\ndist/assets/public-sans-latin-700-normal-BqJmxWdE.woff2        14.60 kB\ndist/assets/public-sans-latin-400-normal-8Rpg0ruU.woff2        14.63 kB\ndist/assets/public-sans-latin-400-normal-SBbinRkI.woff         18.48 kB\ndist/assets/public-sans-latin-600-normal-BR59oU-I.woff         18.55 kB\ndist/assets/public-sans-latin-700-normal-Dm-oTPSL.woff         18.65 kB\ndist/assets/index-x7MzrU_b.css                                 71.60 kB \u2502 gzip:  11.91 kB\ndist/assets/index-xgXy8eay.js                                 692.03 kB \u2502 gzip: 180.09 kB\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n\u2713 built in 503ms\n",
   "isolation": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:dev-preview-isolation\n> node scripts/check-dev-preview-isolation.mjs\n\ndev-preview isolation check passed: 21 file(s) in dist/ scanned, no trace of the fixture found.\n",
   "ui": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality:ui\n> node scripts/ui-smoke.mjs\n\nquality:ui PASS \u2014 assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances \u00d7 three densities \u00d7 four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.\n",
   "recovery": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality:ui:recovery\n> node scripts/ui-recovery.mjs\n\nquality:ui:recovery PASS \u2014 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.\n",
@@ -4299,9 +6966,18 @@
   "inspectedRenders": [
     "pending desktop/light comfortable",
     "saved/newer-zero desktop/light comfortable",
+    "unconfirmed desktop/light comfortable",
     "pending phone/dark guided",
-    "saved/newer-zero phone/dark guided"
+    "saved/newer-zero phone/dark guided",
+    "unconfirmed phone/dark guided"
   ],
+  "verificationInterruptions": {
+    "initialCandidate": "34391d79 passed initial122/1691/36\u00d72; superseded by failure-path source changes, not reused",
+    "concurrentFullQuality": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 quality\n> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 typecheck\n> node node_modules/typescript-compiler/bin/tsc -b --noEmit\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 lint\n> eslint .\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 format:check\n> prettier --check .\n\nChecking formatting...\nAll matched files use Prettier code style!\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed: no restricted imports found.\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 check:deadcode\n> knip\n\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test:batch-runner\n> node --test scripts/ctos/verify-batches.node-test.mjs\n\n\u2714 a successful executed check passes (137.219488ms)\n\u2714 failure cannot be reported as pass (188.278386ms)\n\u2714 missing execution capability stays not run (5.181063ms)\n\u2714 timeout cannot be reported as completed (33.640589ms)\n\u2139 tests 4\n\u2139 suites 0\n\u2139 pass 4\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 513.678956\nnpm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n\n> likha-sis@0.2.0 test\n> vitest run\n\n\n RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis\n\n \u276f src/ui/SchoolMembershipScreen.test.tsx (19 tests | 1 failed) 11015ms\n   \u276f SchoolMembershipScreen (19)\n     \u00d7 has no detectable accessibility violations 5191ms\n \u276f src/ui/ReportCardReviewSourcePanel.test.tsx (20 tests | 1 failed) 7856ms\n   \u276f ReportCardReviewSourcePanel (20)\n     \u00d7 exposes accessible explicit non-approving checks in efficient 6369ms\n \u276f src/ui/LegacySetupRecovery.test.tsx (8 tests | 1 failed) 8282ms\n   \u276f Legacy setup recovery (8)\n     \u00d7 cancel writes nothing, clears the password and returns keyboard focus 5402ms\n \u276f src/ui/AdminPasswordResetScreen.test.tsx (8 tests | 2 failed) 9178ms\n   \u276f AdminPasswordResetScreen (7)\n     \u00d7 resets a colleague's password and shows the confirmation 5322ms\n     \u00d7 does not submit a second reset while the first is still in flight 715ms\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 5 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  src/ui/AdminPasswordResetScreen.test.tsx > AdminPasswordResetScreen > resets a colleague's password and shows the confirmation\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n \u276f src/ui/AdminPasswordResetScreen.test.tsx:87:3\n     85|   });\n     86|\n     87|   it(\"resets a colleague's password and shows the confirmation\", async\u2026\n       |   ^\n     88|     const user = userEvent.setup();\n     89|     const { repo } = renderScreen();\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/5]\u23af\n\n FAIL  src/ui/AdminPasswordResetScreen.test.tsx > AdminPasswordResetScreen > does not submit a second reset while the first is still in flight\nTestingLibraryElementError: Unable to find an accessible element with the role \"button\" and name \"Reset password\"\n\nHere are the accessible roles:\n\n  region:\n\n  Name \"Reset a Password\":\n  <section\n    aria-label=\"Reset a Password\"\n  />\n\n  --------------------------------------------------\n  heading:\n\n  Name \"Reset a Password\":\n  <h2\n    tabindex=\"-1\"\n  />\n\n  --------------------------------------------------\n  form:\n\n  Name \"Reset a colleague's password\":\n  <form\n    aria-label=\"Reset a colleague's password\"\n  />\n\n  --------------------------------------------------\n  combobox:\n\n  Name \"Teacher\":\n  <select\n    id=\"reset-target\"\n    required=\"\"\n  />\n\n  --------------------------------------------------\n  option:\n\n  Name \"Select a teacher\":\n  <option\n    disabled=\"\"\n    value=\"\"\n  />\n\n  Name \"Ana Cruz\":\n  <option\n    value=\"teacher-1\"\n  />\n\n  Name \"Bo Reyes\":\n  <option\n    value=\"head-1\"\n  />\n\n  --------------------------------------------------\n  button:\n\n  Name \"Resetting\u2026\":\n  <button\n    aria-disabled=\"true\"\n    class=\"button-primary\"\n    type=\"submit\"\n  />\n\n  --------------------------------------------------\n\nIgnored nodes: comments, script, style\n<body>\n  <div>\n    <section\n      aria-label=\"Reset a Password\"\n    >\n      <div\n        class=\"page-header\"\n      >\n        <h2\n          tabindex=\"-1\"\n        >\n          Reset a Password\n        </h2>\n      </div>\n      <form\n        aria-label=\"Reset a colleague's password\"\n      >\n        <div\n          class=\"form-row\"\n        >\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"reset-target\"\n            >\n              Teacher\n            </label>\n            <select\n              id=\"reset-target\"\n              required=\"\"\n            >\n              <option\n                disabled=\"\"\n                value=\"\"\n              >\n                Select a teacher\n              </option>\n              <option\n                value=\"teacher-1\"\n              >\n                Ana Cruz\n              </option>\n              <option\n                value=\"head-1\"\n              >\n                Bo Reyes\n              </option>\n            </select>\n          </div>\n          <div\n            class=\"field\"\n          >\n            <label\n              for=\"reset-new-password\"\n            >\n              New password\n            </label>\n            <input\n              autocomplete=\"new-password\"\n              id=\"reset-new-password\"\n              required=\"\"\n              type=\"password\"\n              value=\"sbwroarndd-ne\"\n            />\n          </div>\n        </div>\n        <button\n          aria-disabled=\"true\"\n          class=\"button-primary\"\n          type=\"submit\"\n        >\n          Resetting\u2026\n        </button>\n      </form>\n    </section>\n  </div>\n</body>\n \u276f Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:76:38\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:52:17\n \u276f node_modules/@testing-library/dom/dist/query-helpers.js:95:19\n \u276f src/ui/AdminPasswordResetScreen.test.tsx:119:32\n    117|     await user.selectOptions(screen.getByRole(\"combobox\", { name: \"Tea\u2026\n    118|     await user.type(screen.getByLabelText(\"New password\"), \"brand-new-\u2026\n    119|     const resetButton = screen.getByRole(\"button\", { name: \"Reset pass\u2026\n       |                                ^\n    120|     await user.click(resetButton);\n    121|     await waitFor(() => expect(repo.resetPasswordCalls).toHaveLength(1\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[2/5]\u23af\n\n FAIL  src/ui/LegacySetupRecovery.test.tsx > Legacy setup recovery > cancel writes nothing, clears the password and returns keyboard focus\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n \u276f src/ui/LegacySetupRecovery.test.tsx:58:3\n     56|   });\n     57|\n     58|   it(\"cancel writes nothing, clears the password and returns keyboard \u2026\n       |   ^\n     59|     const { service, restore } = setup();\n     60|     const user = userEvent.setup();\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[3/5]\u23af\n\n FAIL  src/ui/ReportCardReviewSourcePanel.test.tsx > ReportCardReviewSourcePanel > exposes accessible explicit non-approving checks in efficient\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n \u276f src/ui/ReportCardReviewSourcePanel.test.tsx:72:50\n     70| describe(\"ReportCardReviewSourcePanel\", () => {\n     71|   afterEach(() => window.localStorage.removeItem(\"likha-sis:teacher-mo\u2026\n     72|   it.each([\"efficient\", \"comfortable\", \"guided\"])(\n       |                                                  ^\n     73|     \"exposes accessible explicit non-approving checks in %s\",\n     74|     async (mode) => {\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[4/5]\u23af\n\n FAIL  src/ui/SchoolMembershipScreen.test.tsx > SchoolMembershipScreen > has no detectable accessibility violations\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n \u276f src/ui/SchoolMembershipScreen.test.tsx:213:3\n    211|   });\n    212|\n    213|   it(\"has no detectable accessibility violations\", async () => {\n       |   ^\n    214|     const { container } = renderScreen();\n    215|     await screen.findByText(\"Ana Cruz\");\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[5/5]\u23af\n\n\n Test Files  4 failed | 157 passed (161)\n      Tests  5 failed | 1687 passed (1692)\n   Start at  23:35:02\n   Duration  86.02s (tests 44%, environment 42%, import 5%, setup 5%, transform 3%)\n\nEnvironment  jsdom was created 161 times \u00b7 229.99s total, 42% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n",
+    "diagnosis": "Four unchanged test files produced timeout failures and a secondary interaction failure during concurrent browser work. Same-source sequential full quality passed; resource contention/timeout leakage is an inference, not a product fix. No timeout threshold or test requirement changed.",
+    "abortedBrowserLog": "{\"completed\":1}\n{\"completed\":2}\n{\"completed\":3}\n{\"completed\":4}\n{\"completed\":5}\n{\"completed\":6}\n{\"completed\":7}\n{\"completed\":8}\n{\"completed\":9}\n{\"completed\":10}\n{\"completed\":11}\n{\"completed\":12}\n{\"completed\":13}\n{\"completed\":14}\n{\"completed\":15}\n{\"completed\":16}\n{\"completed\":17}\n{\"completed\":18}\n{\"completed\":19}\n{\"completed\":20}\n{\"completed\":21}\n{\"completed\":22}\n{\"completed\":23}\n{\"completed\":24}\n{\"completed\":25}\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nlocator.waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('table', { name: 'Computed term grades', exact: true }).getByText(/Score save was not confirmed/) to be visible\n\n    at /workspace/scratch/2b4a6f776035/likha-sis/scripts/assurance/scores-grade-readiness-browser.mjs:236:29 {\n  log: [\n    \"  - waiting for getByRole('table', { name: 'Computed term grades', exact: true }).getByText(/Score save was not confirmed/) to be visible\"\n  ],\n  name: 'TimeoutError'\n}\n\nNode.js v24.19.0\n",
+    "syncCorrection": "Regenerated PR merge ref rejected a combined fetch; subsequent local reconciliation used a stale head. Restored the preserved strengthened checkpoint, fetched branch and merge refs separately, verified exact3150b27b tree, and discarded/restarted the affected browser run. Final stable run held production/test/probe sources fixed on5f83f388."
+  },
   "sourceFinding": {
     "id": "SRC-AUTH-1",
     "classification": "source-observed permission-gap candidate; synthetic native exploit NOT RUN",
@@ -4311,18 +6987,17 @@
     },
     "observation": "compute_learner_term_grade checks active school scope without calling an assignment/item-access guard; separate native verification is next priority"
   },
-  "publication": "Affected implementation CI and scoped integration publication pending; do not reuse parent-checkpoint CI",
+  "publication": {
+    "pullRequest": 161,
+    "ciMergeReceipt": "scores-grade-readiness-ci-merge-2026-10-23.json",
+    "actualMerge": "534d0b71844e3009d0fca55ccaea7648c32a2949",
+    "scope": "Existing integration branch only; parent PR150 remains draft on149"
+  },
   "limits": [
     "Synthetic in-memory fixture persistence/computation; not native grading, installed device or teacher proof",
     "Both resolved appearances; System provider evidence separate",
     "Full PM-13/A1\u2013A7 partial; manual AT, OS zoom and physical IME not run",
-    "Overall Scores A1\u2013A7 and teacher/device/manual acceptance remain partial; SRC-AUTH-1 blocks broader assignment-boundary acceptance"
-  ],
-  "superseded": {
-    "initialHead": "34391d79ad8a2afc30a2ad2908df13bde91b2fe0",
-    "reason": "Failure-path strengthening changes production/test/probe source. These initial receipts are historical; final source-bound replacement required before acceptance.",
-    "followUpBaseline": "2 FAIL /3 PASS /118 skipped",
-    "finalFocused": "123 PASS",
-    "remaining": "Final full quality/browser36\u00d73/UI/recovery/journey and CI pending"
-  }
+    "Overall Scores A1\u2013A7 and teacher/device/manual acceptance remain partial; SRC-AUTH-1 blocks broader assignment-boundary acceptance",
+    "No score write/replay by the grade-read handler. Existing score-input blur/Tab commit remains an independent save trigger; not every navigation gesture is read-only. Null-result unconfirmed branch source-inspected; new failure-order runtime cases exercise exceptions."
+  ]
 }

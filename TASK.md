@@ -1,13 +1,13 @@
 # Current task — CTOS / FORGE 4.0
 
-Updated: 2026-10-22 (Asia/Manila).
+Updated: 2026-10-23 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
 Continuation convention: when the user says **continue**, show the selected task-pack prompt first, execute it, then report before-and-after changes. See `docs/assurance/redesign-continuation-sequence.md`. Existing authorization and gates remain.
 
 ## Current PM-13 saved-grade readiness continuation — 23 October
 
-Branch forge/scores-grade-readiness-20261023 from05e885c6. Full task-pack PM-13 prompt shown first; frozen C1–C6. Initial baseline4 FAIL/118 PASS and first candidate122/full1,691/browser36×2 passed, then were superseded by required failure-path strengthening. Follow-up2 FAIL/3 PASS/118 skipped; final focused123 PASS, five added cases. Explicit grade checks wait for unresolved score writes; affected cell shows pending; failed/unconfirmed saves keep grade unconfirmed until fresh read and reject pre-write replies. All modes explain saved-only evidence/current-item unsaved work; newer zero/reason/drafts remain without replay. Final full quality/browser36×3/UI/recovery/journey and affected implementation CI/publication in progress. Final build/isolation21 PASS. Exact status in scores-grade-readiness-handoff-2026-10-23.md. Full PM-12/13/A1–A7 partial. SRC-AUTH-1: native compute command checks school scope without an explicit assignment guard; next priority is synthetic same-school unauthorized grade-read reproduction and trusted-boundary repair if confirmed, before runtime expansion. Parent PR150 stays draft on PR149.
+Branch forge/scores-grade-readiness-20261023 from05e885c6. Full PM-13 prompt shown before work; frozen C1–C6. Original4 FAIL/118 PASS, failure-path2 FAIL/3 PASS/118 skipped; final focused123/full quality1,692/161 PASS with five added cases. Pending writes block explicit grade checks; affected cells show pending, failed/unconfirmed outcomes stay unconfirmed until fresh read; pre-write replies rejected. Saved-only and current-item unsaved work explained in all modes; zero/reason/drafts retained without replay. Final stable browser36/108, six inspected internal renders, UI/recovery50/Scores47/build/isolation21 PASS. PR161 passed Quality39866307674 and Security39866307682 on5f83f388, then merged as534d0b71. Checked/CI/actual merge tree3150b27b matches. CI confirms1,692/161, UI smoke, recovery50 and startup26; native/Windows skipped by the affected-work classifier. Exact receipt: scores-grade-readiness-ci-merge-2026-10-23.json. Parent PR150 remains draft on149. Full PM-12/13/A1–A7 remain partial. Next priority SRC-AUTH-1: synthetic native reproduction of same-school unassigned grade reads and trusted-boundary repair if confirmed, before runtime expansion. Broader category/period/report-readiness and teacher/device observations remain queued.
 
 ## Current PM-13 roster refresh continuation — 22 October
 
