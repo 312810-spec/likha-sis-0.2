@@ -35,3 +35,5 @@ All four native field families retain source CSS. Each tested configuration reco
 | Studio handled composition Enter as creation                                       | Composing Enter does not call create; ordinary Enter remains                                     |
 
 Failures keep the current draft and require explicit retry. Existing duplicate review, invalid ranges, scored-item rename/delete restrictions and cancel behavior are protected by existing tests; this slice does not certify all remaining PM-12 editing/deletion combinations. Browser records are synthetic in-memory fixtures. Full Scores A1–A7 teacher/device/manual acceptance remains pending.
+
+Appearance scope: System preference resolution retains the unchanged shared-provider receipt in design-system-measurements-2026-10-22.json. This72-case run exercises both resolved appearances; it does not claim fresh System-preference transition execution or complete A4/manual acceptance.
