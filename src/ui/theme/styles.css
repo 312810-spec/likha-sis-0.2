@@ -791,6 +791,12 @@ label {
   margin-top: calc(var(--spacing-unit) * 1.5);
 }
 
+/* Keep the complete exported path readable and copyable at narrow widths. */
+.score-export-path {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .score-entry-scroll {
   overflow-x: auto;
   margin-bottom: var(--spacing-unit);
