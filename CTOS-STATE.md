@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current PM-12 edit/rename acknowledgment continuation — 22 October
+
+Branch forge/assessment-edit-ack-20261022 from e4c92cdd. Full task-pack PM-12 prompt shown before execution. Baseline10 FAIL/101 PASS; first candidate exposed editor unmount/focus loss during list read. Preserve newer name/category/max, ABA and cancel/reopen/switch choices; identify old write failures; keep editors mounted during guarded refresh. Pre-supplement focused117 PASS; browser72 configurations +2 flows PASS; UI/recovery50/Scores/browser/build/isolation PASS, four internal renders inspected. Final quality1,652/161 PASS,18 added cases. CI/publication pending until recorded in assessment-edit-handoff-2026-10-22.md and evidence. Full PM-12/A1–A7 partial; next remaining authoring consequence/validation/delete states and external observations.
+
 ## Current PM-12 creation acknowledgment continuation — 22 October
 
 Active branch `forge/assessment-draft-ack-20261022` from82dd88f. Task-pack PM-12 prompt shown before execution. Preserve newer creation drafts/focus across delayed acknowledgment in workspace/Studio; prevent composing Enter submission; retain implicit empty-record editor for newer work. Baseline5 FAIL/91 PASS; additional implicit-open regression reproduced. Ten added component cases; local quality1,634/161 files and build/isolation PASS; browser72/UI/recovery50/Scores47 PASS; four renders inspected. PR157 gated/merged into parent as6276bf55; Quality39738480234 /Security39738480229 PASS on54203b7; checked/CI/actual merge tree043bab83. Exact receipt: `docs/assurance/assessment-draft-ci-merge-2026-10-22.json`. Current prompt/contract/elements/before-after/limits: `docs/assurance/assessment-draft-handoff-2026-10-22.md`. Full PM-12 and Scores A1–A7 remain partial/pending. Next: remaining Scores authoring states and external observations.

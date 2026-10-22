@@ -2271,3 +2271,205 @@ describe("first assessment creation draft continuity", () => {
     );
   });
 });
+
+describe("PM-12 delayed edit receipts", () => {
+  const prefix = "";
+  async function begin(repo: FakeAssessmentRepository) {
+    renderScreen({ assessmentRepo: repo });
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Edit" }).length).toBeGreaterThan(0),
+    );
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]!);
+    return screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` });
+  }
+
+  it("retains newer edit fields and focus after a delayed full update", async () => {
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue([
+      CATEGORY,
+      { ...CATEGORY, id: "cat-2", name: "Other category" },
+    ]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Saving…" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    const max = screen.getByLabelText("Max score", { selector: `#${prefix}edit-max-ai-1` });
+    fireEvent.change(max, { target: { value: "30" } });
+    fireEvent.change(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+      { target: { value: "cat-2" } },
+    );
+    max.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Newer revision");
+    expect(max).toHaveValue(30);
+    expect(max).toHaveFocus();
+    expect(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+    ).toHaveValue("cat-2");
+    expect(save).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision", "cat-1", 20);
+    expect(await screen.findByText(/Submitted revision updated\./)).toBeVisible();
+  });
+
+  it("preserves a newer scored-item rename even when text returns to the submitted value", async () => {
+    const repo = new FakeAssessmentRepository([{ ...ITEM, recordedCount: 2 }]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const rename = vi
+      .spyOn(repo, "renameItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const update = vi.spyOn(repo, "updateItem");
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Temporary" } });
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Submitted revision");
+    expect(rename).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "preserves a reopened editor after cancel; different target=%s",
+    async (different) => {
+      const repo = new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2" }]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      const save = vi
+        .spyOn(repo, "updateItem")
+        .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      const edits = screen.getAllByRole("button", { name: "Edit" });
+      await userEvent.click(edits[different ? 1 : 0]!);
+      const id = different ? "ai-2" : "ai-1";
+      const reopened = screen.getByLabelText("Item name", {
+        selector: `#${prefix}edit-name-${id}`,
+      });
+      fireEvent.change(reopened, { target: { value: "Reopened work" } });
+      await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+      expect(reopened).toBeVisible();
+      expect(reopened).toHaveValue("Reopened work");
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("retains newer work on rejection and retries only after explicit Save", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((_done, fail) => (reject = fail)))
+      .mockResolvedValueOnce({ ...ITEM, name: "Newer revision" });
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(name).toHaveValue("Newer revision");
+    expect(await screen.findByText(/Could not save changes to “Submitted revision”/)).toBeVisible();
+    expect(save).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(save).toHaveBeenLastCalledWith("ai-1", "Newer revision", "cat-1", 20);
+    expect(await screen.findByText("Newer revision updated.")).toBeVisible();
+    expect(
+      screen.queryByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }),
+    ).not.toBeInTheDocument();
+  });
+  it("keeps an editor mounted while the post-save list read is delayed", async () => {
+    const repo = new FakeAssessmentRepository();
+    const read = repo.listItemsByClassRecord.bind(repo);
+    let listResolve!: (items: AssessmentItemDetail[]) => void;
+    vi.spyOn(repo, "listItemsByClassRecord")
+      .mockImplementationOnce(read)
+      .mockImplementationOnce(() => new Promise((done) => (listResolve = done)));
+    let resolve!: (item: AssessmentItem | null) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((done) => (resolve = done)),
+    );
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    name.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    fireEvent.change(name, { target: { value: "Work during list read" } });
+    await act(async () => listResolve([ITEM]));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(name).toHaveValue("Work during list read");
+  });
+
+  it.each(["null", "reject"])(
+    "identifies the old target on a delayed %s without clearing the next editor",
+    async (outcome) => {
+      const repo = new FakeAssessmentRepository([
+        ITEM,
+        { ...ITEM, id: "ai-2", name: "Second item" },
+      ]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      let reject!: (error: Error) => void;
+      const save = vi.spyOn(repo, "updateItem").mockImplementationOnce(
+        () =>
+          new Promise((done, fail) => {
+            resolve = done;
+            reject = fail;
+          }),
+      );
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+      const next = screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-2` });
+      fireEvent.change(next, { target: { value: "Second unsaved work" } });
+      await act(async () =>
+        outcome === "null" ? resolve(null) : reject(new Error("synthetic rejection")),
+      );
+      expect(next).toBeVisible();
+      expect(next).toHaveValue("Second unsaved work");
+      expect(
+        await screen.findByText(/Could not save changes to “Submitted revision”/),
+      ).toBeVisible();
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("ignores a rejected old write after the source screen is unmounted and reopened", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((_done, fail) => (reject = fail)),
+    );
+    const mounted = renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: "Edit" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }), {
+      target: { value: "Old source revision" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    mounted.unmount();
+    const next = new FakeAssessmentRepository();
+    const name = await begin(next);
+    fireEvent.change(name, { target: { value: "Current source work" } });
+    await act(async () => reject(new Error("old source rejected")));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Current source work");
+    expect(
+      screen.queryByText(/Could not save changes to “Old source revision”/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute("aria-disabled", "false");
+  });
+});
