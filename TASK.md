@@ -5,7 +5,7 @@ Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant che
 
 ## Current Scores state continuation — 22 October
 
-Active branch `forge/scores-grade-refresh-20261022` from290b574. PM-12/13/31 term-grade stale-response/failure repairs: three reproduced regressions, five added tests. Local quality1,617/161 files, UI, recovery50, Scores browser47, build/isolation PASS. Current state/contract/source owners and publication status: `docs/assurance/scores-grade-refresh-handoff-2026-10-22.md`. Changed-state matrix36 PASS with keyboard read-only retry/internal renders; CI/publication pending receipt. Preserve shared system and Scores pilot; teacher/device/manual A1–A7 still pending. Next: source-owned Scores states and existing external observation protocol.
+Active branch `forge/scores-grade-refresh-20261022` from290b574. PM-12/13/31 term-grade stale-response/failure repairs: three reproduced regressions, five added tests. Local quality1,617/161 files, UI, recovery50, Scores browser47, build/isolation PASS. Current state/contract/source owners and publication status: `docs/assurance/scores-grade-refresh-handoff-2026-10-22.md`. Changed-state matrix36 PASS with keyboard read-only retry/internal renders; PR155 gated/merged into parent as689abb8c; Quality39699949146 /Security39699949148 PASS onb15a91a; checked/CI/actual merge treea7912280. Exact receipt: `docs/assurance/scores-grade-refresh-ci-merge-2026-10-22.json`. Preserve shared system and Scores pilot; teacher/device/manual A1–A7 still pending. Next: source-owned Scores states and existing external observation protocol.
 
 ## Current shared-system continuation — 22 October
 
