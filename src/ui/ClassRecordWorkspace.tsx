@@ -202,7 +202,7 @@ export function ClassRecordWorkspace({
   const termGradeContextRef = useRef(0);
 
   const [termGrades, setTermGrades] = useState<
-    Record<string, ComputedTermGrade | null | "refreshing" | "error">
+    Record<string, ComputedTermGrade | null | "refreshing" | "error" | "unconfirmed">
   >({});
   const termGradesRequestedRef = useRef(false);
   const termGradeGenerationRef = useRef<Map<string, number>>(new Map());
@@ -697,6 +697,15 @@ export function ClassRecordWorkspace({
     writeGenerationRef.current.set(learnerId, generation);
     writeInFlightRef.current.add(learnerId);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
+    // A read started before this write cannot establish its saved outcome.
+    termGradeGenerationRef.current.set(
+      learnerId,
+      (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1,
+    );
+    function markGradeUnconfirmed() {
+      if (termGradesRequestedRef.current)
+        setTermGrades((current) => ({ ...current, [learnerId]: "unconfirmed" }));
+    }
     try {
       const score = status === "scored" ? Number(scoreText) : null;
       const recorded = await learnerScoreService.recordScore(
@@ -716,6 +725,7 @@ export function ClassRecordWorkspace({
       )
         return false;
       if (recorded === null) {
+        markGradeUnconfirmed();
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
         return false;
       }
@@ -760,6 +770,7 @@ export function ClassRecordWorkspace({
         rosterRequestRef.current !== rosterRequest
       )
         return false;
+      markGradeUnconfirmed();
       setRowErrors((current) => ({
         ...current,
         [learnerId]: err instanceof ValidationError ? err.message : "Could not save this score.",
@@ -896,7 +907,14 @@ export function ClassRecordWorkspace({
    * Once shown, an individual score change afterward keeps just that one
    * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
-    if (termGradeBulkInFlightRef.current || rosterLoading || rosterError || !itemsReady) return;
+    if (
+      termGradeBulkInFlightRef.current ||
+      writeInFlightRef.current.size > 0 ||
+      rosterLoading ||
+      rosterError ||
+      !itemsReady
+    )
+      return;
     const rosterRequest = rosterRequestRef.current;
     const gradeContext = termGradeContextRef.current;
     termGradeBulkInFlightRef.current = true;
@@ -992,6 +1010,16 @@ export function ClassRecordWorkspace({
   const selectedItem = rosterItem;
   const recordedCount = roster.filter((entry) => entry.status !== null).length;
   const remainingCount = roster.length - recordedCount;
+  const hasPendingScoreEdits =
+    Object.keys(scoreDrafts).length > 0 || Object.keys(pendingCorrections).length > 0;
+  const gradeCheckWait =
+    savingLearnerIds.size > 0
+      ? "A score save is pending. Term-grade checks wait until it finishes."
+      : !itemsReady
+        ? "Term-grade checks wait for the assessment items to be checked."
+        : rosterLoading || rosterError
+          ? "Term-grade checks need the current learner roster. Retry the roster check if it failed."
+          : null;
 
   return (
     <Page
@@ -1730,9 +1758,7 @@ export function ClassRecordWorkspace({
             classRecordId={classRecordId}
             revision={reportingRevision}
             disabled={!itemsReady || savingLearnerIds.size > 0}
-            pendingEdits={
-              Object.keys(scoreDrafts).length > 0 || Object.keys(pendingCorrections).length > 0
-            }
+            pendingEdits={hasPendingScoreEdits}
           />
           <ReportCardDraftPanel
             key={`drafts-${classRecordId}`}
@@ -1747,9 +1773,25 @@ export function ClassRecordWorkspace({
               <p className="field-hint">
                 Grading weighting: <strong>{weightPolicyName ?? "not shown"}</strong>
               </p>
+              <p className="field-hint" id="term-grade-saved-evidence">
+                Term grades use saved records on this device across the full grading period. Unsaved
+                input is excluded; computed completeness is not reporting approval.
+              </p>
+              {hasPendingScoreEdits && (
+                <p className="score-draft-note" role="status">
+                  This item has unsaved score work. Save or cancel it before reviewing the saved
+                  result.
+                </p>
+              )}
+              {gradeCheckWait && (
+                <p className="field-hint" id="term-grade-check-wait" role="status">
+                  {gradeCheckWait}
+                </p>
+              )}
               <button
                 type="button"
-                aria-disabled={termGradesLoading}
+                aria-disabled={termGradesLoading || Boolean(gradeCheckWait)}
+                aria-describedby={`term-grade-saved-evidence${gradeCheckWait ? " term-grade-check-wait" : ""}`}
                 onClick={handleShowTermGrades}
               >
                 {termGradesLoading ? "Computing…" : "Show term grades"}
@@ -1781,7 +1823,16 @@ export function ClassRecordWorkspace({
                             {entry.givenName} {entry.familyName}
                           </th>
                           <td>
-                            {grade === "refreshing" ? (
+                            {savingLearnerIds.has(entry.learnerId) ? (
+                              <span className="field-hint" role="status">
+                                Score save pending. Check term grades after it finishes.
+                              </span>
+                            ) : grade === "unconfirmed" ? (
+                              <span className="field-hint" role="status">
+                                Score save was not confirmed. Show term grades to check saved
+                                records.
+                              </span>
+                            ) : grade === "refreshing" ? (
                               <span className="field-hint" role="status">
                                 Updating grade…
                               </span>
