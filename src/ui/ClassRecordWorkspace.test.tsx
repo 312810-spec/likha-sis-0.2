@@ -2911,3 +2911,106 @@ describe("PM-13 roster preservation across assessment checks", () => {
     await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(19));
   });
 });
+
+describe("PM-13 saved-grade readiness with unsaved work", () => {
+  async function begin() {
+    const x = renderScreen();
+    await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    const compute = vi.spyOn(x.scoreRepo, "computeTermGrade");
+    let resolve!: (r: LearnerScore | null) => void;
+    let reject!: (e: Error) => void;
+    const record = vi.spyOn(x.scoreRepo, "record").mockImplementationOnce(
+      () =>
+        new Promise((done, fail) => {
+          resolve = done;
+          reject = fail;
+        }),
+    );
+    const startSave = async () => {
+      fireEvent.change(input, { target: { value: "18" } });
+      input.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(record).toHaveBeenCalledExactlyOnceWith("ai-1", "l1", "scored", 18, null);
+    };
+    return { ...x, input, compute, record, startSave, done: () => resolve, fail: () => reject };
+  }
+
+  it("does not read a term-grade snapshot while a score write is unresolved", async () => {
+    const x = await begin();
+    await x.startSave();
+    const button = screen.getByRole("button", { name: "Show term grades" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(x.compute).not.toHaveBeenCalled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveAccessibleDescription(/A score save is pending/);
+    expect(x.record).toHaveBeenCalledTimes(1);
+    await act(async () => x.done()(x.scoreRepo.recordResult));
+    fireEvent.click(button);
+    await screen.findByText("88");
+    expect(x.compute).toHaveBeenCalledExactlyOnceWith("cr-1", "l1");
+  });
+
+  it("withholds a displayed grade during saving then refreshes saved evidence while retaining a newer zero draft", async () => {
+    const x = await begin();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    await x.startSave();
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save pending/)).toBeVisible();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    await act(async () => x.done()(x.scoreRepo.recordResult));
+    expect(x.input).toHaveValue(0);
+    expect(within(grades).getByText("88")).toBeVisible();
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not expose an older grade reply during saving and keeps the newer draft after failure", async () => {
+    const x = await begin();
+    let grade!: (r: ComputedTermGrade | null) => void;
+    x.compute.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          grade = done;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await x.startSave();
+    await act(async () => grade(x.scoreRepo.computeTermGradeResult));
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    await act(async () => x.fail()(new Error("synthetic denied save")));
+    expect(x.input).toHaveValue(19);
+    expect(screen.getByText("Could not save this score.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show term grades" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels computed completeness as saved-only with an unsaved zero, and Escape removes only the warning", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    const note = screen.getByText(/Term grades use saved records on this device/);
+    expect(note).toHaveTextContent(/Unsaved input is excluded/);
+    expect(note).toHaveTextContent(/computed completeness is not reporting approval/);
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    expect(x.record).not.toHaveBeenCalled();
+    x.input.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText(/This item has unsaved score work/)).not.toBeInTheDocument();
+    expect(note).toBeVisible();
+    expect(x.record).not.toHaveBeenCalled();
+  });
+});
