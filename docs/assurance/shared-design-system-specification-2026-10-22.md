@@ -79,7 +79,7 @@ Use semantic roles on their intended opaque surfaces. Soft borders are decorativ
 | comfortable |         12px |      15px |                   40px |
 | guided      |         18px |      17px |                   72px |
 
-Space steps multiply the unit by .25/.5/.75/1/1.5/2/3/4. Base typography uses Public Sans with system fallbacks and 1.5 line-height. Token availability does not authorize tiny text for required instructions. Base radius is 8px, large 14px; additional existing aliases remain in the inventory below. Focus-visible outline is 2px with 2px offset. Shared geometry is a floor: long labels/content may increase actual height. Catalog control geometry and 24 computed properties for each sampled selector are in the receipt.
+Space steps multiply the unit by .25/.5/.75/1/1.5/2/3/4. Base typography uses Public Sans with system fallbacks and 1.5 line-height. Token availability does not authorize tiny text for required instructions. Base radius is 8px, large 14px; additional existing aliases remain in the inventory below. Focus-visible outline is 2px with 2px offset. Shared geometry is a floor: long labels/content may increase actual height. Catalog control geometry and 21 computed style properties for each of22 sampled selectors are in the receipt.
 
 ## Control and component contract
 
