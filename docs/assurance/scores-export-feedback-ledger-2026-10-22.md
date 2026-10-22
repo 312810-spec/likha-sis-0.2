@@ -10,19 +10,19 @@ The previous workspace retained a prior result when a new attempt started or fai
 
 ## State ownership
 
-| State                  | Visible feedback/action                                                             | Protection and meaning                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Idle                   | Export report card (CSV) / Export class summary (CSV)                               | Existing explicit actions; no background export                                         |
-| Pending                | Exporting…; aria-disabled                                                           | Existing handler guard; prior result/path/folder action for that kind is removed        |
-| Confirmed              | Report card exported / Class summary exported; exact returned path                  | Only a returned result establishes UI confirmation; omitted-field disclosure preserved  |
-| Snapshot               | Exported snapshot of saved records; later changes require export again              | Does not imply a live file, submission-ready official form or teacher approval          |
-| Failure                | Output-specific export not confirmed heading and error                              | Does not assert no file could exist; no automatic retry or unrelated Reload items       |
-| Null                   | No named output export was returned; check access and try again                     | Does not invent a specific not-found/denial cause                                       |
-| Retry                  | Same named Export action; keyboard Enter retains initiating focus                   | Explicitly requests an export; cannot submit a score/correction                         |
-| Other output confirmed | Its path and named folder action remain                                             | Errors/results are independent by output kind                                           |
-| Folder action          | Visible Open folder; accessible Open report card folder / Open class summary folder | Exact returned path passed to revealExportedFile                                        |
-| Folder failure         | Could not open the folder for this file                                             | Confirmed export retained; no new export request                                        |
-| Long path              | Complete copyable path wraps using .score-export-path                               | Scoped overflow-wrap:anywhere and white-space:normal; no truncation or filename rewrite |
+| State                  | Visible feedback/action                                                             | Protection and meaning                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Idle                   | Export report card (CSV) / Export class summary (CSV)                               | Existing explicit actions; no background export                                                                       |
+| Pending                | Exporting…; aria-disabled                                                           | Existing handler guard; prior result/path/folder action for that kind is removed                                      |
+| Confirmed              | Report card exported / Class summary exported; exact returned path                  | Only a returned result establishes UI confirmation; omitted-field disclosure preserved                                |
+| Snapshot               | Exported snapshot of saved records; later changes require export again              | Does not imply a live file, submission-ready official form or teacher approval                                        |
+| Failure                | Output-specific export not confirmed heading and error                              | Does not assert no file could exist; no automatic retry or unrelated Reload items                                     |
+| Null                   | No named output export was returned; check access and try again                     | Does not invent a specific not-found/denial cause                                                                     |
+| Retry                  | Same named Export action; keyboard Enter retains initiating focus                   | Explicitly requests an export; does not replay a score/correction; existing score-field blur commits remain unchanged |
+| Other output confirmed | Its path and named folder action remain                                             | Errors/results are independent by output kind                                                                         |
+| Folder action          | Visible Open folder; accessible Open report card folder / Open class summary folder | Exact returned path passed to revealExportedFile                                                                      |
+| Folder failure         | Could not open the folder for this file                                             | Confirmed export retained; no new export request                                                                      |
+| Long path              | Complete copyable path wraps using .score-export-path                               | Scoped overflow-wrap:anywhere and white-space:normal; no truncation or filename rewrite                               |
 
 No new component abstraction, dependency, palette or animation. The existing native buttons, Alert roles, spacing and semantic theme tokens remain. Repeated activation is checked with native keyboard Enter on the aria-disabled button; Playwright's availability checks intentionally prevent a normal click on that state.
 

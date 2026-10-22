@@ -5,7 +5,7 @@ Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V
 
 ## Current Scores CSV feedback continuation — 22 October
 
-Active branch `forge/scores-export-feedback-20261022` from c7c9d01. PM-12/13/31 bounded CSV attempt/error/snapshot/folder/path feedback repair. Restored after workspace maintenance; fresh baseline6 FAIL/74 PASS, seven added cases. Current contract/state ledger/checks/publication: `docs/assurance/scores-export-feedback-handoff-2026-10-22.md`. Fresh quality1,624/161 files, UI/recovery50/Scores47/build/isolation and browser36 configurations/72 feedback states PASS; internal renders inspected. CI/publication pending receipt. Preserve all merged repairs; Scores remains the single runtime pilot. Teacher/device/manual A1–A7 remain pending.
+Active branch `forge/scores-export-feedback-20261022` from c7c9d01. PM-12/13/31 bounded CSV attempt/error/snapshot/folder/path feedback repair. Restored after workspace maintenance; fresh baseline6 FAIL/74 PASS, seven added cases. Current contract/state ledger/checks/publication: `docs/assurance/scores-export-feedback-handoff-2026-10-22.md`. Fresh quality1,624/161 files, UI/recovery50/Scores47/build/isolation and browser36 configurations/72 feedback states PASS; internal renders inspected. PR156 gated/merged into parent asfb47e9f1; Quality39735201256 /Security39735201237 PASS on3a34cd9; checked/CI/actual merge tree1e1b32da. Exact receipt: `docs/assurance/scores-export-feedback-ci-merge-2026-10-22.json`. Preserve all merged repairs; Scores remains the single runtime pilot. Teacher/device/manual A1–A7 remain pending.
 
 ## Current Scores state continuation — 22 October
 

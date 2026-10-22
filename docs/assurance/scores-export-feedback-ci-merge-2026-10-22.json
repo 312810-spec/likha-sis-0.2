@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-22",
+  "timezone": "Asia/Manila",
+  "pr": 156,
+  "url": "https://github.com/312810-spec/likha-sis-0.2/pull/156",
+  "base": "c7c9d01dd5ff6a03ef425274128fa04fb87ecaf1",
+  "checkedHead": "3a34cd93c3e2e75391342ad2773aeb22b00e5451",
+  "ciMerge": "a898afb4b5551c06c16b3463234ee27cb41819d4",
+  "checkedTree": "1e1b32da57152af2b7e3891c1262a9fae6d53419",
+  "actualMerge": "fb47e9f1c9252dd2ef6d573980816fed48374f2b",
+  "actualMergeTree": "1e1b32da57152af2b7e3891c1262a9fae6d53419",
+  "qualityRun": 39735201256,
+  "securityRun": 39735201237,
+  "qualityConclusion": "success",
+  "securityConclusion": "success",
+  "classifier": {
+    "javascript": true,
+    "ui": true,
+    "native": false,
+    "windows": false
+  },
+  "ciJobs": {
+    "qualityJob": 119679195222,
+    "classifierJob": 119679150716,
+    "qualityLogExcerpts": [
+      "2026-10-22T06:41:13.2082596Z  Test Files  161 passed (161)",
+      "2026-10-22T06:41:13.2096174Z       Tests  1624 passed (1624)",
+      "2026-10-22T06:42:05.5341851Z quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-22T06:42:27.6894354Z quality:ui:recovery PASS — 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-22T06:42:32.5253078Z PASS: 13/13 development startup cases.",
+      "2026-10-22T06:42:34.5606065Z PASS: 13/13 production startup cases.",
+      "2026-10-22T06:42:36.1760865Z Artifact likha-sis-appearance-startup-verification successfully finalized. Artifact ID 12407395659",
+      "2026-10-22T06:42:36.1763005Z Artifact likha-sis-appearance-startup-verification has been successfully uploaded! Final size is 1332 bytes. Artifact ID is 12407395659",
+      "2026-10-22T06:42:38.2742744Z Artifact likha-sis-ui-verification successfully finalized. Artifact ID 12406373948",
+      "2026-10-22T06:42:38.2743947Z Artifact likha-sis-ui-verification has been successfully uploaded! Final size is 929091 bytes. Artifact ID is 12406373948"
+    ],
+    "securityJobs": [
+      {
+        "id": 119679150124,
+        "name": "Security / cargo-deny",
+        "conclusion": "success"
+      },
+      {
+        "id": 119679150373,
+        "name": "Security / osv-scanner",
+        "conclusion": "success"
+      },
+      {
+        "id": 119679150472,
+        "name": "Security / gitleaks",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12407395659,
+        "name": "likha-sis-appearance-startup-verification",
+        "size_in_bytes": 1332,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12407395659",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12407395659/zip",
+        "expired": false,
+        "created_at": "2026-10-22T06:42:35Z",
+        "expires_at": "2026-10-29T06:42:34Z",
+        "updated_at": "2026-10-22T06:42:35Z",
+        "digest": "sha256:7c0c57268c593e55b9c0203dd3d7f10872f4852ac1566454ed16bc0507a70a0d",
+        "workflow_run": {
+          "id": 39735201256,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/scores-export-feedback-20261022",
+          "head_sha": "3a34cd93c3e2e75391342ad2773aeb22b00e5451"
+        }
+      },
+      {
+        "id": 12406373948,
+        "name": "likha-sis-ui-verification",
+        "size_in_bytes": 929091,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12406373948",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12406373948/zip",
+        "expired": false,
+        "created_at": "2026-10-22T06:42:38Z",
+        "expires_at": "2026-10-29T06:42:36Z",
+        "updated_at": "2026-10-22T06:42:38Z",
+        "digest": "sha256:e6416e588f7528a3a4e321fb7c3ed9132c0b861392601d61425218b81c132dd2",
+        "workflow_run": {
+          "id": 39735201256,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/scores-export-feedback-20261022",
+          "head_sha": "3a34cd93c3e2e75391342ad2773aeb22b00e5451"
+        }
+      }
+    ]
+  },
+  "localEvidence": "scores-export-feedback-evidence-2026-10-22.json",
+  "limits": [
+    "Virtual browser export paths/results only",
+    "No native file-byte/official-form fidelity/device/teacher approval claim",
+    "Existing score-field blur-save semantics preserved; export/reveal handlers do not replay scores",
+    "Full Scores A1–A7 teacher/device/manual acceptance pending",
+    "No main merge/deployment"
+  ]
+}
