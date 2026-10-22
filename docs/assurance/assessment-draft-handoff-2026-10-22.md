@@ -1,0 +1,17 @@
+# PM-12 assessment creation acknowledgment handoff
+
+22 October2026,Asia/Manila. Branch forge/assessment-draft-ack-20261022 from82dd88f32fd73d6153a1b7ecdc56024d4141a803. Retrieved the current task pack and showed its complete PM-12 prompt before execution, per the user's new continuation sequence. That workflow is now recorded in redesign-continuation-sequence.md and TASK.
+
+## Outcome and reproduction
+
+Bounded PM-12 continuation: preserve newer creation drafts and focus in the workspace and Creation Studio; prevent composition Enter from creating an item. Initial baseline:5 new regressions FAIL/91 existing PASS across both component files. First candidate passed those96 tests. Actual browser testing then found the implicit empty-record editor collapsing after its first successful creation; an additional focused regression failed (one failure/84 skipped) before repair. Final implementation retains implicit open intent for newer work while respecting an explicit user close. Four further boundary cases cover max-only/category-only edits and failed creation in both surfaces.
+
+Current source: both composers capture user-edit revision for creation acknowledgment. They clear only an unchanged submitted draft; confirmation names the saved item and distinguishes retained newer work. Studio focus returns only if revision/source/initiating focus remain unchanged after refresh. Composition Enter is ignored. No automatic creation replay, category/rule/dependency/native/algorithm/export/lock/workflow changes.
+
+Prompt: assessment-draft-task-prompt-2026-10-22.md. Contract: assessment-draft-contract-2026-10-22.md. Element/state/effect and before/after ledger: assessment-draft-ledger-2026-10-22.md. Probe: scripts/assurance/assessment-draft-browser.mjs. Fresh local quality PASS:1,634 tests/161 files plus typecheck/lint/format/architecture/dead-code/batch gates. Build and21-file fixture isolation PASS; browser72 configurations plus two failed-create/explicit-retry flows PASS, with exact submitted canonical arguments, old item receipt, retained newer draft/focus, guarded duplicate and synthetic composing Enter. UI smoke, recovery50 and existing Scores browser47 PASS. All four light-comfortable desktop/dark-guided phone renders internally inspected: saved max20 and newer draft max10 remain distinct, confirmation wraps, editor and focus remain. Evidence: assessment-draft-evidence-2026-10-22.json. CI/publication pending receipt.
+
+The probe sets and asserts focus before releasing the delayed response. It uses the exact existing Add-and-continue label and locates the actual error Alert including its Reload items child, rather than requiring an exact text-node-only match. Unsupported Testing Library role-option exact fields were removed from new tests; matching semantics stay the same. These harness corrections are separate from product regressions.
+
+## Limits and next action
+
+Complete affected browser/UI/recovery checks and internal render inspection, then publish/gated integration merge using existing authorization. Next eligible work stays inside Scores: remaining PM-12 edit/rename acknowledgment/state coverage, plus the prepared external observation protocol. Full PM-12 and whole-app redesign are not complete. Actual device IME, manual AT/OS zoom, teacher/device/native/full A1–A7 acceptance remain pending. Preserve main and draft dependency chain; no deployment.

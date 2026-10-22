@@ -97,6 +97,8 @@ export function AssessmentAuthoringScreen({
     () => "20",
   );
   const [creatingItem, setCreatingItem] = useState(false);
+  // User edits belong to a newer draft even if its text returns to the submitted value.
+  const createDraftRevisionRef = useRef(0);
   const [addedCount, setAddedCount] = useState(0);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -221,6 +223,8 @@ export function AssessmentAuthoringScreen({
     setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
+    const submittedDraftRevision = createDraftRevisionRef.current;
+    const initiatingElement = document.activeElement;
     setCreatingItem(true);
     try {
       const created = await assessmentService.createItem(
@@ -233,11 +237,20 @@ export function AssessmentAuthoringScreen({
       if (created === null) {
         setError("Could not add this item — check the category and class record.");
       } else {
-        setItemName("");
+        const hasNewerDraft = createDraftRevisionRef.current !== submittedDraftRevision;
+        if (!hasNewerDraft) setItemName("");
         setAddedCount((count) => count + 1);
-        setConfirmation(`${created.name} added.`);
+        setConfirmation(
+          `${created.name} added.${hasNewerDraft ? " Your newer item draft is retained." : ""}`,
+        );
         await refreshItemsAfterWrite();
-        nameInputRef.current?.focus();
+        if (
+          !hasNewerDraft &&
+          isActiveSource() &&
+          createDraftRevisionRef.current === submittedDraftRevision &&
+          document.activeElement === initiatingElement
+        )
+          nameInputRef.current?.focus();
       }
     } catch (err) {
       setError(err instanceof ValidationError ? err.message : "Could not add this item.");
@@ -393,7 +406,10 @@ export function AssessmentAuthoringScreen({
           <select
             id="authoring-category-set"
             value={categorySetId}
-            onChange={(event) => setCategorySetId(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setCategorySetId(event.target.value);
+            }}
           >
             <option value="" disabled>
               Select a current category set
@@ -411,7 +427,10 @@ export function AssessmentAuthoringScreen({
           <select
             id="authoring-category"
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setCategoryId(event.target.value);
+            }}
           >
             <option value="" disabled>
               Select a current category
@@ -431,8 +450,12 @@ export function AssessmentAuthoringScreen({
             type="text"
             placeholder="e.g. Item 1"
             value={itemName}
-            onChange={(event) => setItemName(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setItemName(event.target.value);
+            }}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter") {
                 event.preventDefault();
                 void handleAddItem();
@@ -447,7 +470,10 @@ export function AssessmentAuthoringScreen({
             type="number"
             min="1"
             value={maxScore}
-            onChange={(event) => setMaxScore(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setMaxScore(event.target.value);
+            }}
           />
         </div>
       </div>
