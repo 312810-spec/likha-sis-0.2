@@ -69,6 +69,8 @@ export function ClassRecordWorkspace({
   );
   const [itemsLoading, setItemsLoading] = useState(true);
   const [itemsRefreshing, setItemsRefreshing] = useState(false);
+  const itemReadGenerationRef = useRef(0);
+  const itemsRequireReloadRef = useRef(false);
   const [itemsSource, setItemsSource] = useState<{
     service: AssessmentApplicationService;
     classId: string;
@@ -143,7 +145,9 @@ export function ClassRecordWorkspace({
   const editDraftRef = useRef({ revision: 0, open: editingItemId !== null });
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const pendingDeleteIds = useRef(new Set<string>());
+  const deleteButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [deletingItemIds, setDeletingItemIds] = useState<ReadonlySet<string>>(new Set());
 
   const [selectedItemId, setSelectedItemId] = useSessionDraft<string | null>(
     `${classRecordId}:record:selected`,
@@ -236,8 +240,11 @@ export function ClassRecordWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++itemReadGenerationRef.current;
+    itemsRequireReloadRef.current = false;
     // Fresh reads invalidate actionable source state before awaiting the response.
     setItemsLoading(true);
+    setItemsRefreshing(false);
     setItemsSource(null);
     setItems([]);
     setError(null);
@@ -246,7 +253,7 @@ export function ClassRecordWorkspace({
       assessmentService.listCategorySets(),
     ])
       .then(([itemList, sets]) => {
-        if (cancelled) return;
+        if (cancelled || itemReadGenerationRef.current !== generation) return;
         setItems(itemList);
         setItemsSource({ service: assessmentService, classId: classRecordId });
         setCategorySets(sets);
@@ -256,10 +263,11 @@ export function ClassRecordWorkspace({
           setCategorySetId("");
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this class record's assessment items.");
+        if (!cancelled && itemReadGenerationRef.current === generation)
+          setError("Could not load this class record's assessment items.");
       })
       .finally(() => {
-        if (!cancelled) setItemsLoading(false);
+        if (!cancelled && itemReadGenerationRef.current === generation) setItemsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -339,21 +347,28 @@ export function ClassRecordWorkspace({
     categoriesSource.setId === categorySetId &&
     categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
+    // An uncertain deletion requires explicit reload, even if another write completes.
+    if (itemsRequireReloadRef.current) return;
+    const generation = ++itemReadGenerationRef.current;
+    const isCurrentRead = () => isActiveSource() && itemReadGenerationRef.current === generation;
     // Keep current editors mounted during a read; block writes until it finishes.
     setItemsRefreshing(true);
     try {
       const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-      if (!isActiveSource()) return;
+      if (!isCurrentRead()) return;
       setItems(refreshed);
       setItemsSource({ service: assessmentService, classId: classRecordId });
     } catch {
-      if (!isActiveSource()) return;
+      if (!isCurrentRead()) return;
       setItemsSource(null);
       setError(
         "The change is saved, but the item list could not refresh. Reload items before making another change.",
       );
     } finally {
-      if (isActiveSource()) setItemsRefreshing(false);
+      if (isCurrentRead()) {
+        setItemsRefreshing(false);
+        setItemsLoading(false);
+      }
     }
   }
 
@@ -415,6 +430,7 @@ export function ClassRecordWorkspace({
   }
 
   function startEditingItem(item: AssessmentItemDetail) {
+    if (pendingDeleteIds.current.has(item.id)) return;
     editDraftRef.current.revision += 1;
     editDraftRef.current.open = true;
     setItemActionError(null);
@@ -498,32 +514,54 @@ export function ClassRecordWorkspace({
    * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
     if (
-      deletingItemId === item.id ||
+      pendingDeleteIds.current.has(item.id) ||
+      item.recordedCount > 0 ||
       !itemsReady ||
       !items.some((current) => current.id === item.id)
     )
       return;
-    setDeletingItemId(item.id);
+    pendingDeleteIds.current.add(item.id);
+    setDeletingItemIds(new Set(pendingDeleteIds.current));
+    setConfirmation(null);
     setItemActionError(null);
     try {
       const deleted = await assessmentService.deleteItem(item.id);
       if (!isActiveSource()) return;
       if (!deleted) {
-        setItemActionError("Could not delete this item — it may already have recorded scores.");
-        setConfirmingDeleteItemId(null);
+        setItemActionError(`“${item.name}” was not deleted. It may already have recorded scores.`);
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
       } else {
+        const row = deleteButtonRefs.current[item.id]?.closest("li");
+        const restoreFocus = Boolean(row?.contains(document.activeElement));
+        const adjacentRow = row?.nextElementSibling ?? row?.previousElementSibling;
+        const nextFocus = adjacentRow?.querySelector<HTMLElement>(
+          'button:not([aria-disabled="true"]):not(:disabled)',
+        );
         setItems((current) => current.filter((existing) => existing.id !== item.id));
-        if (selectedItemId === item.id) setSelectedItemId(null);
-        setConfirmingDeleteItemId(null);
+        setSelectedItemId((current) => (current === item.id ? null : current));
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
         setConfirmation(`${item.name} deleted.`);
         await refreshItemsAfterWrite();
+        if (restoreFocus && isActiveSource() && document.activeElement === document.body) {
+          (nextFocus?.isConnected ? nextFocus : composerToggleRef.current)?.focus();
+        }
       }
     } catch (err) {
+      if (!isActiveSource()) return;
       setItemActionError(
-        err instanceof ValidationError ? err.message : "Could not delete this item.",
+        `Deletion of “${item.name}” was not confirmed.${
+          err instanceof ValidationError ? ` ${err.message}` : ""
+        }`,
       );
+      itemsRequireReloadRef.current = true;
+      itemReadGenerationRef.current += 1;
+      setItemsLoading(false);
+      setItemsRefreshing(false);
+      setItemsSource(null);
+      setError("Reload items to check the deletion result before making another change.");
     } finally {
-      setDeletingItemId(null);
+      pendingDeleteIds.current.delete(item.id);
+      if (isActiveSource()) setDeletingItemIds(new Set(pendingDeleteIds.current));
     }
   }
 
@@ -1200,13 +1238,33 @@ export function ClassRecordWorkspace({
                       </span>
                     </button>
                     <div role="group" aria-label={`Actions for ${item.name}`}>
-                      <button type="button" onClick={() => startEditingItem(item)}>
+                      <button
+                        type="button"
+                        aria-disabled={deletingItemIds.has(item.id)}
+                        onClick={() => startEditingItem(item)}
+                      >
                         Edit
                       </button>
                       {isScored ? (
                         <span className="field-hint">
                           Can&rsquo;t delete — already has recorded scores.
                         </span>
+                      ) : deletingItemIds.has(item.id) ? (
+                        <>
+                          <span className="field-hint" role="status">
+                            Deletion requested. Waiting for the result; it can’t be cancelled here.
+                          </span>
+                          <button
+                            type="button"
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled="true"
+                            onClick={() => void handleDeleteItem(item)}
+                          >
+                            Deleting…
+                          </button>
+                        </>
                       ) : isConfirmingDelete ? (
                         <>
                           <span className="field-hint">
@@ -1214,10 +1272,13 @@ export function ClassRecordWorkspace({
                           </span>
                           <button
                             type="button"
-                            aria-disabled={deletingItemId === item.id}
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled={!itemsReady}
                             onClick={() => void handleDeleteItem(item)}
                           >
-                            {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
+                            Confirm delete
                           </button>
                           <button type="button" onClick={() => setConfirmingDeleteItemId(null)}>
                             Cancel

@@ -3,6 +3,10 @@
 Updated: 2026-10-22 (Asia/Manila). Repository: `312810-spec/likha-sis-0.2`.
 Controlling plan: `CTOS.md`; execution rules: `AGENTS.md` and `docs/ctos/FORGE-V4-ADAPTER.md`.
 
+## Current PM-12 deletion/validation continuation — 22 October
+
+Branch forge/assessment-delete-state-20261022 from6d9c7122. Full task-pack PM-12 prompt shown first. Baseline11 FAIL/121 PASS; focus and read-order follow-up failures reproduced. Per-ID pending/duplicate guards, confirmation/selection preservation, truthful non-cancellable pending state, refused/unconfirmed distinction, explicit reload without replay, read-generation/reload latch and removed-row focus implemented. Final focused155/3 and quality1,675/161 PASS;23 added cases. Final browser72 +2 flows/build/isolation PASS; four internal renders inspected. UI/recovery50/Scores47 PASS. CI/publication pending until recorded in assessment-delete-handoff-2026-10-22.md and evidence. Full PM-12/A1–A7 partial. Next source-owned Scores category/period and roster-refresh coverage plus external teacher/device observations.
+
 ## Current PM-12 edit/rename acknowledgment continuation — 22 October
 
 Branch forge/assessment-edit-ack-20261022 from e4c92cdd. Full task-pack PM-12 prompt shown before execution. Baseline10 FAIL/101 PASS; first candidate exposed editor unmount/focus loss during list read. Preserve newer name/category/max, ABA and cancel/reopen/switch choices; identify old write failures; keep editors mounted during guarded refresh. Pre-supplement focused117 PASS; browser72 configurations +2 flows PASS; UI/recovery50/Scores/browser/build/isolation PASS, four internal renders inspected. Final quality1,652/161 PASS,18 added cases. PR158 gated/merged as d57fe421; Quality39770794816 /Security39770794690 PASS on bf8fb342; checked/CI/merge tree cf3833cf. Exact receipt assessment-edit-ci-merge-2026-10-22.json; handoff assessment-edit-handoff-2026-10-22.md. Full PM-12/A1–A7 partial; next remaining authoring consequence/validation/delete states and external observations.
