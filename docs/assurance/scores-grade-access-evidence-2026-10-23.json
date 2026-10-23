@@ -41,11 +41,22 @@
     "result": "fmt-only failure; two wraps corrected before actual native reproduction"
   },
   "candidate": {
-    "status": "INCONCLUSIVE: native CI pending",
+    "status": "PASS bounded G1\u2013G5; merged PR162",
     "sources": {
       "src-tauri/src/commands/learner_score.rs": "717bab2f5259d04e08cc87e40a6cd0e3d9ee030e7a0fcb7fa2274018a2f7ed5b",
       "scripts/assurance/score-native-negative-controls.py": "43cec891d9493b16d76e85c8ed88308cf696b6d3141f14c2358e6fdf80df61d0"
-    }
+    },
+    "head": "b2c3d954a5cb6be2b5e69d6d7d601a13dfc5b11c",
+    "tree": "86bcef43f7cc4b1277c8f381e91619c96273e7b0",
+    "ci_merge": "0eb4bc9de58c4896196bbf9674d08d12de84beea",
+    "actual_merge": "43ca7bc1371e776362e18a663506340f8412cb03",
+    "actual_merge_tree": "86bcef43f7cc4b1277c8f381e91619c96273e7b0",
+    "quality_run": 39875036566,
+    "security_run": 39875036619,
+    "ubuntu_native_tests": 1542,
+    "windows_native_tests": 1551,
+    "negative_controls": "Five actual assertion failures against pinned old bodies, source restored exactly",
+    "receipt": "scores-grade-access-ci-merge-2026-10-23.json"
   },
   "local": {
     "javascript_quality": "PASS1692 tests/161 files",
