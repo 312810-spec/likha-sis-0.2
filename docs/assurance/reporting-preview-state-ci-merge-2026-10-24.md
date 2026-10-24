@@ -794,3 +794,9 @@
 ```
 
 The execution environment became unavailable after the refreshed local checks. This receipt and final handoff were prepared and persisted through GitHub. No final local checkout/resync or post-outage formatting execution is claimed. Earlier command outputs, verified Git trees and actual CI job records support the reported results. Main and the dependent PR146–150 chain were not merged; PR150 remains draft on149. No deployment or installed-device acceptance is implied.
+
+## PM-35 recovery addendum — 24 October 2026
+
+The operationalLimit and inaccessible renewed-raw statements in the original record above are historical, superseded by this recovery. Local checkout restoredcdf6dbd/tree355b8e2f. The complete raw browser receipt for checked headb001f58 was recovered unchanged (SHA25636492aca8dd830ea8d6086dafbdc1758069270ce54d4bb09a3fc788ee54dfa4d), parsed and verified across36 configurations/108 states with all six source hashes matching current merged files. Every case retains the two exact intentional18/19 write calls, two reads of one canonical record, stored18 and the assessed no-violation/overflow/hit results. It now supplies the full browser record in reporting-preview-state-evidence-2026-10-24.json; prior initial raw remains in Git atcdf6dbd.
+
+Three actual formatting warnings in TASK/CTOS-STATE/handoff were corrected; full npm run format:check PASS. This docs-only recovery changes no checked runtime, test, probe, workflow, manifest or lock bytes, and reruns no application/native suite. Exact recovery contract/checks/source proof and shown PM-35 prompt: reporting-preview-recovery-2026-10-24.md. Remote checkpoint receipt is recorded in PR150. Full teacher/device/manual limits remain pending.

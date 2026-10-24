@@ -19,7 +19,7 @@
   "focused": "PASS138 tests /2 files; seven added",
   "browser": {
     "project": "LIKHA-SIS",
-    "head": "7ad600fe2ef03445ab38a652a539273e48370c71",
+    "head": "b001f58bd46852cec01866340d5596d3f0abbe12",
     "node": "v24.22.1",
     "browser": "156.0.8078.47",
     "sources": {
@@ -108,8 +108,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:23.797Z",
-            "updatedAt": "2026-10-24T12:47:23.797Z"
+            "recordedAt": "2026-10-24T13:03:35.231Z",
+            "updatedAt": "2026-10-24T13:03:35.231Z"
           },
           "roster": [
             {
@@ -118,7 +118,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:23.797Z"
+              "updatedAt": "2026-10-24T13:03:35.231Z"
             },
             {
               "learnerId": "l2",
@@ -217,8 +217,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:26.094Z",
-            "updatedAt": "2026-10-24T12:47:26.094Z"
+            "recordedAt": "2026-10-24T13:03:37.409Z",
+            "updatedAt": "2026-10-24T13:03:37.409Z"
           },
           "roster": [
             {
@@ -227,7 +227,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:26.094Z"
+              "updatedAt": "2026-10-24T13:03:37.409Z"
             },
             {
               "learnerId": "l2",
@@ -326,8 +326,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:28.420Z",
-            "updatedAt": "2026-10-24T12:47:28.420Z"
+            "recordedAt": "2026-10-24T13:03:39.524Z",
+            "updatedAt": "2026-10-24T13:03:39.524Z"
           },
           "roster": [
             {
@@ -336,7 +336,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:28.420Z"
+              "updatedAt": "2026-10-24T13:03:39.524Z"
             },
             {
               "learnerId": "l2",
@@ -435,8 +435,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:30.714Z",
-            "updatedAt": "2026-10-24T12:47:30.714Z"
+            "recordedAt": "2026-10-24T13:03:41.717Z",
+            "updatedAt": "2026-10-24T13:03:41.717Z"
           },
           "roster": [
             {
@@ -445,7 +445,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:30.714Z"
+              "updatedAt": "2026-10-24T13:03:41.717Z"
             },
             {
               "learnerId": "l2",
@@ -544,8 +544,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:33.058Z",
-            "updatedAt": "2026-10-24T12:47:33.058Z"
+            "recordedAt": "2026-10-24T13:03:43.996Z",
+            "updatedAt": "2026-10-24T13:03:43.996Z"
           },
           "roster": [
             {
@@ -554,7 +554,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:33.058Z"
+              "updatedAt": "2026-10-24T13:03:43.996Z"
             },
             {
               "learnerId": "l2",
@@ -653,8 +653,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:35.358Z",
-            "updatedAt": "2026-10-24T12:47:35.358Z"
+            "recordedAt": "2026-10-24T13:03:46.257Z",
+            "updatedAt": "2026-10-24T13:03:46.257Z"
           },
           "roster": [
             {
@@ -663,7 +663,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:35.358Z"
+              "updatedAt": "2026-10-24T13:03:46.257Z"
             },
             {
               "learnerId": "l2",
@@ -762,8 +762,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:37.579Z",
-            "updatedAt": "2026-10-24T12:47:37.579Z"
+            "recordedAt": "2026-10-24T13:03:48.366Z",
+            "updatedAt": "2026-10-24T13:03:48.366Z"
           },
           "roster": [
             {
@@ -772,7 +772,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:37.579Z"
+              "updatedAt": "2026-10-24T13:03:48.366Z"
             },
             {
               "learnerId": "l2",
@@ -871,8 +871,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:39.612Z",
-            "updatedAt": "2026-10-24T12:47:39.612Z"
+            "recordedAt": "2026-10-24T13:03:50.477Z",
+            "updatedAt": "2026-10-24T13:03:50.477Z"
           },
           "roster": [
             {
@@ -881,7 +881,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:39.612Z"
+              "updatedAt": "2026-10-24T13:03:50.477Z"
             },
             {
               "learnerId": "l2",
@@ -980,8 +980,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:42.033Z",
-            "updatedAt": "2026-10-24T12:47:42.033Z"
+            "recordedAt": "2026-10-24T13:03:52.769Z",
+            "updatedAt": "2026-10-24T13:03:52.769Z"
           },
           "roster": [
             {
@@ -990,7 +990,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:42.033Z"
+              "updatedAt": "2026-10-24T13:03:52.769Z"
             },
             {
               "learnerId": "l2",
@@ -1089,8 +1089,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:44.271Z",
-            "updatedAt": "2026-10-24T12:47:44.271Z"
+            "recordedAt": "2026-10-24T13:03:54.885Z",
+            "updatedAt": "2026-10-24T13:03:54.885Z"
           },
           "roster": [
             {
@@ -1099,7 +1099,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:44.271Z"
+              "updatedAt": "2026-10-24T13:03:54.885Z"
             },
             {
               "learnerId": "l2",
@@ -1198,8 +1198,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:46.497Z",
-            "updatedAt": "2026-10-24T12:47:46.497Z"
+            "recordedAt": "2026-10-24T13:03:57.030Z",
+            "updatedAt": "2026-10-24T13:03:57.030Z"
           },
           "roster": [
             {
@@ -1208,7 +1208,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:46.497Z"
+              "updatedAt": "2026-10-24T13:03:57.030Z"
             },
             {
               "learnerId": "l2",
@@ -1307,8 +1307,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:48.651Z",
-            "updatedAt": "2026-10-24T12:47:48.651Z"
+            "recordedAt": "2026-10-24T13:03:59.080Z",
+            "updatedAt": "2026-10-24T13:03:59.080Z"
           },
           "roster": [
             {
@@ -1317,7 +1317,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:48.651Z"
+              "updatedAt": "2026-10-24T13:03:59.080Z"
             },
             {
               "learnerId": "l2",
@@ -1416,8 +1416,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:50.648Z",
-            "updatedAt": "2026-10-24T12:47:50.648Z"
+            "recordedAt": "2026-10-24T13:04:01.094Z",
+            "updatedAt": "2026-10-24T13:04:01.094Z"
           },
           "roster": [
             {
@@ -1426,7 +1426,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:50.648Z"
+              "updatedAt": "2026-10-24T13:04:01.094Z"
             },
             {
               "learnerId": "l2",
@@ -1525,8 +1525,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:52.714Z",
-            "updatedAt": "2026-10-24T12:47:52.714Z"
+            "recordedAt": "2026-10-24T13:04:03.134Z",
+            "updatedAt": "2026-10-24T13:04:03.134Z"
           },
           "roster": [
             {
@@ -1535,7 +1535,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:52.714Z"
+              "updatedAt": "2026-10-24T13:04:03.134Z"
             },
             {
               "learnerId": "l2",
@@ -1634,8 +1634,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:55.030Z",
-            "updatedAt": "2026-10-24T12:47:55.030Z"
+            "recordedAt": "2026-10-24T13:04:05.239Z",
+            "updatedAt": "2026-10-24T13:04:05.239Z"
           },
           "roster": [
             {
@@ -1644,7 +1644,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:55.030Z"
+              "updatedAt": "2026-10-24T13:04:05.239Z"
             },
             {
               "learnerId": "l2",
@@ -1743,8 +1743,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:57.096Z",
-            "updatedAt": "2026-10-24T12:47:57.096Z"
+            "recordedAt": "2026-10-24T13:04:07.454Z",
+            "updatedAt": "2026-10-24T13:04:07.454Z"
           },
           "roster": [
             {
@@ -1753,7 +1753,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:57.096Z"
+              "updatedAt": "2026-10-24T13:04:07.454Z"
             },
             {
               "learnerId": "l2",
@@ -1852,8 +1852,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:47:59.164Z",
-            "updatedAt": "2026-10-24T12:47:59.164Z"
+            "recordedAt": "2026-10-24T13:04:09.519Z",
+            "updatedAt": "2026-10-24T13:04:09.519Z"
           },
           "roster": [
             {
@@ -1862,7 +1862,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:47:59.164Z"
+              "updatedAt": "2026-10-24T13:04:09.519Z"
             },
             {
               "learnerId": "l2",
@@ -1961,8 +1961,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:01.300Z",
-            "updatedAt": "2026-10-24T12:48:01.300Z"
+            "recordedAt": "2026-10-24T13:04:11.623Z",
+            "updatedAt": "2026-10-24T13:04:11.623Z"
           },
           "roster": [
             {
@@ -1971,7 +1971,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:01.300Z"
+              "updatedAt": "2026-10-24T13:04:11.623Z"
             },
             {
               "learnerId": "l2",
@@ -2070,8 +2070,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:03.390Z",
-            "updatedAt": "2026-10-24T12:48:03.390Z"
+            "recordedAt": "2026-10-24T13:04:13.726Z",
+            "updatedAt": "2026-10-24T13:04:13.726Z"
           },
           "roster": [
             {
@@ -2080,7 +2080,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:03.390Z"
+              "updatedAt": "2026-10-24T13:04:13.726Z"
             },
             {
               "learnerId": "l2",
@@ -2179,8 +2179,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:05.637Z",
-            "updatedAt": "2026-10-24T12:48:05.637Z"
+            "recordedAt": "2026-10-24T13:04:15.806Z",
+            "updatedAt": "2026-10-24T13:04:15.806Z"
           },
           "roster": [
             {
@@ -2189,7 +2189,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:05.637Z"
+              "updatedAt": "2026-10-24T13:04:15.806Z"
             },
             {
               "learnerId": "l2",
@@ -2288,8 +2288,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:07.822Z",
-            "updatedAt": "2026-10-24T12:48:07.822Z"
+            "recordedAt": "2026-10-24T13:04:17.950Z",
+            "updatedAt": "2026-10-24T13:04:17.950Z"
           },
           "roster": [
             {
@@ -2298,7 +2298,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:07.822Z"
+              "updatedAt": "2026-10-24T13:04:17.950Z"
             },
             {
               "learnerId": "l2",
@@ -2397,8 +2397,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:10.060Z",
-            "updatedAt": "2026-10-24T12:48:10.060Z"
+            "recordedAt": "2026-10-24T13:04:20.098Z",
+            "updatedAt": "2026-10-24T13:04:20.098Z"
           },
           "roster": [
             {
@@ -2407,7 +2407,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:10.060Z"
+              "updatedAt": "2026-10-24T13:04:20.098Z"
             },
             {
               "learnerId": "l2",
@@ -2506,8 +2506,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:12.207Z",
-            "updatedAt": "2026-10-24T12:48:12.207Z"
+            "recordedAt": "2026-10-24T13:04:22.213Z",
+            "updatedAt": "2026-10-24T13:04:22.213Z"
           },
           "roster": [
             {
@@ -2516,7 +2516,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:12.207Z"
+              "updatedAt": "2026-10-24T13:04:22.213Z"
             },
             {
               "learnerId": "l2",
@@ -2615,8 +2615,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:14.423Z",
-            "updatedAt": "2026-10-24T12:48:14.423Z"
+            "recordedAt": "2026-10-24T13:04:24.448Z",
+            "updatedAt": "2026-10-24T13:04:24.448Z"
           },
           "roster": [
             {
@@ -2625,7 +2625,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:14.423Z"
+              "updatedAt": "2026-10-24T13:04:24.448Z"
             },
             {
               "learnerId": "l2",
@@ -2724,8 +2724,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:16.611Z",
-            "updatedAt": "2026-10-24T12:48:16.611Z"
+            "recordedAt": "2026-10-24T13:04:26.596Z",
+            "updatedAt": "2026-10-24T13:04:26.596Z"
           },
           "roster": [
             {
@@ -2734,7 +2734,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:16.611Z"
+              "updatedAt": "2026-10-24T13:04:26.596Z"
             },
             {
               "learnerId": "l2",
@@ -2833,8 +2833,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:18.660Z",
-            "updatedAt": "2026-10-24T12:48:18.660Z"
+            "recordedAt": "2026-10-24T13:04:28.674Z",
+            "updatedAt": "2026-10-24T13:04:28.674Z"
           },
           "roster": [
             {
@@ -2843,7 +2843,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:18.660Z"
+              "updatedAt": "2026-10-24T13:04:28.674Z"
             },
             {
               "learnerId": "l2",
@@ -2942,8 +2942,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:20.726Z",
-            "updatedAt": "2026-10-24T12:48:20.726Z"
+            "recordedAt": "2026-10-24T13:04:30.757Z",
+            "updatedAt": "2026-10-24T13:04:30.757Z"
           },
           "roster": [
             {
@@ -2952,7 +2952,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:20.726Z"
+              "updatedAt": "2026-10-24T13:04:30.757Z"
             },
             {
               "learnerId": "l2",
@@ -3051,8 +3051,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:22.740Z",
-            "updatedAt": "2026-10-24T12:48:22.740Z"
+            "recordedAt": "2026-10-24T13:04:32.903Z",
+            "updatedAt": "2026-10-24T13:04:32.903Z"
           },
           "roster": [
             {
@@ -3061,7 +3061,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:22.740Z"
+              "updatedAt": "2026-10-24T13:04:32.903Z"
             },
             {
               "learnerId": "l2",
@@ -3160,8 +3160,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:24.901Z",
-            "updatedAt": "2026-10-24T12:48:24.901Z"
+            "recordedAt": "2026-10-24T13:04:35.180Z",
+            "updatedAt": "2026-10-24T13:04:35.180Z"
           },
           "roster": [
             {
@@ -3170,7 +3170,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:24.901Z"
+              "updatedAt": "2026-10-24T13:04:35.180Z"
             },
             {
               "learnerId": "l2",
@@ -3269,8 +3269,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:27.020Z",
-            "updatedAt": "2026-10-24T12:48:27.020Z"
+            "recordedAt": "2026-10-24T13:04:37.511Z",
+            "updatedAt": "2026-10-24T13:04:37.511Z"
           },
           "roster": [
             {
@@ -3279,7 +3279,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:27.020Z"
+              "updatedAt": "2026-10-24T13:04:37.511Z"
             },
             {
               "learnerId": "l2",
@@ -3378,8 +3378,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:29.043Z",
-            "updatedAt": "2026-10-24T12:48:29.043Z"
+            "recordedAt": "2026-10-24T13:04:39.672Z",
+            "updatedAt": "2026-10-24T13:04:39.672Z"
           },
           "roster": [
             {
@@ -3388,7 +3388,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:29.043Z"
+              "updatedAt": "2026-10-24T13:04:39.672Z"
             },
             {
               "learnerId": "l2",
@@ -3487,8 +3487,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:31.130Z",
-            "updatedAt": "2026-10-24T12:48:31.130Z"
+            "recordedAt": "2026-10-24T13:04:41.795Z",
+            "updatedAt": "2026-10-24T13:04:41.795Z"
           },
           "roster": [
             {
@@ -3497,7 +3497,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:31.130Z"
+              "updatedAt": "2026-10-24T13:04:41.795Z"
             },
             {
               "learnerId": "l2",
@@ -3596,8 +3596,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:33.180Z",
-            "updatedAt": "2026-10-24T12:48:33.180Z"
+            "recordedAt": "2026-10-24T13:04:43.896Z",
+            "updatedAt": "2026-10-24T13:04:43.896Z"
           },
           "roster": [
             {
@@ -3606,7 +3606,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:33.180Z"
+              "updatedAt": "2026-10-24T13:04:43.896Z"
             },
             {
               "learnerId": "l2",
@@ -3705,8 +3705,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:35.239Z",
-            "updatedAt": "2026-10-24T12:48:35.239Z"
+            "recordedAt": "2026-10-24T13:04:46.040Z",
+            "updatedAt": "2026-10-24T13:04:46.040Z"
           },
           "roster": [
             {
@@ -3715,7 +3715,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:35.239Z"
+              "updatedAt": "2026-10-24T13:04:46.040Z"
             },
             {
               "learnerId": "l2",
@@ -3814,8 +3814,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:37.326Z",
-            "updatedAt": "2026-10-24T12:48:37.326Z"
+            "recordedAt": "2026-10-24T13:04:48.227Z",
+            "updatedAt": "2026-10-24T13:04:48.227Z"
           },
           "roster": [
             {
@@ -3824,7 +3824,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:37.326Z"
+              "updatedAt": "2026-10-24T13:04:48.227Z"
             },
             {
               "learnerId": "l2",
@@ -3923,8 +3923,8 @@
             "status": "scored",
             "score": 18,
             "recordedByUserId": "fixture-user",
-            "recordedAt": "2026-10-24T12:48:39.455Z",
-            "updatedAt": "2026-10-24T12:48:39.455Z"
+            "recordedAt": "2026-10-24T13:04:50.455Z",
+            "updatedAt": "2026-10-24T13:04:50.455Z"
           },
           "roster": [
             {
@@ -3933,7 +3933,7 @@
               "familyName": "Santos",
               "status": "scored",
               "score": 18,
-              "updatedAt": "2026-10-24T12:48:39.455Z"
+              "updatedAt": "2026-10-24T13:04:50.455Z"
             },
             {
               "learnerId": "l2",
@@ -3976,7 +3976,7 @@
     "Final exact seven regression tests rerun on original production component and all fail; candidate bytes restored before full quality"
   ],
   "candidate": {
-    "status": "PASS bounded R1–R5/S1; PR163 merged",
+    "status": "PASS bounded R1\u2013R5/S1; PR163 merged",
     "checkedHead": "b001f58bd46852cec01866340d5596d3f0abbe12",
     "checkedTree": "f8420f1ffb6b2dba254d1b8ccec516b190fc8b48",
     "ciMerge": "3287dc5f0072fdd9c1f085a4319b7744eb71c7c5",
@@ -3988,7 +3988,7 @@
     "windowsNativeTests": 1551,
     "refreshedLocal": "PASS1699/161; browser36/108; Scores47; build/isolation21; UI/recovery50 on b001f58",
     "receipt": "reporting-preview-state-ci-merge-2026-10-24.md",
-    "operationalLimit": "Executor disconnected after local checks. Final source/CI/merge/docs checkpoint verified via GitHub; local final resync and post-outage formatting command NOT RUN."
+    "operationalLimit": "Historical executor outage recovered: local cdf6dbd resync and full renewed raw browser receipt verified on24 October; formatting/publication tracked in reporting-preview-recovery-2026-10-24.md"
   },
   "limits": [
     "Synthetic browser storage/read models only, not native persistence or grading arithmetic",
@@ -4369,5 +4369,27 @@
       "https://registry.npmjs.org/zod"
     ],
     "network_diagnostic": "Direct crates.io API denied; recovered official registry index through GitHub connector, no credential workaround"
+  },
+  "prior_browser_record": {
+    "recordedHead": "7ad600fe2ef03445ab38a652a539273e48370c71",
+    "sources": {
+      "src/ui/ReportCardReadinessPanel.tsx": "6804cf36263a5ef81e4f1cca67d8858d1984cfa06f20dbfa999a713abf87b056",
+      "src/ui/ReportCardReadinessPanel.test.tsx": "cae51d3b1298a49d7ecb34a0c47fe188559a8048d99329074e72e149f0c6ae4d",
+      "src/ui/ClassRecordWorkspace.tsx": "2520abee273a9ef17cca4b5db17c367985767a7315809f01a8d31bfd0d9dfa4b",
+      "src/ui/ClassRecordWorkspace.test.tsx": "0b84d685d6d74c9645c42fb62afb3fdb5f96500ac8e974c5409b63675d831a6e",
+      "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+      "scripts/assurance/reporting-preview-state-browser.mjs": "10ceca5971cc3f06bd0f76b69c3b585f035089615e891c07d86e80dc8373616c"
+    },
+    "full_raw_archive": "cdf6dbd5289b8748d3249551a7a8573a0bc1bef6:docs/assurance/reporting-preview-state-evidence-2026-10-24.json"
+  },
+  "recovery": {
+    "date": "2026-10-24",
+    "base": "cdf6dbd5289b8748d3249551a7a8573a0bc1bef6",
+    "raw_sha256": "36492aca8dd830ea8d6086dafbdc1758069270ce54d4bb09a3fc788ee54dfa4d",
+    "complete_matrix": "PASS36 configurations/108 states",
+    "per_case": "PASS two exact intentional writes18/19; same canonical record for two reads; saved18 preserved; no assessed axe/overflow/hit failure",
+    "source_hashes": "PASS six current files match raw receipt",
+    "format_baseline": "FAIL three documentation files; corrected; full repository format gate PASS",
+    "publication": "Docs-only source-root preservation and final local/remote checkpoint verified at publication; actual receipt in PR150"
   }
 }
