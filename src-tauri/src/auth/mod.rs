@@ -1,4 +1,5 @@
 pub mod data_scope;
+pub mod legacy_setup_recovery;
 mod password;
 
 pub use password::{hash_password, verify_dummy_password_for_timing_safety, verify_password};

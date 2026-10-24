@@ -28,6 +28,8 @@ import type {
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
+import type { ReportReadinessRepository } from "../domain/ports/report-readiness-repository";
+import type { ReportCardReadiness } from "../domain/report-readiness";
 import type { AssessmentRepository } from "../domain/ports/assessment-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
@@ -302,6 +304,7 @@ function renderScreen(
     exportRepo?: FakeExportRepository;
     syncService?: LearnerScoreSyncStatusApplicationService;
     owner?: string;
+    readiness?: ReportReadinessRepository;
   } = {},
 ) {
   const assessmentRepo = options.assessmentRepo ?? new FakeAssessmentRepository();
@@ -317,7 +320,7 @@ function renderScreen(
           weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
           assessmentService={new AssessmentApplicationService(assessmentRepo)}
           learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
-          exportService={new ExportApplicationService(exportRepo)}
+          exportService={new ExportApplicationService(exportRepo, options.readiness)}
         />
       </ModeProvider>
     </SessionDraftProvider>,
@@ -1147,7 +1150,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
     await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false });
 
-    await user.click(screen.getByRole("button", { name: "Open folder" }));
+    await user.click(screen.getByRole("button", { name: "Open report card folder" }));
 
     await waitFor(() =>
       expect(exportRepo.revealCalls).toEqual([
@@ -1185,7 +1188,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
     await screen.findByText("ClassSummary_Mabini_Science_1st_Term.csv", { exact: false });
 
-    await user.click(screen.getByRole("button", { name: "Open folder" }));
+    await user.click(screen.getByRole("button", { name: "Open class summary folder" }));
 
     await waitFor(() =>
       expect(exportRepo.revealCalls).toEqual([
@@ -1910,4 +1913,1212 @@ describe("score decision status distinctions", () => {
     expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
     expect(repo.recordCalls).toHaveLength(0);
   });
+});
+
+describe("term-grade response continuity", () => {
+  async function open(user: ReturnType<typeof userEvent.setup>, name = "Quiz 1") {
+    await user.click(
+      await screen.findByRole("button", { name: `Written Works — ${name} (max 20)` }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+  }
+
+  it("replaces a stale grade with an explicit refresh failure and retries without replaying a score", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    const compute = vi
+      .spyOn(scoreRepo, "computeTermGrade")
+      .mockRejectedValueOnce(new Error("synthetic failed read"));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    expect(await screen.findByText("Could not refresh. Show term grades to retry.")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(screen.getByText(/Saved on this device/)).toBeVisible();
+    compute.mockRestore();
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+  });
+
+  it("discards a term-grade response after leaving its assessment roster", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository();
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(repo, "computeTermGrade").mockImplementation(
+      () =>
+        new Promise((r) => {
+          release = r;
+        }),
+    );
+    renderScreen({
+      scoreRepo: repo,
+      assessmentRepo: new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2", name: "Quiz 2" }]),
+    });
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await open(user, "Quiz 2");
+    await act(async () => release(repo.computeTermGradeResult));
+    expect(screen.queryByRole("table", { name: "Computed term grades" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show term grades" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+  });
+
+  it("does not let an older bulk computation replace a grade refreshed after a score save", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await open(user);
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            release = r;
+          }),
+      )
+      .mockResolvedValueOnce({ ...scoreRepo.computeTermGradeResult!, termGrade: 92 });
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    await screen.findByText("92");
+    await act(async () => release(scoreRepo.computeTermGradeResult));
+    expect(screen.getByText("92")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+  });
+});
+
+describe("term-grade refresh ordering and partial failure", () => {
+  it("keeps a newer explicit read when an older automatic refresh finishes later", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    let release!: (value: ComputedTermGrade | null) => void;
+    vi.spyOn(scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            release = r;
+          }),
+      )
+      .mockResolvedValueOnce({ ...scoreRepo.computeTermGradeResult!, termGrade: 92 });
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    expect(await screen.findByText("Updating grade…")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("92");
+    await act(async () => release(scoreRepo.computeTermGradeResult));
+    expect(screen.getByText("92")).toBeVisible();
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+  });
+
+  it("shows independent success, unavailable and failed reads without hiding the successful rows", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      { ...ROSTER_ENTRY, learnerId: "l2", givenName: "Bo", familyName: "Reyes" },
+      { ...ROSTER_ENTRY, learnerId: "l3", givenName: "Ci", familyName: "Lim" },
+    ]);
+    vi.spyOn(repo, "computeTermGrade").mockImplementation(async (_record, learner) => {
+      if (learner === "l2") throw new Error("synthetic failed read");
+      return learner === "l3" ? null : repo.computeTermGradeResult;
+    });
+    renderScreen({ scoreRepo: repo });
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    const grades = await screen.findByRole("table", { name: "Computed term grades" });
+    expect(await within(grades).findByText("88")).toBeVisible();
+    expect(within(grades).getByText("Not yet available")).toBeVisible();
+    expect(within(grades).getByText("Could not refresh. Show term grades to retry.")).toBeVisible();
+    expect(repo.recordCalls).toHaveLength(0);
+  });
+});
+
+describe("Scores CSV attempt feedback", () => {
+  const variants = [
+    { label: "report card", method: "exportClassRecordReportCard", result: "reportCardResult" },
+    { label: "class summary", method: "exportClassRecordSummary", result: "classSummaryResult" },
+  ] as const;
+  async function open(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
+    );
+    await screen.findByLabelText("Score for Ana Cruz");
+  }
+  it.each(variants)(
+    "removes the previous $label outcome during a new attempt and failure",
+    async ({ label, method, result }) => {
+      const user = userEvent.setup();
+      const { exportRepo } = renderScreen();
+      await open(user);
+      const action = screen.getByRole("button", { name: `Export ${label} (CSV)` });
+      await user.click(action);
+      await screen.findByText(exportRepo[result]!.filePath);
+      let reject!: (e: Error) => void;
+      vi.spyOn(exportRepo, method).mockImplementationOnce(
+        () =>
+          new Promise((_resolve, fail) => {
+            reject = fail;
+          }),
+      );
+      await user.click(action);
+      expect(screen.queryByText(exportRepo[result]!.filePath)).not.toBeInTheDocument();
+      await act(async () => reject(new Error("synthetic failure")));
+      expect(await screen.findByText(`Could not export the ${label}.`)).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Reload items" })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: `Export ${label} (CSV)` }));
+      await screen.findByText(exportRepo[result]!.filePath);
+      expect(screen.queryByText(`Could not export the ${label}.`)).not.toBeInTheDocument();
+    },
+  );
+  it.each(variants)(
+    "does not present a previous $label result after a null response",
+    async ({ label, method, result }) => {
+      const user = userEvent.setup();
+      const { exportRepo } = renderScreen();
+      await open(user);
+      const action = screen.getByRole("button", { name: `Export ${label} (CSV)` });
+      await user.click(action);
+      await screen.findByText(exportRepo[result]!.filePath);
+      vi.spyOn(exportRepo, method).mockResolvedValueOnce(null);
+      await user.click(action);
+      expect(
+        await screen.findByText(
+          `No ${label} export was returned. Check access to this class record and try again.`,
+        ),
+      ).toBeVisible();
+      expect(screen.queryByText(exportRepo[result]!.filePath)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reload items" })).not.toBeInTheDocument();
+    },
+  );
+  it("keeps the other output confirmed with its named folder action", async () => {
+    const user = userEvent.setup();
+    const { exportRepo, scoreRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+    await screen.findByRole("button", { name: "Open report card folder" });
+    await screen.findByRole("button", { name: "Open class summary folder" });
+    vi.spyOn(exportRepo, "exportClassRecordSummary").mockRejectedValueOnce(
+      new Error("synthetic failure"),
+    );
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+    await screen.findByText("Could not export the class summary.");
+    expect(screen.getByText(exportRepo.reportCardResult!.filePath)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Open report card folder" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Open class summary folder" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Exported snapshot of saved records/)).toBeVisible();
+    expect(scoreRepo.recordCalls).toHaveLength(0);
+  });
+  it("guards duplicate class-summary export while pending", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await open(user);
+    exportRepo.classSummaryPending = true;
+    const action = screen.getByRole("button", { name: "Export class summary (CSV)" });
+    await user.click(action);
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    await user.click(action);
+    expect(exportRepo.classSummaryCalls).toHaveLength(1);
+  });
+  it("retains the confirmed file if opening its folder fails without exporting again", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    const folder = await screen.findByRole("button", { name: "Open report card folder" });
+    exportRepo.revealShouldThrow = true;
+    await user.click(folder);
+    expect(await screen.findByText("Could not open the folder for this file.")).toBeVisible();
+    expect(screen.getByText(exportRepo.reportCardResult!.filePath)).toBeVisible();
+    expect(exportRepo.reportCardCalls).toHaveLength(1);
+    expect(exportRepo.revealCalls).toEqual([exportRepo.reportCardResult!.filePath]);
+  });
+});
+
+describe("assessment creation acknowledgment continuity", () => {
+  it.each([false, true])(
+    "retains a newer creation draft and focus, including returned original text: %s",
+    async (returned) => {
+      const user = userEvent.setup();
+      const repo = new FakeAssessmentRepository();
+      const create = repo.createItem.bind(repo);
+      let release!: () => Promise<void>;
+      const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+        (...args) =>
+          new Promise((resolve) => {
+            release = async () => resolve(await create(...args));
+          }),
+      );
+      renderScreen({ assessmentRepo: repo });
+      await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+      await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+      const name = screen.getByLabelText("Item name"),
+        max = screen.getByLabelText("Max score");
+      await user.type(name, "Quiz 2");
+      await user.click(screen.getByRole("button", { name: "Add item" }));
+      await user.clear(name);
+      await user.type(name, returned ? "Quiz 2" : "Quiz 3");
+      if (!returned) {
+        await user.clear(max);
+        await user.type(max, "10");
+      } else await user.click(max);
+      await act(async () => release());
+      expect(name).toBeVisible();
+      expect(name).toHaveValue(returned ? "Quiz 2" : "Quiz 3");
+      expect(max).toHaveValue(returned ? 20 : 10);
+      expect(max).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Close item editor" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith("cr-1", "cat-1", "Quiz 2", 20);
+      expect(screen.getByText(/Quiz 2 added\./)).toBeVisible();
+    },
+  );
+});
+
+describe("assessment creation draft boundaries", () => {
+  it("retains a max-only change without clearing the submitted name", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(max);
+    await user.type(max, "10");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 2");
+    expect(name).toBeVisible();
+    expect(max).toHaveValue(10);
+    expect(max).toHaveFocus();
+    expect(repo.createCalls).toEqual([
+      { classRecordId: "cr-1", categoryId: "cat-1", name: "Quiz 2", maxScore: 20 },
+    ]);
+  });
+  it("retains a newer workspace draft after a failed create without retrying it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    let reject!: (e: Error) => void;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(await screen.findByText("Could not create this item.")).toBeVisible();
+    expect(name).toHaveValue("Quiz 3");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("first assessment creation draft continuity", () => {
+  it("keeps an implicitly open empty-record composer open for newer work", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository([]);
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen({ assessmentRepo: repo });
+    const name = await screen.findByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Close item editor" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+});
+
+describe("PM-12 delayed edit receipts", () => {
+  const prefix = "";
+  async function begin(repo: FakeAssessmentRepository) {
+    renderScreen({ assessmentRepo: repo });
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Edit" }).length).toBeGreaterThan(0),
+    );
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]!);
+    return screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` });
+  }
+
+  it("retains newer edit fields and focus after a delayed full update", async () => {
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue([
+      CATEGORY,
+      { ...CATEGORY, id: "cat-2", name: "Other category" },
+    ]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Saving…" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    const max = screen.getByLabelText("Max score", { selector: `#${prefix}edit-max-ai-1` });
+    fireEvent.change(max, { target: { value: "30" } });
+    fireEvent.change(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+      { target: { value: "cat-2" } },
+    );
+    max.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Newer revision");
+    expect(max).toHaveValue(30);
+    expect(max).toHaveFocus();
+    expect(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+    ).toHaveValue("cat-2");
+    expect(save).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision", "cat-1", 20);
+    expect(await screen.findByText(/Submitted revision updated\./)).toBeVisible();
+  });
+
+  it("preserves a newer scored-item rename even when text returns to the submitted value", async () => {
+    const repo = new FakeAssessmentRepository([{ ...ITEM, recordedCount: 2 }]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const rename = vi
+      .spyOn(repo, "renameItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const update = vi.spyOn(repo, "updateItem");
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Temporary" } });
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Submitted revision");
+    expect(rename).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "preserves a reopened editor after cancel; different target=%s",
+    async (different) => {
+      const repo = new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2" }]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      const save = vi
+        .spyOn(repo, "updateItem")
+        .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      const edits = screen.getAllByRole("button", { name: "Edit" });
+      await userEvent.click(edits[different ? 1 : 0]!);
+      const id = different ? "ai-2" : "ai-1";
+      const reopened = screen.getByLabelText("Item name", {
+        selector: `#${prefix}edit-name-${id}`,
+      });
+      fireEvent.change(reopened, { target: { value: "Reopened work" } });
+      await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+      expect(reopened).toBeVisible();
+      expect(reopened).toHaveValue("Reopened work");
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("retains newer work on rejection and retries only after explicit Save", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((_done, fail) => (reject = fail)))
+      .mockResolvedValueOnce({ ...ITEM, name: "Newer revision" });
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(name).toHaveValue("Newer revision");
+    expect(await screen.findByText(/Could not save changes to “Submitted revision”/)).toBeVisible();
+    expect(save).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(save).toHaveBeenLastCalledWith("ai-1", "Newer revision", "cat-1", 20);
+    expect(await screen.findByText("Newer revision updated.")).toBeVisible();
+    expect(
+      screen.queryByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }),
+    ).not.toBeInTheDocument();
+  });
+  it("keeps an editor mounted while the post-save list read is delayed", async () => {
+    const repo = new FakeAssessmentRepository();
+    const read = repo.listItemsByClassRecord.bind(repo);
+    let listResolve!: (items: AssessmentItemDetail[]) => void;
+    vi.spyOn(repo, "listItemsByClassRecord")
+      .mockImplementationOnce(read)
+      .mockImplementationOnce(() => new Promise((done) => (listResolve = done)));
+    let resolve!: (item: AssessmentItem | null) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((done) => (resolve = done)),
+    );
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    name.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    fireEvent.change(name, { target: { value: "Work during list read" } });
+    await act(async () => listResolve([ITEM]));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(name).toHaveValue("Work during list read");
+  });
+
+  it.each(["null", "reject"])(
+    "identifies the old target on a delayed %s without clearing the next editor",
+    async (outcome) => {
+      const repo = new FakeAssessmentRepository([
+        ITEM,
+        { ...ITEM, id: "ai-2", name: "Second item" },
+      ]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      let reject!: (error: Error) => void;
+      const save = vi.spyOn(repo, "updateItem").mockImplementationOnce(
+        () =>
+          new Promise((done, fail) => {
+            resolve = done;
+            reject = fail;
+          }),
+      );
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+      const next = screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-2` });
+      fireEvent.change(next, { target: { value: "Second unsaved work" } });
+      await act(async () =>
+        outcome === "null" ? resolve(null) : reject(new Error("synthetic rejection")),
+      );
+      expect(next).toBeVisible();
+      expect(next).toHaveValue("Second unsaved work");
+      expect(
+        await screen.findByText(/Could not save changes to “Submitted revision”/),
+      ).toBeVisible();
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("ignores a rejected old write after the source screen is unmounted and reopened", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((_done, fail) => (reject = fail)),
+    );
+    const mounted = renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("button", { name: "Edit" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }), {
+      target: { value: "Old source revision" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    mounted.unmount();
+    const next = new FakeAssessmentRepository();
+    const name = await begin(next);
+    fireEvent.change(name, { target: { value: "Current source work" } });
+    await act(async () => reject(new Error("old source rejected")));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Current source work");
+    expect(
+      screen.queryByText(/Could not save changes to “Old source revision”/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute("aria-disabled", "false");
+  });
+});
+
+describe("PM-12 deletion state ownership", () => {
+  async function begin(
+    items = [
+      { ...ITEM, recordedCount: 0 },
+      { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+    ],
+  ) {
+    const repo = new FakeAssessmentRepository(items);
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("group", { name: "Actions for Quiz 1" });
+    return repo;
+  }
+  function group(name: string) {
+    return screen.getByRole("group", { name: `Actions for ${name}` });
+  }
+  async function arm(name: string) {
+    await userEvent.click(within(group(name)).getByRole("button", { name: "Delete" }));
+  }
+  async function submit(name: string) {
+    await arm(name);
+    await userEvent.click(within(group(name)).getByRole("button", { name: "Confirm delete" }));
+  }
+
+  it.each([true, false])(
+    "keeps the next prepared confirmation after an older result=%s",
+    async (result) => {
+      const repo = await begin();
+      let resolve!: (value: boolean) => void;
+      const remove = vi
+        .spyOn(repo, "deleteItem")
+        .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+      await submit("Quiz 1");
+      await arm("Quiz 2");
+      await act(async () => resolve(result));
+      expect(within(group("Quiz 2")).getByRole("button", { name: "Confirm delete" })).toBeVisible();
+      expect(remove).toHaveBeenCalledExactlyOnceWith("ai-1");
+      if (!result) expect(await screen.findByText(/“Quiz 1” was not deleted/)).toBeVisible();
+    },
+  );
+
+  it("keeps another pending delete guarded after the first result arrives", async () => {
+    const repo = await begin();
+    const original = repo.deleteItem.bind(repo);
+    let first!: (value: boolean) => void;
+    let second!: (value: boolean) => void;
+    const remove = vi
+      .spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((done) => (second = done)))
+      .mockImplementation(original);
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => first(true));
+    const busy = within(group("Quiz 2")).getByRole("button", { name: "Deleting…" });
+    await userEvent.click(busy);
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(busy).toHaveAttribute("aria-disabled", "true");
+    await act(async () => second(false));
+    expect(await screen.findByText(/“Quiz 2” was not deleted/)).toBeVisible();
+  });
+
+  it("does not offer Cancel or Edit as executable actions after dispatch", async () => {
+    const repo = await begin();
+    vi.spyOn(repo, "deleteItem").mockImplementationOnce(() => new Promise(() => {}));
+    await submit("Quiz 1");
+    expect(
+      within(group("Quiz 1")).queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    expect(within(group("Quiz 1")).getByText(/Deletion requested/)).toBeVisible();
+    const edit = within(group("Quiz 1")).getByRole("button", { name: "Edit" });
+    expect(edit).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(edit);
+    expect(
+      screen.queryByLabelText("Item name", { selector: "#edit-name-ai-1" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("requires read-only reload after an unconfirmed result and never replays deletion", async () => {
+    const repo = await begin();
+    let reject!: (error: Error) => void;
+    const remove = vi
+      .spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((_done, fail) => (reject = fail)));
+    await submit("Quiz 1");
+    await arm("Quiz 2");
+    await act(async () => reject(new Error("synthetic unknown result")));
+    expect(await screen.findByText(/Deletion of “Quiz 1” was not confirmed/)).toBeVisible();
+    const reload = screen.getByRole("button", { name: "Reload items" });
+    expect(screen.queryByRole("button", { name: "Confirm delete" })).not.toBeInTheDocument();
+    expect(remove).toHaveBeenCalledTimes(1);
+    await userEvent.click(reload);
+    expect(await screen.findByRole("group", { name: "Actions for Quiz 2" })).toBeVisible();
+    expect(within(group("Quiz 2")).getByRole("button", { name: "Confirm delete" })).toBeVisible();
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a prepared deletion without a write", async () => {
+    const repo = await begin();
+    const remove = vi.spyOn(repo, "deleteItem");
+    await arm("Quiz 1");
+    await userEvent.click(within(group("Quiz 1")).getByRole("button", { name: "Cancel" }));
+    expect(within(group("Quiz 1")).getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(remove).not.toHaveBeenCalled();
+  });
+  it.each(["range", "name"])(
+    "retains invalid %s edit and never calls the repository",
+    async (kind) => {
+      const repo = await begin();
+      const update = vi.spyOn(repo, "updateItem");
+      await userEvent.click(within(group("Quiz 1")).getByRole("button", { name: "Edit" }));
+      const selector = kind === "range" ? "#edit-max-ai-1" : "#edit-name-ai-1";
+      const value = kind === "range" ? "0" : "x".repeat(101);
+      const field = screen.getByLabelText(kind === "range" ? "Max score" : "Item name", {
+        selector,
+      });
+      fireEvent.change(field, { target: { value } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(
+        await screen.findByText(
+          kind === "range"
+            ? /Max score must be a positive number/
+            : /Item name must be at most 100 characters/,
+        ),
+      ).toBeVisible();
+      expect(field).toBeVisible();
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns keyboard focus to a surviving item after the focused deletion succeeds", async () => {
+    const repo = await begin();
+    vi.spyOn(repo, "listItemsByClassRecord").mockResolvedValue([
+      { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+    ]);
+    let resolve!: (value: boolean) => void;
+    vi.spyOn(repo, "deleteItem").mockImplementationOnce(
+      () => new Promise((done) => (resolve = done)),
+    );
+    await submit("Quiz 1");
+    expect(within(group("Quiz 1")).getByRole("button", { name: "Deleting…" })).toHaveFocus();
+    await act(async () => resolve(true));
+    const second = group("Quiz 2").closest("li")!;
+    expect(second.contains(document.activeElement)).toBe(true);
+  });
+  it("does not let an older post-delete list read re-enable writes after an unconfirmed deletion", async () => {
+    const repo = await begin();
+    let first!: (value: boolean) => void;
+    let secondFail!: (error: Error) => void;
+    vi.spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((_done, fail) => (secondFail = fail)));
+    let read!: (items: AssessmentItemDetail[]) => void;
+    vi.spyOn(repo, "listItemsByClassRecord").mockImplementationOnce(
+      () => new Promise((done) => (read = done)),
+    );
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => first(true));
+    await act(async () => secondFail(new Error("synthetic unconfirmed deletion")));
+    await act(async () =>
+      read([
+        { ...ITEM, recordedCount: 0 },
+        { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+      ]),
+    );
+    expect(await screen.findByRole("button", { name: "Reload items" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Actions for Quiz 2" })).not.toBeInTheDocument();
+  });
+  it("does not automatically recover an unconfirmed deletion when another delete acknowledges later", async () => {
+    const repo = await begin();
+    const read = vi.spyOn(repo, "listItemsByClassRecord");
+    let first!: (value: boolean) => void;
+    let secondFail!: (error: Error) => void;
+    vi.spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((_done, fail) => (secondFail = fail)));
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => secondFail(new Error("synthetic unconfirmed deletion")));
+    await act(async () => first(true));
+    expect(await screen.findByRole("button", { name: "Reload items" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Actions for Quiz 2" })).not.toBeInTheDocument();
+    expect(read).not.toHaveBeenCalled();
+  });
+});
+
+it("retains a later selected item when an older selected deletion completes", async () => {
+  const repo = new FakeAssessmentRepository([
+    { ...ITEM, recordedCount: 0 },
+    { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+  ]);
+  let resolve!: (value: boolean) => void;
+  vi.spyOn(repo, "deleteItem").mockImplementationOnce(
+    () => new Promise((done) => (resolve = done)),
+  );
+  renderScreen({ assessmentRepo: repo });
+  await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+  const first = screen.getByRole("group", { name: "Actions for Quiz 1" });
+  await userEvent.click(within(first).getByRole("button", { name: "Delete" }));
+  await userEvent.click(within(first).getByRole("button", { name: "Confirm delete" }));
+  await userEvent.click(screen.getByRole("button", { name: /Quiz 2 \(max 20\)/ }));
+  expect(await screen.findByRole("heading", { name: "Quiz 2 scores" })).toBeVisible();
+  await act(async () => resolve(true));
+  expect(screen.getByRole("heading", { name: "Quiz 2 scores" })).toBeVisible();
+});
+
+describe("PM-13 roster preservation across assessment checks", () => {
+  const second = { ...ITEM, id: "ai-2", name: "Quiz 2" };
+  async function begin(entry: LearnerScoreRosterEntry = ROSTER_ENTRY) {
+    const assessmentRepo = new FakeAssessmentRepository([ITEM, second]);
+    const scoreRepo = new FakeLearnerScoreRepository([entry]);
+    const roster = vi.spyOn(scoreRepo, "rosterForItem");
+    renderScreen({ assessmentRepo, scoreRepo });
+    await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    let read!: (items: AssessmentItemDetail[]) => void;
+    let readFail!: (error: Error) => void;
+    vi.spyOn(assessmentRepo, "listItemsByClassRecord").mockImplementationOnce(
+      () =>
+        new Promise((done, fail) => {
+          read = done;
+          readFail = fail;
+        }),
+    );
+    let remove!: (result: boolean) => void;
+    vi.spyOn(assessmentRepo, "deleteItem").mockImplementationOnce(
+      () => new Promise((done) => (remove = done)),
+    );
+    const group = screen.getByRole("group", { name: "Actions for Quiz 2" });
+    await userEvent.click(within(group).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(group).getByRole("button", { name: "Confirm delete" }));
+    return {
+      assessmentRepo,
+      scoreRepo,
+      input,
+      read: () => read,
+      readFail: () => readFail,
+      remove: () => remove,
+      roster,
+    };
+  }
+
+  it("keeps a newer score input mounted and focused while an unrelated assessment read is pending", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(await screen.findByText(/Checking assessment items/)).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    await act(async () => x.read()([ITEM]));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveFocus();
+    expect(x.input).toHaveValue(19);
+    expect(x.roster).toHaveBeenCalledTimes(1);
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+
+  it("accepts an already-dispatched score acknowledgment during the check and preserves newer work", async () => {
+    const x = await begin();
+    let save!: (result: LearnerScore | null) => void;
+    const record = vi
+      .spyOn(x.scoreRepo, "record")
+      .mockImplementationOnce(() => new Promise((done) => (save = done)));
+    fireEvent.change(x.input, { target: { value: "18" } });
+    await userEvent.click(x.input);
+    await userEvent.keyboard("{Enter}");
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => save(x.scoreRepo.recordResult));
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(await screen.findByText(/On this device: 18 \/ 20/)).toBeVisible();
+    await act(async () => x.read()([ITEM]));
+    expect(x.input).toHaveValue(19);
+    expect(x.input).toHaveFocus();
+    expect(record).toHaveBeenCalledExactlyOnceWith("ai-1", "l1", "scored", 18, null);
+    expect(screen.getByRole("button", { name: /Quiz 1 \(max 20\) · 1 of/ })).toBeVisible();
+  });
+
+  it("preserves a reasoned correction and its comparison during the item check", async () => {
+    const x = await begin({ ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "old" });
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    const reason = await screen.findByRole("textbox", {
+      name: "Reason for changing Ana Cruz's recorded score",
+    });
+    fireEvent.change(reason, { target: { value: "Rechecked paper" } });
+    reason.focus();
+    await act(async () => x.remove()(true));
+    expect(reason).toBeVisible();
+    expect(reason).toHaveValue("Rechecked paper");
+    expect(reason).toHaveFocus();
+    expect(screen.getByText("Recorded: 15 / 20")).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    await act(async () => x.read()([ITEM]));
+    expect(reason).toHaveFocus();
+    expect(reason).toHaveValue("Rechecked paper");
+  });
+
+  it("retains a row validation error until the teacher corrects the draft", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "21" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    const error = await screen.findByText(/Score must be between 0 and 20/);
+    await act(async () => x.remove()(true));
+    expect(error).toBeVisible();
+    expect(x.input).toHaveValue(21);
+    await act(async () => x.read()([ITEM]));
+    expect(error).toBeVisible();
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+  it.each(["maximum", "category", "removed"])(
+    "invalidates the roster when its selected %s contract changes",
+    async (kind) => {
+      const x = await begin();
+      fireEvent.change(x.input, { target: { value: "19" } });
+      await act(async () => x.remove()(true));
+      await act(async () =>
+        x.read()(
+          kind === "removed"
+            ? []
+            : [{ ...ITEM, ...(kind === "maximum" ? { maxScore: 15 } : { categoryId: "cat-2" }) }],
+        ),
+      );
+      if (kind === "removed")
+        expect(screen.queryByLabelText("Score for Ana Cruz")).not.toBeInTheDocument();
+      else {
+        const next = await screen.findByLabelText("Score for Ana Cruz");
+        expect(x.roster).toHaveBeenCalledTimes(2);
+        expect(next).toHaveValue(19);
+        if (kind === "maximum") {
+          expect(next).toHaveAttribute("max", "15");
+          next.focus();
+          await userEvent.keyboard("{Enter}");
+          expect(await screen.findByText(/Score must be between 0 and 15/)).toBeVisible();
+        }
+      }
+      expect(x.scoreRepo.recordCalls).toHaveLength(0);
+    },
+  );
+
+  it("withholds the roster on list-read failure and restores its draft only after explicit reload", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => x.readFail()(new Error("synthetic denied list read")));
+    expect(screen.queryByLabelText("Score for Ana Cruz")).not.toBeInTheDocument();
+    const reload = await screen.findByRole("button", { name: "Reload items" });
+    await userEvent.click(reload);
+    expect(await screen.findByLabelText("Score for Ana Cruz")).toHaveValue(19);
+    expect(x.scoreRepo.recordCalls).toHaveLength(0);
+  });
+
+  it("preserves the roster for a selected-item rename that keeps its score contract", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    await act(async () => x.read()([{ ...ITEM, name: "Quiz 1 revised" }]));
+    expect(screen.getByRole("heading", { name: "Quiz 1 revised scores" })).toBeVisible();
+    expect(x.input).toBeVisible();
+    expect(x.input).toHaveFocus();
+    expect(x.input).toHaveValue(0);
+    expect(x.roster).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates displayed derived grades without resetting the active zero draft", async () => {
+    const x = await begin();
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    fireEvent.change(x.input, { target: { value: "0" } });
+    x.input.focus();
+    await act(async () => x.remove()(true));
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(x.input).toHaveValue(0);
+    expect(x.input).toHaveFocus();
+    await act(async () => x.read()([ITEM]));
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+    expect(x.scoreRepo.computeTermGradeCalls).toHaveLength(1);
+  });
+
+  it("rejects an old grade reply and its bulk finally while a newer grade request is pending", async () => {
+    const x = await begin();
+    let old!: (grade: ComputedTermGrade | null) => void;
+    let next!: (grade: ComputedTermGrade | null) => void;
+    const compute = vi
+      .spyOn(x.scoreRepo, "computeTermGrade")
+      .mockImplementationOnce(() => new Promise((done) => (old = done)))
+      .mockImplementationOnce(() => new Promise((done) => (next = done)));
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await act(async () => x.remove()(true));
+    await act(async () => x.read()([ITEM]));
+    await userEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await act(async () => old({ ...x.scoreRepo.computeTermGradeResult!, termGrade: 99 }));
+    expect(screen.queryByText("99")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Computing…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await act(async () => next(x.scoreRepo.computeTermGradeResult));
+    expect(await screen.findByText("88")).toBeVisible();
+    expect(compute).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains a newer draft after an in-flight score fails during the check and retries only explicitly", async () => {
+    const x = await begin();
+    let fail!: (error: Error) => void;
+    const record = vi
+      .spyOn(x.scoreRepo, "record")
+      .mockImplementationOnce(() => new Promise((_done, reject) => (fail = reject)))
+      .mockResolvedValueOnce({ ...x.scoreRepo.recordResult!, score: 19 });
+    fireEvent.change(x.input, { target: { value: "18" } });
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    fireEvent.change(x.input, { target: { value: "19" } });
+    await act(async () => x.remove()(true));
+    await act(async () => fail(new Error("synthetic failed score")));
+    expect(await screen.findByText("Could not save this score.")).toBeVisible();
+    expect(x.input).toHaveValue(19);
+    await act(async () => x.read()([ITEM]));
+    expect(record).toHaveBeenCalledTimes(1);
+    x.input.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(record).toHaveBeenLastCalledWith("ai-1", "l1", "scored", 19, null);
+    await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(19));
+  });
+});
+
+describe("PM-13 saved-grade readiness with unsaved work", () => {
+  async function begin() {
+    const x = renderScreen();
+    await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText("Score for Ana Cruz");
+    const compute = vi.spyOn(x.scoreRepo, "computeTermGrade");
+    let resolve!: (r: LearnerScore | null) => void;
+    let reject!: (e: Error) => void;
+    const record = vi.spyOn(x.scoreRepo, "record").mockImplementationOnce(
+      () =>
+        new Promise((done, fail) => {
+          resolve = done;
+          reject = fail;
+        }),
+    );
+    const startSave = async () => {
+      fireEvent.change(input, { target: { value: "18" } });
+      input.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(record).toHaveBeenCalledExactlyOnceWith("ai-1", "l1", "scored", 18, null);
+    };
+    return { ...x, input, compute, record, startSave, done: () => resolve, fail: () => reject };
+  }
+
+  it("does not read a term-grade snapshot while a score write is unresolved", async () => {
+    const x = await begin();
+    await x.startSave();
+    const button = screen.getByRole("button", { name: "Show term grades" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(x.compute).not.toHaveBeenCalled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveAccessibleDescription(/A score save is pending/);
+    expect(x.record).toHaveBeenCalledTimes(1);
+    await act(async () => x.done()(x.scoreRepo.recordResult));
+    fireEvent.click(button);
+    await screen.findByText("88");
+    expect(x.compute).toHaveBeenCalledExactlyOnceWith("cr-1", "l1");
+  });
+
+  it("withholds a displayed grade during saving then refreshes saved evidence while retaining a newer zero draft", async () => {
+    const x = await begin();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    await x.startSave();
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save pending/)).toBeVisible();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    await act(async () => x.done()(x.scoreRepo.recordResult));
+    expect(x.input).toHaveValue(0);
+    expect(within(grades).getByText("88")).toBeVisible();
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not expose an older grade reply during saving and keeps the newer draft after failure", async () => {
+    const x = await begin();
+    let grade!: (r: ComputedTermGrade | null) => void;
+    x.compute.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          grade = done;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await x.startSave();
+    await act(async () => grade(x.scoreRepo.computeTermGradeResult));
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    fireEvent.change(x.input, { target: { value: "19" } });
+    await act(async () => x.fail()(new Error("synthetic denied save")));
+    expect(x.input).toHaveValue(19);
+    expect(within(grades).queryByText("88")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save was not confirmed/)).toBeVisible();
+    expect(screen.getByText("Could not save this score.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Show term grades" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels computed completeness as saved-only with an unsaved zero, and Escape removes only the warning", async () => {
+    const x = await begin();
+    fireEvent.change(x.input, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+    const note = screen.getByText(/Term grades use saved records on this device/);
+    expect(note).toHaveTextContent(/Unsaved input is excluded/);
+    expect(note).toHaveTextContent(/computed completeness is not reporting approval/);
+    expect(screen.getByText(/This item has unsaved score work/)).toBeVisible();
+    expect(x.record).not.toHaveBeenCalled();
+    x.input.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText(/This item has unsaved score work/)).not.toBeInTheDocument();
+    expect(note).toBeVisible();
+    expect(x.record).not.toHaveBeenCalled();
+  });
+  it("rejects a pre-save grade reply that arrives after the score failure until an explicit fresh check", async () => {
+    const x = await begin();
+    let old!: (r: ComputedTermGrade | null) => void;
+    x.compute.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          old = done;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    await x.startSave();
+    await act(async () => x.fail()(new Error("synthetic unknown write outcome")));
+    await act(async () => old({ ...x.scoreRepo.computeTermGradeResult!, termGrade: 99 }));
+    const grades = screen.getByRole("table", { name: "Computed term grades" });
+    expect(within(grades).queryByText("99")).not.toBeInTheDocument();
+    expect(within(grades).getByText(/Score save was not confirmed/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Show term grades" }));
+    expect(await within(grades).findByText("88")).toBeVisible();
+    expect(x.compute).toHaveBeenCalledTimes(2);
+    expect(x.record).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PM-13 reporting preview freshness", () => {
+  it.each(["null", "reject"])(
+    "retires the reporting snapshot after an unconfirmed %s correction without replay",
+    async (outcome) => {
+      const scoreRepo = new FakeLearnerScoreRepository([
+        { ...ROSTER_ENTRY, status: "scored", score: 18, updatedAt: "saved-before-check" },
+      ]);
+      const preview: ReportCardReadiness = {
+        classRecordId: "cr-1",
+        schoolYear: "2026-2027",
+        sectionName: "Synthetic Section",
+        subjectName: "Synthetic Subject",
+        gradingPeriodLabel: "Synthetic Term",
+        startsOn: "2026-06-08",
+        endsOn: "2026-09-15",
+        weightPolicyId: "synthetic-policy",
+        checkedAt: "before correction",
+        learnerCount: 1,
+        missingGradeCount: 0,
+        provisionalGradeCount: 0,
+        completeGradeCount: 1,
+        missingLrnCount: 0,
+        officialFidelity: "not_verified",
+        learners: [],
+        disclosure: { populatedFields: [], omittedFields: [] },
+      };
+      const previewReportCard = vi
+        .fn()
+        .mockResolvedValueOnce(preview)
+        .mockResolvedValueOnce({ ...preview, checkedAt: "fresh after uncertain write" });
+      const x = renderScreen({ scoreRepo, readiness: { previewReportCard } });
+      await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+      await screen.findByLabelText("Score for Ana Cruz");
+      await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+      await screen.findByText(/Checked: before correction/);
+      const input = screen.getByLabelText("Score for Ana Cruz");
+      fireEvent.change(input, { target: { value: "19" } });
+      input.focus();
+      await userEvent.keyboard("{Enter}");
+      const reason = await screen.findByLabelText("Reason for changing Ana Cruz's recorded score");
+      fireEvent.change(reason, { target: { value: "Synthetic recheck reason" } });
+      let done!: (value: LearnerScore | null) => void;
+      let fail!: (error: Error) => void;
+      const write = vi.spyOn(scoreRepo, "record").mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            done = resolve;
+            fail = reject;
+          }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Save correction" }));
+      expect(screen.queryByText(/Checked: before correction/)).not.toBeInTheDocument();
+      await act(async () =>
+        outcome === "null" ? done(null) : fail(new Error("Synthetic unknown write outcome")),
+      );
+      await screen.findByText("Could not save this score.");
+      expect(screen.queryByText(/Checked: before correction/)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Run the check again to review the current saved records/),
+      ).toBeVisible();
+      expect(reason).toHaveValue("Synthetic recheck reason");
+      expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+      expect(reason).toBeVisible();
+      expect(previewReportCard).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+      expect(await screen.findByText(/Checked: fresh after uncertain write/)).toBeVisible();
+      expect(write).toHaveBeenCalledExactlyOnceWith(
+        "ai-1",
+        "l1",
+        "scored",
+        19,
+        "Synthetic recheck reason",
+      );
+      expect(previewReportCard.mock.calls).toEqual([["cr-1"], ["cr-1"]]);
+      expect(x.exportRepo.reportCardCalls).toHaveLength(0);
+      expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+      expect(reason).toBeVisible();
+      expect(reason).toHaveValue("Synthetic recheck reason");
+    },
+  );
 });

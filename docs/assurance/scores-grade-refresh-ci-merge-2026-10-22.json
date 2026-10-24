@@ -1,0 +1,114 @@
+{
+  "date": "2026-10-22",
+  "timezone": "Asia/Manila",
+  "pr": 155,
+  "url": "https://github.com/312810-spec/likha-sis-0.2/pull/155",
+  "base": "290b574d1fddc4031be76c7a6aacbe15696c06b1",
+  "checkedHead": "b15a91a3a63b8076e9c8ad0fdfdbeac7651e1d9d",
+  "ciMerge": "6072547a076856888d5fe7afb5c3eff9851719ce",
+  "checkedTree": "a7912280671be2c62a7e48390f2caec85bafb9e8",
+  "actualMerge": "689abb8c358641ca76d5f01233f16b90500281d0",
+  "actualMergeTree": "a7912280671be2c62a7e48390f2caec85bafb9e8",
+  "qualityRun": 39699949146,
+  "securityRun": 39699949148,
+  "qualityConclusion": "success",
+  "securityConclusion": "success",
+  "classifier": {
+    "javascript": true,
+    "ui": true,
+    "native": false,
+    "windows": false
+  },
+  "ciJobs": {
+    "qualityJob": 119566539564,
+    "classifierJob": 119566494973,
+    "qualityLogExcerpts": [
+      "2026-10-22T00:29:50.8071407Z Architecture check passed: no restricted imports found.",
+      "2026-10-22T00:30:51.5376307Z  Test Files  161 passed (161)",
+      "2026-10-22T00:30:51.5383129Z       Tests  1617 passed (1617)",
+      "2026-10-22T00:31:19.1283714Z quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-22T00:31:35.8394820Z quality:ui:recovery PASS — 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-22T00:31:35.9583266Z node scripts/assurance/appearance-startup-browser.mjs",
+      "2026-10-22T00:31:35.9583544Z node scripts/assurance/appearance-startup-browser.mjs --built",
+      "2026-10-22T00:31:39.1856665Z PASS: 13/13 development startup cases.",
+      "2026-10-22T00:31:40.6706557Z PASS: 13/13 production startup cases.",
+      "2026-10-22T00:31:41.2653171Z   name: likha-sis-appearance-startup-verification",
+      "2026-10-22T00:31:41.2653494Z   path: .cache/appearance-startup/*.json",
+      "2026-10-22T00:31:41.6351539Z Uploading artifact: likha-sis-appearance-startup-verification.zip",
+      "2026-10-22T00:31:42.5287968Z Artifact likha-sis-appearance-startup-verification successfully finalized. Artifact ID 12392811325",
+      "2026-10-22T00:31:42.5288894Z Artifact likha-sis-appearance-startup-verification has been successfully uploaded! Final size is 1332 bytes. Artifact ID is 12392811325"
+    ],
+    "securityJobs": [
+      {
+        "id": 119566494627,
+        "name": "Security / gitleaks",
+        "conclusion": "success"
+      },
+      {
+        "id": 119566494894,
+        "name": "Security / osv-scanner",
+        "conclusion": "success"
+      },
+      {
+        "id": 119566494939,
+        "name": "Security / cargo-deny",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12392911220,
+        "name": "likha-sis-ui-verification",
+        "size_in_bytes": 929270,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12392911220",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12392911220/zip",
+        "expired": false,
+        "created_at": "2026-10-22T00:31:43Z",
+        "expires_at": "2026-10-29T00:31:42Z",
+        "updated_at": "2026-10-22T00:31:43Z",
+        "digest": "sha256:97c03b6aadfd7fc5d523a06492b172c644dbf98a7a9cc30526d01f162718271f",
+        "workflow_run": {
+          "id": 39699949146,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/scores-grade-refresh-20261022",
+          "head_sha": "b15a91a3a63b8076e9c8ad0fdfdbeac7651e1d9d"
+        }
+      },
+      {
+        "id": 12392811325,
+        "name": "likha-sis-appearance-startup-verification",
+        "size_in_bytes": 1332,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12392811325",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12392811325/zip",
+        "expired": false,
+        "created_at": "2026-10-22T00:31:42Z",
+        "expires_at": "2026-10-29T00:31:41Z",
+        "updated_at": "2026-10-22T00:31:42Z",
+        "digest": "sha256:9dad3e93e23fdfcf9278ca7a02bdb5ca2e00f5badd9294ca9e6d19d5eaa78698",
+        "workflow_run": {
+          "id": 39699949146,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/scores-grade-refresh-20261022",
+          "head_sha": "b15a91a3a63b8076e9c8ad0fdfdbeac7651e1d9d"
+        }
+      }
+    ],
+    "sourceBinding": "The local browser head records the precommit base with modified candidate files; recorded source hashes match the checked/published implementation. Documentation checkpoint preserves those bytes."
+  },
+  "localEvidence": "scores-grade-refresh-evidence-2026-10-22.json",
+  "limits": [
+    "Synthetic browser/component fixtures do not establish native computation/authorization",
+    "Full Scores A1–A7 teacher/device/manual acceptance remains pending",
+    "No main merge/deployment"
+  ],
+  "baselineFailureExcerpts": [
+    "⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > term-grade response continuity > replaces a stale grade with an explicit refresh failure and retries without replaying a score",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > term-grade response continuity > discards a term-grade response after leaving its assessment roster",
+    " FAIL  src/ui/ClassRecordWorkspace.test.tsx > term-grade response continuity > does not let an older bulk computation replace a grade refreshed after a score save",
+    " Test Files  1 failed (1)",
+    "      Tests  3 failed | 68 passed (71)"
+  ]
+}

@@ -1,0 +1,530 @@
+{
+  "project": "LIKHA-SIS",
+  "baseline": "7bea54ac4b3e26baea3f30fd02963d606ceb154e",
+  "method": "Matched synthetic browser tasks with identical LIKHA async model/content/CSS; actual production app builds differ only in disclosure wrapper",
+  "candidate": {
+    "package": "@base-ui/react",
+    "version": "1.9.0",
+    "license": "MIT",
+    "licenseSha256": "07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a",
+    "dependencies": {
+      "@babel/runtime": "^7.29.7 || ^8.0.0",
+      "@base-ui/utils": "0.5.0",
+      "@floating-ui/react-dom": "^2.1.9",
+      "@floating-ui/utils": "^0.2.12",
+      "use-sync-external-store": "^1.7.0"
+    }
+  },
+  "sources": {
+    "scriptSha256": "3c3cbd53ff59353d34842c4587fdf4cf531294a259fb6e7ec0cc0357fc811e9f",
+    "nativeSha256": "75296c25f11bfc69458207e9cb0963db932c59a3c7fdff0045034c22fcdc6a3a",
+    "originalSha256": "5ac294c21508e43e284fc099e7a8d9df065aabf538c73e861f4a2e363923ce82",
+    "candidateSha256": "ac55bbd175db614f119a17e72ed8d1e49f7511bd68346980a7966e21dbbab7ce"
+  },
+  "checks": [
+    {
+      "variant": "original",
+      "case": "read-only error/recovery/history",
+      "retryActions": 2,
+      "duplicateRequests": 0,
+      "writes": 0
+    },
+    {
+      "variant": "native",
+      "case": "read-only error/recovery/history",
+      "retryActions": 1,
+      "duplicateRequests": 0,
+      "writes": 0
+    },
+    {
+      "variant": "native",
+      "case": "service and item response isolation",
+      "status": "PASS"
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/efficient/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/efficient/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/efficient/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/comfortable/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/comfortable/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/comfortable/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/guided/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/guided/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y light/guided/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/efficient/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/efficient/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/efficient/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/comfortable/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/comfortable/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/comfortable/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/guided/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/guided/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "layout/a11y dark/guided/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "native",
+      "case": "keyboard close, touch reopen/refresh and full reason selection",
+      "status": "PASS",
+      "minimumTarget": 24
+    },
+    {
+      "variant": "base",
+      "case": "read-only error/recovery/history",
+      "retryActions": 1,
+      "duplicateRequests": 0,
+      "writes": 0
+    },
+    {
+      "variant": "base",
+      "case": "service and item response isolation",
+      "status": "PASS"
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/efficient/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/efficient/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/efficient/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/comfortable/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/comfortable/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/comfortable/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/guided/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/guided/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y light/guided/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/efficient/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/efficient/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/efficient/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/comfortable/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/comfortable/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/comfortable/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/guided/1280",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/guided/640",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "layout/a11y dark/guided/390",
+      "violations": [],
+      "geometry": {
+        "pageOverflow": false,
+        "panelOverflow": false,
+        "selectable": "auto",
+        "reducedMotion": true,
+        "transitionSeconds": [0.00001, 0.00001]
+      }
+    },
+    {
+      "variant": "base",
+      "case": "keyboard close, touch reopen/refresh and full reason selection",
+      "status": "PASS",
+      "minimumTarget": 24
+    }
+  ],
+  "bundles": {
+    "native": {
+      "jsBytes": 683983,
+      "jsGzipBytes": 176726,
+      "cssBytes": 70932,
+      "assets": {
+        "index-CtAHG3bv.js": "53665bfb62e2ed889ce10aa92b2b78633d0b744591c5be0fb4a1ce88a8559fb2",
+        "index-DJUcVoWx.css": "ed46e28beee0f77fd414472af19bfb78cc0ae1155fc4ea9c2bbf4fd76a379dcc"
+      }
+    },
+    "base": {
+      "jsBytes": 701898,
+      "jsGzipBytes": 183480,
+      "cssBytes": 70932,
+      "assets": {
+        "index-28VIvHjZ.js": "af83c6ee4625d8282662751d27b78357dc07a2b98623a211c9dec676333a0ebe",
+        "index-DJUcVoWx.css": "ed46e28beee0f77fd414472af19bfb78cc0ae1155fc4ea9c2bbf4fd76a379dcc"
+      }
+    }
+  },
+  "delta": {
+    "jsBytes": 17915,
+    "jsGzipBytes": 6754
+  },
+  "limits": [
+    "Synthetic fixtures/browser environment; no teacher comprehension or native/device claim",
+    "Experimental no-save dependency install; restore lockfile environment with npm ci before final production verification",
+    "No whole-library quality judgment or unsupported component adoption"
+  ]
+}

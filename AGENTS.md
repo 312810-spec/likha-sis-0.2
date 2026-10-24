@@ -1,6 +1,6 @@
 # CTOS current program
 
-The current product program is **CTOS — Calm Teacher Operating System**. For substantial work, read `CTOS.md` first, then `CTOS-STATE.md`, then the latest CTOS checkpoint if present. Apply the project adapter in `docs/ctos/FORGE-V3-ADAPTER.md`.
+The current product program is **CTOS — Calm Teacher Operating System**. For substantial work, read `CTOS.md` first, then `CTOS-STATE.md`, then the latest CTOS checkpoint if present. Apply the current project adapter in `docs/ctos/FORGE-V4-ADAPTER.md`; the v3 adapter remains historical reference.
 
 CTOS supersedes older broad planning/harness instructions where they conflict. Keep active context small: do not reload all historical plans merely because they exist. PR #103 is a salvage/reconciliation source, not a branch to mass-merge.
 

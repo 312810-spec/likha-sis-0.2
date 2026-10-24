@@ -68,6 +68,9 @@ export function ClassRecordWorkspace({
     [items, syncCheckRevision, weightPolicyName],
   );
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsRefreshing, setItemsRefreshing] = useState(false);
+  const itemReadGenerationRef = useRef(0);
+  const itemsRequireReloadRef = useRef(false);
   const [itemsSource, setItemsSource] = useState<{
     service: AssessmentApplicationService;
     classId: string;
@@ -78,10 +81,9 @@ export function ClassRecordWorkspace({
     setId: string;
   } | null>(null);
   const [duplicateReview, setDuplicateReview] = useState(false);
-  const itemsReady =
-    !itemsLoading &&
-    itemsSource?.service === assessmentService &&
-    itemsSource.classId === classRecordId;
+  const itemsCurrent =
+    itemsSource?.service === assessmentService && itemsSource.classId === classRecordId;
+  const itemsReady = !itemsRefreshing && !itemsLoading && itemsCurrent;
   const activeSource = useRef({
     service: assessmentService,
     classId: classRecordId,
@@ -115,6 +117,8 @@ export function ClassRecordWorkspace({
   const [itemName, setItemName] = useSessionDraft(`${classRecordId}:record:itemName`, () => "");
   const [maxScore, setMaxScore] = useSessionDraft(`${classRecordId}:record:maxScore`, () => "20");
   const [creatingItem, setCreatingItem] = useState(false);
+  // User edits belong to a newer draft even if its text returns to the submitted value.
+  const createDraftRevisionRef = useRef(0);
   const composerToggleRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const [composerOpen, setComposerOpen] = useSessionDraft<boolean | null>(
@@ -137,9 +141,13 @@ export function ClassRecordWorkspace({
     () => "",
   );
   const [savingEdit, setSavingEdit] = useState(false);
+  // Opening/cancelling is a new editing choice even for the same item/text.
+  const editDraftRef = useRef({ revision: 0, open: editingItemId !== null });
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const pendingDeleteIds = useRef(new Set<string>());
+  const deleteButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [deletingItemIds, setDeletingItemIds] = useState<ReadonlySet<string>>(new Set());
 
   const [selectedItemId, setSelectedItemId] = useSessionDraft<string | null>(
     `${classRecordId}:record:selected`,
@@ -190,18 +198,27 @@ export function ClassRecordWorkspace({
   // fetch whose selected item has since changed from applying its result
   // to the now-current item.
   const rosterRequestRef = useRef(0);
+  const itemScoreRevisionsRef = useRef(new Map<string, number>());
+  const termGradeContextRef = useRef(0);
 
-  const [termGrades, setTermGrades] = useState<Record<string, ComputedTermGrade | null>>({});
+  const [termGrades, setTermGrades] = useState<
+    Record<string, ComputedTermGrade | null | "refreshing" | "error" | "unconfirmed">
+  >({});
+  const termGradesRequestedRef = useRef(false);
+  const termGradeGenerationRef = useRef<Map<string, number>>(new Map());
+  const termGradeBulkInFlightRef = useRef(false);
   const [termGradesLoading, setTermGradesLoading] = useState(false);
   const [justUpdatedLearnerId, setJustUpdatedLearnerId] = useState<string | null>(null);
   const updateFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportCardResult, setReportCardResult] = useState<ReportCardExportResult | null>(null);
+  const [reportCardExportError, setReportCardExportError] = useState<string | null>(null);
   const [exportingReportCard, setExportingReportCard] = useState(false);
   const [revealingReportCard, setRevealingReportCard] = useState(false);
   const [revealReportCardError, setRevealReportCardError] = useState<string | null>(null);
   const [classSummaryResult, setClassSummaryResult] = useState<ClassSummaryExportResult | null>(
     null,
   );
+  const [classSummaryExportError, setClassSummaryExportError] = useState<string | null>(null);
   const [exportingClassSummary, setExportingClassSummary] = useState(false);
   const [revealingClassSummary, setRevealingClassSummary] = useState(false);
   const [revealClassSummaryError, setRevealClassSummaryError] = useState<string | null>(null);
@@ -225,8 +242,11 @@ export function ClassRecordWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++itemReadGenerationRef.current;
+    itemsRequireReloadRef.current = false;
     // Fresh reads invalidate actionable source state before awaiting the response.
     setItemsLoading(true);
+    setItemsRefreshing(false);
     setItemsSource(null);
     setItems([]);
     setError(null);
@@ -235,7 +255,7 @@ export function ClassRecordWorkspace({
       assessmentService.listCategorySets(),
     ])
       .then(([itemList, sets]) => {
-        if (cancelled) return;
+        if (cancelled || itemReadGenerationRef.current !== generation) return;
         setItems(itemList);
         setItemsSource({ service: assessmentService, classId: classRecordId });
         setCategorySets(sets);
@@ -245,10 +265,11 @@ export function ClassRecordWorkspace({
           setCategorySetId("");
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this class record's assessment items.");
+        if (!cancelled && itemReadGenerationRef.current === generation)
+          setError("Could not load this class record's assessment items.");
       })
       .finally(() => {
-        if (!cancelled) setItemsLoading(false);
+        if (!cancelled && itemReadGenerationRef.current === generation) setItemsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -282,11 +303,29 @@ export function ClassRecordWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentService, categorySetId, itemsAttempt]);
 
+  const rosterItem = itemsCurrent ? items.find((item) => item.id === selectedItemId) : undefined;
+  // A temporary write lock is not a new learner/assessment context.
+  const rosterIdentity = rosterItem
+    ? JSON.stringify([classRecordId, rosterItem.id, rosterItem.categoryId, rosterItem.maxScore])
+    : null;
+
+  function invalidateTermGrades() {
+    termGradeContextRef.current += 1;
+    setTermGrades({});
+    setTermGradesLoading(false);
+    termGradesRequestedRef.current = false;
+    termGradeBulkInFlightRef.current = false;
+    setJustUpdatedLearnerId(null);
+    if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
+  }
+
   function loadRoster() {
-    if (!selectedItemId || !itemsReady || !items.some((item) => item.id === selectedItemId)) return;
+    if (!selectedItemId || !rosterIdentity) return;
     const requestId = ++rosterRequestRef.current;
     setRosterLoading(true);
     setRosterError(null);
+    invalidateTermGrades();
+    termGradeGenerationRef.current.clear();
     learnerScoreService
       .rosterForItem(selectedItemId)
       .then((result) => {
@@ -316,24 +355,44 @@ export function ClassRecordWorkspace({
       rosterRequestRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnerScoreService, selectedItemId, itemsReady]);
+  }, [learnerScoreService, rosterIdentity]);
 
   const categoryReady =
     categoriesSource?.service === assessmentService &&
     categoriesSource.setId === categorySetId &&
     categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
-    setItemsSource(null);
+    invalidateTermGrades();
+    // An uncertain deletion requires explicit reload, even if another write completes.
+    if (itemsRequireReloadRef.current) return;
+    const generation = ++itemReadGenerationRef.current;
+    const scoreRevisions = new Map(itemScoreRevisionsRef.current);
+    const isCurrentRead = () => isActiveSource() && itemReadGenerationRef.current === generation;
+    // Keep current editors mounted during a read; block writes until it finishes.
+    setItemsRefreshing(true);
     try {
       const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-      if (!isActiveSource()) return;
-      setItems(refreshed);
+      if (!isCurrentRead()) return;
+      setItems((current) =>
+        refreshed.map((item) => {
+          const newer = current.find((candidate) => candidate.id === item.id);
+          return newer && scoreRevisions.get(item.id) !== itemScoreRevisionsRef.current.get(item.id)
+            ? { ...item, recordedCount: newer.recordedCount, totalEligible: newer.totalEligible }
+            : item;
+        }),
+      );
       setItemsSource({ service: assessmentService, classId: classRecordId });
     } catch {
-      if (!isActiveSource()) return;
+      if (!isCurrentRead()) return;
+      setItemsSource(null);
       setError(
         "The change is saved, but the item list could not refresh. Reload items before making another change.",
       );
+    } finally {
+      if (isCurrentRead()) {
+        setItemsRefreshing(false);
+        setItemsLoading(false);
+      }
     }
   }
 
@@ -354,6 +413,7 @@ export function ClassRecordWorkspace({
     setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
+    const submittedDraftRevision = createDraftRevisionRef.current;
     setCreatingItem(true);
     try {
       const created = await assessmentService.createItem(
@@ -366,15 +426,24 @@ export function ClassRecordWorkspace({
       if (created === null) {
         setError("Could not create this item — check the category and class record.");
       } else {
-        setItemName("");
-        setComposerOpen(false);
-        if (
-          composerRef.current?.contains(document.activeElement) &&
-          !composerRef.current.closest("[hidden]")
-        ) {
-          composerToggleRef.current?.focus();
+        const hasNewerDraft = createDraftRevisionRef.current !== submittedDraftRevision;
+        if (hasNewerDraft) {
+          // An empty record opens implicitly; retain that intent once the first item exists.
+          // Preserve an explicit close while the request was pending.
+          setComposerOpen((open) => open ?? true);
+        } else {
+          setItemName("");
+          setComposerOpen(false);
+          if (
+            composerRef.current?.contains(document.activeElement) &&
+            !composerRef.current.closest("[hidden]")
+          ) {
+            composerToggleRef.current?.focus();
+          }
         }
-        setConfirmation(`${created.name} added.`);
+        setConfirmation(
+          `${created.name} added.${hasNewerDraft ? " Your newer item draft is retained." : ""}`,
+        );
         await refreshItemsAfterWrite();
       }
     } catch (err) {
@@ -385,6 +454,9 @@ export function ClassRecordWorkspace({
   }
 
   function startEditingItem(item: AssessmentItemDetail) {
+    if (pendingDeleteIds.current.has(item.id)) return;
+    editDraftRef.current.revision += 1;
+    editDraftRef.current.open = true;
     setItemActionError(null);
     setConfirmingDeleteItemId(null);
     setEditingItemId(item.id);
@@ -411,6 +483,8 @@ export function ClassRecordWorkspace({
     )
       return;
     const isScored = item.recordedCount > 0;
+    const submittedRevision = editDraftRef.current.revision;
+    const submittedName = editName.trim();
     setSavingEdit(true);
     setItemActionError(null);
     try {
@@ -425,22 +499,37 @@ export function ClassRecordWorkspace({
       if (!isActiveSource()) return;
       if (updated === null) {
         setItemActionError(
-          isScored
-            ? "Could not rename this item."
-            : "Could not save changes — this item may already have recorded scores.",
+          `Could not save changes to “${submittedName}”. ${
+            isScored
+              ? "The item could not be renamed."
+              : "This item may already have recorded scores."
+          }`,
         );
       } else {
-        setEditingItemId(null);
-        setEditName("");
-        setEditCategoryId("");
-        setEditMaxScore("");
-        setConfirmation(`${updated.name} updated.`);
+        const hasNewerEdit = editDraftRef.current.revision !== submittedRevision;
+        if (!hasNewerEdit) {
+          editDraftRef.current.open = false;
+          setEditingItemId(null);
+          setEditName("");
+          setEditCategoryId("");
+          setEditMaxScore("");
+        }
+        setConfirmation(
+          `${updated.name} updated.${
+            hasNewerEdit && editDraftRef.current.open ? " Your newer item edits are retained." : ""
+          }`,
+        );
         await refreshItemsAfterWrite();
       }
     } catch (err) {
-      setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
+      if (!isActiveSource()) return;
+      setItemActionError(
+        `Could not save changes to “${submittedName}”. ${
+          err instanceof ValidationError ? err.message : "Try Save again when ready."
+        }`,
+      );
     } finally {
-      setSavingEdit(false);
+      if (isActiveSource()) setSavingEdit(false);
     }
   }
 
@@ -449,32 +538,54 @@ export function ClassRecordWorkspace({
    * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
     if (
-      deletingItemId === item.id ||
+      pendingDeleteIds.current.has(item.id) ||
+      item.recordedCount > 0 ||
       !itemsReady ||
       !items.some((current) => current.id === item.id)
     )
       return;
-    setDeletingItemId(item.id);
+    pendingDeleteIds.current.add(item.id);
+    setDeletingItemIds(new Set(pendingDeleteIds.current));
+    setConfirmation(null);
     setItemActionError(null);
     try {
       const deleted = await assessmentService.deleteItem(item.id);
       if (!isActiveSource()) return;
       if (!deleted) {
-        setItemActionError("Could not delete this item — it may already have recorded scores.");
-        setConfirmingDeleteItemId(null);
+        setItemActionError(`“${item.name}” was not deleted. It may already have recorded scores.`);
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
       } else {
+        const row = deleteButtonRefs.current[item.id]?.closest("li");
+        const restoreFocus = Boolean(row?.contains(document.activeElement));
+        const adjacentRow = row?.nextElementSibling ?? row?.previousElementSibling;
+        const nextFocus = adjacentRow?.querySelector<HTMLElement>(
+          'button:not([aria-disabled="true"]):not(:disabled)',
+        );
         setItems((current) => current.filter((existing) => existing.id !== item.id));
-        if (selectedItemId === item.id) setSelectedItemId(null);
-        setConfirmingDeleteItemId(null);
+        setSelectedItemId((current) => (current === item.id ? null : current));
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
         setConfirmation(`${item.name} deleted.`);
         await refreshItemsAfterWrite();
+        if (restoreFocus && isActiveSource() && document.activeElement === document.body) {
+          (nextFocus?.isConnected ? nextFocus : composerToggleRef.current)?.focus();
+        }
       }
     } catch (err) {
+      if (!isActiveSource()) return;
       setItemActionError(
-        err instanceof ValidationError ? err.message : "Could not delete this item.",
+        `Deletion of “${item.name}” was not confirmed.${
+          err instanceof ValidationError ? ` ${err.message}` : ""
+        }`,
       );
+      itemsRequireReloadRef.current = true;
+      itemReadGenerationRef.current += 1;
+      setItemsLoading(false);
+      setItemsRefreshing(false);
+      setItemsSource(null);
+      setError("Reload items to check the deletion result before making another change.");
     } finally {
-      setDeletingItemId(null);
+      pendingDeleteIds.current.delete(item.id);
+      if (isActiveSource()) setDeletingItemIds(new Set(pendingDeleteIds.current));
     }
   }
 
@@ -494,29 +605,36 @@ export function ClassRecordWorkspace({
     return scoreDrafts[learnerId] ?? (currentScore === null ? "" : String(currentScore));
   }
 
-  /** After grades have been shown at least once this session, keep the
-   * one affected learner's grade from silently going stale when their
-   * score changes -- cheap (one round trip for one learner, not the
-   * whole roster) and safe (compute_term_grade is deterministic). If
-   * grades were never shown, there is nothing to keep fresh, so this is
-   * a genuine no-op, not a hidden background cost every score-entry
-   * teacher pays. See ADR-0034 for the full reasoning. */
-  function maybeRefreshTermGrade(learnerId: string) {
-    if (Object.keys(termGrades).length === 0) return;
-    void learnerScoreService
-      .computeTermGrade(classRecordId, learnerId)
-      .then((grade) => {
-        setTermGrades((current) => ({ ...current, [learnerId]: grade }));
+  // Every grade read belongs to a roster generation and a learner revision.
+  // A successful score save invalidates the displayed number immediately;
+  // failed reads never leave an older number looking current.
+  async function refreshTermGrade(learnerId: string) {
+    const rosterRequest = rosterRequestRef.current;
+    const gradeContext = termGradeContextRef.current;
+    const generation = (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1;
+    termGradeGenerationRef.current.set(learnerId, generation);
+    const isCurrent = () =>
+      rosterRequestRef.current === rosterRequest &&
+      termGradeContextRef.current === gradeContext &&
+      termGradeGenerationRef.current.get(learnerId) === generation;
+    setTermGrades((current) => ({ ...current, [learnerId]: "refreshing" }));
+    try {
+      const grade = await learnerScoreService.computeTermGrade(classRecordId, learnerId);
+      if (!isCurrent()) return;
+      setTermGrades((current) => ({ ...current, [learnerId]: grade }));
+      if (grade) {
         setJustUpdatedLearnerId(learnerId);
         if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
         updateFlashTimeoutRef.current = setTimeout(() => setJustUpdatedLearnerId(null), 2500);
-      })
-      .catch(() => {
-        // Best-effort background refresh -- a failure here must not
-        // surface as a page-level error over an otherwise-successful
-        // score save. The teacher can always click "Show term grades"
-        // again for an explicit retry.
-      });
+      }
+    } catch {
+      if (isCurrent()) setTermGrades((current) => ({ ...current, [learnerId]: "error" }));
+    }
+  }
+
+  function maybeRefreshTermGrade(learnerId: string) {
+    // An initial bulk read may still be pending when the score is saved.
+    if (termGradesRequestedRef.current) void refreshTermGrade(learnerId);
   }
 
   /** Saves one learner's status/score. Errors are surfaced inline on that
@@ -579,6 +697,15 @@ export function ClassRecordWorkspace({
     writeGenerationRef.current.set(learnerId, generation);
     writeInFlightRef.current.add(learnerId);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
+    // A read started before this write cannot establish its saved outcome.
+    termGradeGenerationRef.current.set(
+      learnerId,
+      (termGradeGenerationRef.current.get(learnerId) ?? 0) + 1,
+    );
+    function markGradeUnconfirmed() {
+      if (termGradesRequestedRef.current)
+        setTermGrades((current) => ({ ...current, [learnerId]: "unconfirmed" }));
+    }
     try {
       const score = status === "scored" ? Number(scoreText) : null;
       const recorded = await learnerScoreService.recordScore(
@@ -598,12 +725,17 @@ export function ClassRecordWorkspace({
       )
         return false;
       if (recorded === null) {
+        markGradeUnconfirmed();
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
         return false;
       }
       // The correction is written; the held change and its reason are no
       // longer pending.
       clearPendingCorrection(learnerId);
+      itemScoreRevisionsRef.current.set(
+        selectedItemId,
+        (itemScoreRevisionsRef.current.get(selectedItemId) ?? 0) + 1,
+      );
       setRoster((current) =>
         current.map((entry) =>
           entry.learnerId === learnerId
@@ -638,6 +770,7 @@ export function ClassRecordWorkspace({
         rosterRequestRef.current !== rosterRequest
       )
         return false;
+      markGradeUnconfirmed();
       setRowErrors((current) => ({
         ...current,
         [learnerId]: err instanceof ValidationError ? err.message : "Could not save this score.",
@@ -774,37 +907,51 @@ export function ClassRecordWorkspace({
    * Once shown, an individual score change afterward keeps just that one
    * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
-    if (termGradesLoading) return;
+    if (
+      termGradeBulkInFlightRef.current ||
+      writeInFlightRef.current.size > 0 ||
+      rosterLoading ||
+      rosterError ||
+      !itemsReady
+    )
+      return;
+    const rosterRequest = rosterRequestRef.current;
+    const gradeContext = termGradeContextRef.current;
+    termGradeBulkInFlightRef.current = true;
+    termGradesRequestedRef.current = true;
     setTermGradesLoading(true);
     try {
-      const entries = await Promise.all(
-        roster.map(async (entry) => {
-          const grade = await learnerScoreService.computeTermGrade(classRecordId, entry.learnerId);
-          return [entry.learnerId, grade] as const;
-        }),
-      );
-      setTermGrades(Object.fromEntries(entries));
-    } catch {
-      setError("Could not compute term grades.");
+      await Promise.all(roster.map((entry) => refreshTermGrade(entry.learnerId)));
     } finally {
-      setTermGradesLoading(false);
+      if (
+        rosterRequestRef.current === rosterRequest &&
+        termGradeContextRef.current === gradeContext
+      ) {
+        termGradeBulkInFlightRef.current = false;
+        setTermGradesLoading(false);
+      }
     }
   }
 
   async function handleExportReportCard() {
     if (exportingReportCard) return;
-    setError(null);
+    setReportCardExportError(null);
+    setReportCardResult(null);
     setRevealReportCardError(null);
     setExportingReportCard(true);
     try {
       const result = await exportService.exportClassRecordReportCard(classRecordId);
       if (result === null) {
-        setError("Could not export — this class record could not be found.");
+        setReportCardExportError(
+          "No report card export was returned. Check access to this class record and try again.",
+        );
       } else {
         setReportCardResult(result);
       }
     } catch (err) {
-      setError(err instanceof ValidationError ? err.message : "Could not export the report card.");
+      setReportCardExportError(
+        err instanceof ValidationError ? err.message : "Could not export the report card.",
+      );
     } finally {
       setExportingReportCard(false);
     }
@@ -825,18 +972,21 @@ export function ClassRecordWorkspace({
 
   async function handleExportClassSummary() {
     if (exportingClassSummary) return;
-    setError(null);
+    setClassSummaryExportError(null);
+    setClassSummaryResult(null);
     setRevealClassSummaryError(null);
     setExportingClassSummary(true);
     try {
       const result = await exportService.exportClassRecordSummary(classRecordId);
       if (result === null) {
-        setError("Could not export — this class record could not be found.");
+        setClassSummaryExportError(
+          "No class summary export was returned. Check access to this class record and try again.",
+        );
       } else {
         setClassSummaryResult(result);
       }
     } catch (err) {
-      setError(
+      setClassSummaryExportError(
         err instanceof ValidationError ? err.message : "Could not export the class summary.",
       );
     } finally {
@@ -857,9 +1007,19 @@ export function ClassRecordWorkspace({
     }
   }
 
-  const selectedItem = itemsReady ? items.find((i) => i.id === selectedItemId) : undefined;
+  const selectedItem = rosterItem;
   const recordedCount = roster.filter((entry) => entry.status !== null).length;
   const remainingCount = roster.length - recordedCount;
+  const hasPendingScoreEdits =
+    Object.keys(scoreDrafts).length > 0 || Object.keys(pendingCorrections).length > 0;
+  const gradeCheckWait =
+    savingLearnerIds.size > 0
+      ? "A score save is pending. Term-grade checks wait until it finishes."
+      : !itemsReady
+        ? "Term-grade checks wait for the assessment items to be checked."
+        : rosterLoading || rosterError
+          ? "Term-grade checks need the current learner roster. Retry the roster check if it failed."
+          : null;
 
   return (
     <Page
@@ -933,7 +1093,10 @@ export function ClassRecordWorkspace({
               id="workspace-category-set"
               aria-describedby={mode === "guided" ? "workspace-category-set-hint" : undefined}
               value={categorySetId}
-              onChange={(event) => setCategorySetId(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setCategorySetId(event.target.value);
+              }}
             >
               <option value="" disabled>
                 Select a current category set
@@ -958,7 +1121,10 @@ export function ClassRecordWorkspace({
               id="workspace-category"
               aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setCategoryId(event.target.value);
+              }}
             >
               <option value="" disabled>
                 Select a current category
@@ -977,7 +1143,10 @@ export function ClassRecordWorkspace({
               type="text"
               placeholder="e.g. Quiz 1"
               value={itemName}
-              onChange={(event) => setItemName(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setItemName(event.target.value);
+              }}
             />
           </div>
           <div className="field">
@@ -987,7 +1156,10 @@ export function ClassRecordWorkspace({
               type="number"
               min="1"
               value={maxScore}
-              onChange={(event) => setMaxScore(event.target.value)}
+              onChange={(event) => {
+                createDraftRevisionRef.current += 1;
+                setMaxScore(event.target.value);
+              }}
             />
           </div>
         </div>
@@ -1006,7 +1178,7 @@ export function ClassRecordWorkspace({
 
       {itemsLoading ? (
         <Loading label="Loading items…" />
-      ) : !itemsReady ? (
+      ) : !itemsCurrent ? (
         <EmptyState>Reload items to review current records. Your draft is retained.</EmptyState>
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above.</EmptyState>
@@ -1034,7 +1206,10 @@ export function ClassRecordWorkspace({
                           id={`edit-name-${item.id}`}
                           type="text"
                           value={editName}
-                          onChange={(event) => setEditName(event.target.value)}
+                          onChange={(event) => {
+                            editDraftRef.current.revision += 1;
+                            setEditName(event.target.value);
+                          }}
                         />
                       </div>
                       {!isScored && (
@@ -1044,7 +1219,10 @@ export function ClassRecordWorkspace({
                             <select
                               id={`edit-category-${item.id}`}
                               value={editCategoryId}
-                              onChange={(event) => setEditCategoryId(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditCategoryId(event.target.value);
+                              }}
                             >
                               {categories.map((category) => (
                                 <option key={category.id} value={category.id}>
@@ -1066,7 +1244,10 @@ export function ClassRecordWorkspace({
                               type="number"
                               min="1"
                               value={editMaxScore}
-                              onChange={(event) => setEditMaxScore(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditMaxScore(event.target.value);
+                              }}
                             />
                           </div>
                         </>
@@ -1088,6 +1269,8 @@ export function ClassRecordWorkspace({
                     <button
                       type="button"
                       onClick={() => {
+                        editDraftRef.current.revision += 1;
+                        editDraftRef.current.open = false;
                         setEditingItemId(null);
                         setEditName("");
                         setEditCategoryId("");
@@ -1101,24 +1284,49 @@ export function ClassRecordWorkspace({
                   <>
                     <button
                       type="button"
+                      aria-label={`${item.categoryName} — ${item.name} (max ${item.maxScore})${item.totalEligible > 0 ? ` · ${item.recordedCount} of ${item.totalEligible} recorded` : ""}`}
                       aria-pressed={selectedItemId === item.id}
                       onClick={() => {
                         setError(null);
                         setSelectedItemId(item.id);
                       }}
                     >
-                      {item.categoryName} — {item.name} (max {item.maxScore})
-                      {item.totalEligible > 0 &&
-                        ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
+                      <span className="assessment-choice-name">{item.name}</span>
+                      <span className="assessment-choice-meta">
+                        {item.categoryName} · Max {item.maxScore}
+                        {item.totalEligible > 0 &&
+                          ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
+                        {selectedItemId === item.id && <span aria-hidden="true"> · Selected</span>}
+                      </span>
                     </button>
                     <div role="group" aria-label={`Actions for ${item.name}`}>
-                      <button type="button" onClick={() => startEditingItem(item)}>
+                      <button
+                        type="button"
+                        aria-disabled={deletingItemIds.has(item.id)}
+                        onClick={() => startEditingItem(item)}
+                      >
                         Edit
                       </button>
                       {isScored ? (
                         <span className="field-hint">
                           Can&rsquo;t delete — already has recorded scores.
                         </span>
+                      ) : deletingItemIds.has(item.id) ? (
+                        <>
+                          <span className="field-hint" role="status">
+                            Deletion requested. Waiting for the result; it can’t be cancelled here.
+                          </span>
+                          <button
+                            type="button"
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled="true"
+                            onClick={() => void handleDeleteItem(item)}
+                          >
+                            Deleting…
+                          </button>
+                        </>
                       ) : isConfirmingDelete ? (
                         <>
                           <span className="field-hint">
@@ -1126,10 +1334,13 @@ export function ClassRecordWorkspace({
                           </span>
                           <button
                             type="button"
-                            aria-disabled={deletingItemId === item.id}
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled={!itemsReady}
                             onClick={() => void handleDeleteItem(item)}
                           >
-                            {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
+                            Confirm delete
                           </button>
                           <button type="button" onClick={() => setConfirmingDeleteItemId(null)}>
                             Cancel
@@ -1151,7 +1362,24 @@ export function ClassRecordWorkspace({
 
       {selectedItem && (
         <>
-          <h3>{selectedItem.name} scores</h3>
+          <div className="score-workspace-heading">
+            <h3>{selectedItem.name} scores</h3>
+            {!rosterLoading && !rosterError && roster.length > 0 && (
+              <p className="attendance-count">
+                <strong>
+                  {recordedCount} of {roster.length} recorded
+                </strong>{" "}
+                · {remainingCount} remaining
+              </p>
+            )}
+          </div>
+
+          {itemsRefreshing && (
+            <p className="field-hint" id="score-assessment-check" role="status">
+              Checking assessment items. Your draft is retained; new score saves wait until the
+              check finishes.
+            </p>
+          )}
 
           {rosterError && (
             <Alert tone="error">
@@ -1168,12 +1396,6 @@ export function ClassRecordWorkspace({
             <EmptyState>No learners eligible for this item's grading period.</EmptyState>
           ) : (
             <>
-              <p className="attendance-count">
-                <strong>
-                  {recordedCount} of {roster.length} recorded
-                </strong>{" "}
-                · {remainingCount} remaining
-              </p>
               <p className="field-hint" id="score-keyboard-help">
                 Enter or arrow keys save and move between scores. Tab saves a changed score;
                 otherwise it reaches row actions. Escape restores the recorded value.
@@ -1240,7 +1462,7 @@ export function ClassRecordWorkspace({
                                   placeholder="Reason for the change"
                                   readOnly={isSaving}
                                   aria-invalid={hasRowError}
-                                  aria-describedby={`score-review-${entry.learnerId}${hasRowError ? ` score-error-${entry.learnerId}` : ""}`}
+                                  aria-describedby={`score-review-${entry.learnerId}${hasRowError ? ` score-error-${entry.learnerId}` : ""}${itemsRefreshing ? " score-assessment-check" : ""}`}
                                   value={correctionReasons[entry.learnerId] ?? ""}
                                   onChange={(event) => {
                                     setCorrectionReasons((current) => ({
@@ -1334,6 +1556,7 @@ export function ClassRecordWorkspace({
                                   aria-describedby={
                                     [
                                       "score-keyboard-help",
+                                      itemsRefreshing ? "score-assessment-check" : null,
                                       hasRowError ? `score-error-${entry.learnerId}` : null,
                                       draft !== undefined && !isSaving
                                         ? `score-draft-${entry.learnerId}`
@@ -1481,9 +1704,9 @@ export function ClassRecordWorkspace({
                                 {entry.status !== null && !isSaving && !hasRowError && (
                                   <ScoreCorrectionHistory
                                     // Keyed by saved-row identity so a fresh
-                                    // correction remounts the panel and the
-                                    // lineage it shows can never be stale —
-                                    // same reasoning as ScoreSyncEvidence.
+                                    // correction remounts the panel. The read
+                                    // component also binds scope/service and
+                                    // supports explicit refresh; it is a snapshot.
                                     key={`history-${selectedItem.id}-${entry.learnerId}-${entry.updatedAt}`}
                                     service={learnerScoreService}
                                     assessmentItemId={selectedItem.id}
@@ -1535,9 +1758,7 @@ export function ClassRecordWorkspace({
             classRecordId={classRecordId}
             revision={reportingRevision}
             disabled={!itemsReady || savingLearnerIds.size > 0}
-            pendingEdits={
-              Object.keys(scoreDrafts).length > 0 || Object.keys(pendingCorrections).length > 0
-            }
+            pendingEdits={hasPendingScoreEdits}
           />
           <ReportCardDraftPanel
             key={`drafts-${classRecordId}`}
@@ -1552,9 +1773,25 @@ export function ClassRecordWorkspace({
               <p className="field-hint">
                 Grading weighting: <strong>{weightPolicyName ?? "not shown"}</strong>
               </p>
+              <p className="field-hint" id="term-grade-saved-evidence">
+                Term grades use saved records on this device across the full grading period. Unsaved
+                input is excluded; computed completeness is not reporting approval.
+              </p>
+              {hasPendingScoreEdits && (
+                <p className="score-draft-note" role="status">
+                  This item has unsaved score work. Save or cancel it before reviewing the saved
+                  result.
+                </p>
+              )}
+              {gradeCheckWait && (
+                <p className="field-hint" id="term-grade-check-wait" role="status">
+                  {gradeCheckWait}
+                </p>
+              )}
               <button
                 type="button"
-                aria-disabled={termGradesLoading}
+                aria-disabled={termGradesLoading || Boolean(gradeCheckWait)}
+                aria-describedby={`term-grade-saved-evidence${gradeCheckWait ? " term-grade-check-wait" : ""}`}
                 onClick={handleShowTermGrades}
               >
                 {termGradesLoading ? "Computing…" : "Show term grades"}
@@ -1563,9 +1800,9 @@ export function ClassRecordWorkspace({
                 <p className="field-hint">
                   Term grade uses the weighting above (DepEd Order No. 015, s. 2026) across every
                   category in this class record, not just the item selected above. A learner shows
-                  "Not yet available" until every category has at least one scored item — this app
-                  never estimates a grade from incomplete scores. Once shown, correcting a score
-                  keeps that learner's grade current automatically.
+                  "Not yet available" when a current grade cannot be returned. Once requested,
+                  saving a score checks that learner's grade again. A failed check hides the older
+                  grade; choose Show term grades to retry.
                 </p>
               )}
               {Object.keys(termGrades).length > 0 && (
@@ -1586,7 +1823,24 @@ export function ClassRecordWorkspace({
                             {entry.givenName} {entry.familyName}
                           </th>
                           <td>
-                            {grade === undefined ? (
+                            {savingLearnerIds.has(entry.learnerId) ? (
+                              <span className="field-hint" role="status">
+                                Score save pending. Check term grades after it finishes.
+                              </span>
+                            ) : grade === "unconfirmed" ? (
+                              <span className="field-hint" role="status">
+                                Score save was not confirmed. Show term grades to check saved
+                                records.
+                              </span>
+                            ) : grade === "refreshing" ? (
+                              <span className="field-hint" role="status">
+                                Updating grade…
+                              </span>
+                            ) : grade === "error" ? (
+                              <span className="field-error" role="alert">
+                                Could not refresh. Show term grades to retry.
+                              </span>
+                            ) : grade === undefined ? (
                               "—"
                             ) : grade === null ? (
                               "Not yet available"
@@ -1643,14 +1897,35 @@ export function ClassRecordWorkspace({
                 </button>
               </div>
 
+              {reportCardExportError && (
+                <Alert tone="error">
+                  <h3>Report card export not confirmed</h3>
+                  <p>{reportCardExportError}</p>
+                  <p>Use Export report card (CSV) to try again.</p>
+                </Alert>
+              )}
+              {classSummaryExportError && (
+                <Alert tone="error">
+                  <h3>Class summary export not confirmed</h3>
+                  <p>{classSummaryExportError}</p>
+                  <p>Use Export class summary (CSV) to try again.</p>
+                </Alert>
+              )}
               {classSummaryResult && (
                 <Alert tone="success">
+                  <h3>Class summary exported</h3>
+                  <p className="field-hint">
+                    Exported snapshot of saved records. Later changes are not included; export again
+                    for current saved records.
+                  </p>
                   <p>
-                    Saved to <code>{classSummaryResult.filePath}</code>.
+                    Saved to{" "}
+                    <code className="score-export-path">{classSummaryResult.filePath}</code>.
                   </p>
                   <button
                     type="button"
                     aria-disabled={revealingClassSummary}
+                    aria-label="Open class summary folder"
                     onClick={handleRevealClassSummary}
                   >
                     {revealingClassSummary ? "Opening…" : "Open folder"}
@@ -1672,12 +1947,18 @@ export function ClassRecordWorkspace({
 
               {reportCardResult && (
                 <Alert tone="success">
+                  <h3>Report card exported</h3>
+                  <p className="field-hint">
+                    Exported snapshot of saved records. Later changes are not included; export again
+                    for current saved records.
+                  </p>
                   <p>
-                    Saved to <code>{reportCardResult.filePath}</code>.
+                    Saved to <code className="score-export-path">{reportCardResult.filePath}</code>.
                   </p>
                   <button
                     type="button"
                     aria-disabled={revealingReportCard}
+                    aria-label="Open report card folder"
                     onClick={handleRevealReportCard}
                   >
                     {revealingReportCard ? "Opening…" : "Open folder"}

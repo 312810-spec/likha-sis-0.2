@@ -1,0 +1,11 @@
+# Shared design-system execution handoff
+
+22 October 2026, Asia/Manila. Branch `forge/design-system-contracts-20261022`, parent integration checkpoint d00278602ed843b1a841b1830de35b891013a9a3. Applies the local Impeccable extraction guidance and current FORGE4 adapter. Existing tauri-ui source/reference and prior native/component experiments remain preserved.
+
+Frozen contract: design-system-contract-2026-10-22.md. Reusable specification: shared-design-system-specification-2026-10-22.md. Raw evidence: design-system-measurements-2026-10-22.json. Reproducible probe: scripts/assurance/design-system-browser.mjs.
+
+Outcome: KEEP_BASE. No production CSS, component, route, manifest or native source changes.36 catalog cases,108 reflow checks,12 deduplicated computed profiles,130 declarations and2 actual provider interaction checks PASS. Internal desktop/phone renders inspected. Quality PASS:1,612 tests/161 files, typecheck/lint/format/architecture/deadcode/batch checks. Production build PASS; preview isolation scanned21 dist files; catalog marker absent from production JS.
+
+Probe corrections were measurement setup: wait for exactly settled hover transition; use combobox accessible-role locators; focus the initiating density select explicitly; export generated Catalog for lint. These did not establish application defects or weaken frozen thresholds.
+
+DS1–DS6 bounded catalog/specification complete. DS7 local checks complete; PR154 gated and merged into parent as`6632a4d3b462a7b3eda520c3d12d7a6989b7cce9`; Quality39698546428 /Security39698546538 PASS onfee28f0; CI/actual merge share checked treea4b600536723fc8fbde5cc956a72a0c832689f7a. Exact receipt: design-system-ci-merge-2026-10-22.json. Native/Windows/UI jobs correctly skipped for this delta; browser matrix/build evidence is local. The following documentation checkpoint preserves all checked production/probe bytes. Current source hashes bind local evidence even after documentation-only commits. No fresh native/platform or teacher acceptance is claimed. Next: continue Scores source-owned state inventory; actual external A1–A7 observations remain required before another runtime journey. Preserve main and draft dependency chain.

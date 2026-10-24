@@ -1,0 +1,603 @@
+{
+  "project": "LIKHA-SIS",
+  "checked_source": "80a6ebfdefac205eaa67a6b3a23db0c2effd3fd6",
+  "checked_tree": "d5f2399619f506d7e2c267440a7f5d1182e03fd8",
+  "ci_merge": "ba099d8acbff94bfffda3bc07f7e004cfb46e276",
+  "merged_pr": 151,
+  "actual_merge": "252ce8791d34b9b11268db61fc9231cdd33b8df1",
+  "target_branch": "forge/legacy-setup-recovery-20261020",
+  "quality_run": 39605264979,
+  "security_run": 39605264944,
+  "quality_jobs": [
+    {
+      "id": 119239931514,
+      "name": "Quality / classify affected work",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264979,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout full history for diff classification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Determine changed files",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Verify classifier behavior",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Classify affected work",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Post Checkout full history for diff classification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        }
+      ]
+    },
+    {
+      "id": 119240015087,
+      "name": "Quality (Windows)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264979,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Confirm Rust toolchain is present",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Update npm to current stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Install Node dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Verify spreadsheet compatibility source provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Verify opener compatibility source provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Build the Windows-native Tauri application",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Test native Windows behavior",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Upload Windows test installers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        }
+      ]
+    },
+    {
+      "id": 119240015321,
+      "name": "Quality (Ubuntu)",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264979,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Update npm to current stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Node dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run documentation formatting gate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6
+        },
+        {
+          "name": "Verify harness contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run JavaScript and TypeScript quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Install Chromium for deterministic UI verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run UI workflow and accessibility smoke gate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Verify UX recovery journeys",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Verify pre-React appearance in development and production",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Upload appearance startup verification receipts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Upload UI verification screenshots",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Install Tauri Linux build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Confirm Rust toolchain is present",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Verify spreadsheet compatibility source provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Verify opener compatibility source provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Verify cold SQLCipher initialization mechanism",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Run native Rust quality gate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Exercise opener compatibility on a private synthetic D-Bus",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "Verify bounded score native baseline negative controls",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Post Set up Node.js",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 43
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 44
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 45
+        }
+      ]
+    }
+  ],
+  "security_jobs": [
+    {
+      "id": 119239709312,
+      "name": "Security / osv-scanner",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264944,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Download and verify osv-scanner v2.6.0 (linux_amd64)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run osv-scanner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        }
+      ]
+    },
+    {
+      "id": 119239709801,
+      "name": "Security / cargo-deny",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264944,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Build EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run cargo-deny",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        }
+      ]
+    },
+    {
+      "id": 119239709845,
+      "name": "Security / gitleaks",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 39605264944,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout (full history)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run gitleaks",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Post Checkout (full history)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12348732545,
+      "name": "likha-sis-windows-test-installers",
+      "size_in_bytes": 22973823,
+      "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12348732545",
+      "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12348732545/zip",
+      "expired": false,
+      "created_at": "2026-10-21T13:32:35Z",
+      "expires_at": "2026-11-04T13:32:32Z",
+      "updated_at": "2026-10-21T13:32:35Z",
+      "digest": "sha256:67f5579bf7857a01799a152ea51649569626613da2d2de62649b92cb952acbd9",
+      "workflow_run": {
+        "id": 39605264979,
+        "repository_id": 1344185717,
+        "head_repository_id": 1344185717,
+        "head_branch": "forge/tauri-ui-forge4-20261021",
+        "head_sha": "80a6ebfdefac205eaa67a6b3a23db0c2effd3fd6"
+      }
+    },
+    {
+      "id": 12348003867,
+      "name": "likha-sis-appearance-startup-verification",
+      "size_in_bytes": 1332,
+      "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12348003867",
+      "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12348003867/zip",
+      "expired": false,
+      "created_at": "2026-10-21T13:12:02Z",
+      "expires_at": "2026-10-28T13:12:01Z",
+      "updated_at": "2026-10-21T13:12:02Z",
+      "digest": "sha256:d2e53cd661586814865a0185bc55e255797b01439aee7a53a171b29d81cea04c",
+      "workflow_run": {
+        "id": 39605264979,
+        "repository_id": 1344185717,
+        "head_repository_id": 1344185717,
+        "head_branch": "forge/tauri-ui-forge4-20261021",
+        "head_sha": "80a6ebfdefac205eaa67a6b3a23db0c2effd3fd6"
+      }
+    },
+    {
+      "id": 12347998939,
+      "name": "likha-sis-ui-verification",
+      "size_in_bytes": 929296,
+      "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12347998939",
+      "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12347998939/zip",
+      "expired": false,
+      "created_at": "2026-10-21T13:12:02Z",
+      "expires_at": "2026-10-28T13:12:02Z",
+      "updated_at": "2026-10-21T13:12:02Z",
+      "digest": "sha256:7969f483fe62cac1351e6d4a4847bd7a046a0050b95c84ec0eb7cf2f73ed40c3",
+      "workflow_run": {
+        "id": 39605264979,
+        "repository_id": 1344185717,
+        "head_repository_id": 1344185717,
+        "head_branch": "forge/tauri-ui-forge4-20261021",
+        "head_sha": "80a6ebfdefac205eaa67a6b3a23db0c2effd3fd6"
+      }
+    }
+  ],
+  "native_counts": {
+    "ubuntu": 1535,
+    "windows": 1544
+  },
+  "ubuntu_receipt": [
+    "2026-10-21T13:10:55.9717141Z \u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m161 passed\u001b[39m\u001b[22m\u001b[90m (161)\u001b[39m",
+    "2026-10-21T13:10:55.9729114Z \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1604 passed\u001b[39m\u001b[22m\u001b[90m (1604)\u001b[39m",
+    "2026-10-21T13:11:59.3000226Z PASS: 13/13 development startup cases.",
+    "2026-10-21T13:12:01.3316293Z PASS: 13/13 production startup cases.",
+    "2026-10-21T13:17:22.9915844Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 24s",
+    "2026-10-21T13:22:37.4771921Z test result: ok. 1313 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 314.29s",
+    "2026-10-21T13:22:37.5090857Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "2026-10-21T13:22:41.4949943Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.98s",
+    "2026-10-21T13:22:51.4332943Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.93s",
+    "2026-10-21T13:22:56.4019900Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.95s",
+    "2026-10-21T13:22:57.0444390Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s",
+    "2026-10-21T13:23:00.5887756Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.54s",
+    "2026-10-21T13:23:12.8421777Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.24s",
+    "2026-10-21T13:23:36.7690715Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.92s",
+    "2026-10-21T13:23:42.1864841Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.40s",
+    "2026-10-21T13:23:53.2456486Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.06s",
+    "2026-10-21T13:23:57.7295326Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.47s",
+    "2026-10-21T13:24:00.3539766Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.61s",
+    "2026-10-21T13:24:06.7751693Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.41s",
+    "2026-10-21T13:24:16.4487046Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.66s",
+    "2026-10-21T13:24:16.8369187Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s",
+    "2026-10-21T13:24:18.7226723Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s",
+    "2026-10-21T13:24:27.9356850Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.20s",
+    "2026-10-21T13:24:38.2601755Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.31s",
+    "2026-10-21T13:24:40.0078309Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.74s",
+    "2026-10-21T13:24:47.8139674Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.80s",
+    "2026-10-21T13:24:55.0174031Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.19s",
+    "2026-10-21T13:24:55.0595695Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+    "2026-10-21T13:25:05.6985739Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.64s",
+    "2026-10-21T13:25:13.4765745Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.76s",
+    "2026-10-21T13:25:14.7345424Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "2026-10-21T13:26:51.3341470Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 36s",
+    "2026-10-21T13:27:15.4166358Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.86s",
+    "2026-10-21T13:27:15.5157164Z opener private D-Bus success: PASS",
+    "2026-10-21T13:27:15.5715586Z opener private D-Bus fallback: PASS",
+    "2026-10-21T13:27:15.6273305Z opener private D-Bus denied: PASS",
+    "2026-10-21T13:27:35.6634501Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 17.47s",
+    "2026-10-21T13:27:37.0465387Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s",
+    "2026-10-21T13:27:37.0476811Z SCORE_NATIVE_NEGATIVE_CONTROLS_JSON={\"baseline\": \"ac4c3add56fb7a0677f1a0f745bf1de816ea55ee\", \"evidence\": \"Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture\", \"source_restored\": true, \"results\": [{\"case\": \"command_rejects_unassigned_same_school_teacher_without_writing\", \"baseline_failed_as_expected\": true}, {\"case\": \"command_local_correction_failure_rolls_back_history\", \"baseline_failed_as_expected\": true}]}"
+  ],
+  "windows_receipt": [
+    "2026-10-21T13:21:36.0242966Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 12m 05s\r",
+    "2026-10-21T13:21:36.2261634Z        Built application at: D:\\a\\likha-sis-0.2\\likha-sis-0.2\\src-tauri\\target\\debug\\app.exe\r",
+    "2026-10-21T13:22:29.6144435Z     Finished 2 bundles at:\r",
+    "2026-10-21T13:24:41.0236680Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 10s\r",
+    "2026-10-21T13:30:01.9021747Z test result: ok. 1322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 320.72s\r",
+    "2026-10-21T13:30:01.9340435Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+    "2026-10-21T13:30:06.1672446Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s\r",
+    "2026-10-21T13:30:15.2911629Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.11s\r",
+    "2026-10-21T13:30:19.6053850Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.30s\r",
+    "2026-10-21T13:30:20.3881040Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s\r",
+    "2026-10-21T13:30:23.6380445Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.23s\r",
+    "2026-10-21T13:30:33.4157891Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.76s\r",
+    "2026-10-21T13:30:56.0567409Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.62s\r",
+    "2026-10-21T13:31:01.9826361Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.91s\r",
+    "2026-10-21T13:31:12.5677925Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.57s\r",
+    "2026-10-21T13:31:16.5847701Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.00s\r",
+    "2026-10-21T13:31:19.3003049Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s\r",
+    "2026-10-21T13:31:25.0030235Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.68s\r",
+    "2026-10-21T13:31:34.9225741Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.90s\r",
+    "2026-10-21T13:31:35.2153832Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s\r",
+    "2026-10-21T13:31:36.9814480Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.75s\r",
+    "2026-10-21T13:31:44.4750619Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.48s\r",
+    "2026-10-21T13:31:54.2362525Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.74s\r",
+    "2026-10-21T13:31:55.9028918Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s\r",
+    "2026-10-21T13:32:03.2475981Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.33s\r",
+    "2026-10-21T13:32:09.7540646Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.49s\r",
+    "2026-10-21T13:32:09.8079417Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s\r",
+    "2026-10-21T13:32:21.1883741Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.36s\r",
+    "2026-10-21T13:32:28.6606235Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.45s\r",
+    "2026-10-21T13:32:30.9754931Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+    "2026-10-21T13:32:35.8965594Z Artifact likha-sis-windows-test-installers successfully finalized. Artifact ID 12348732545\r",
+    "2026-10-21T13:32:35.8966680Z Artifact likha-sis-windows-test-installers has been successfully uploaded! Final size is 22973823 bytes. Artifact ID is 12348732545\r"
+  ],
+  "scope": "T1–T8 bounded instruction/startup/security slice PASS; full Scores pilot INCONCLUSIVE",
+  "not_run": [
+    "installed Windows GUI/upgrade/recovery/printing",
+    "actual Android",
+    "real two-device exchange",
+    "teacher comprehension",
+    "manual assistive technology"
+  ],
+  "notes": [
+    "No production-source or workflow change in the receipt checkpoint; reuse only the checked implementation receipts above.",
+    "No main merge or deployment. PR146–150 remain separate dependent work."
+  ]
+}

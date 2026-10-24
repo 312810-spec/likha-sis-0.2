@@ -3,6 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script id="likha-appearance-bootstrap">
+      // Apply the existing device preference before module loading/React effects.
+      // Presentation only: never write storage, session state or school records.
+      (() => {
+        let preference;
+        try {
+          preference = window.localStorage.getItem("likha-sis:appearance");
+        } catch {
+          // Storage is optional; continue with the system appearance.
+        }
+        let appearance = preference;
+        if (appearance !== "light" && appearance !== "dark") {
+          appearance = "light";
+          try {
+            if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) appearance = "dark";
+          } catch {
+            // An unavailable media query must not prevent the app from starting.
+          }
+        }
+        document.documentElement.dataset.appearance = appearance;
+      })();
+    </script>
     <title>LIKHA-SIS</title>
   </head>
   <body>

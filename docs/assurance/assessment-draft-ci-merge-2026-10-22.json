@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-22",
+  "timezone": "Asia/Manila",
+  "pr": 157,
+  "url": "https://github.com/312810-spec/likha-sis-0.2/pull/157",
+  "base": "82dd88f32fd73d6153a1b7ecdc56024d4141a803",
+  "checkedHead": "54203b720f90e13e8279ca163616f8e450a5c2d0",
+  "ciMerge": "9c2e1207525cc7cbbd2ff2494650cc1dfe85fbbd",
+  "checkedTree": "043bab8355dc81744264c74ecaf4fca426533fbb",
+  "actualMerge": "6276bf556a031a1d2c587b1799e279911b348d39",
+  "actualMergeTree": "043bab8355dc81744264c74ecaf4fca426533fbb",
+  "qualityRun": 39738480234,
+  "securityRun": 39738480229,
+  "qualityConclusion": "success",
+  "securityConclusion": "success",
+  "classifier": {
+    "javascript": true,
+    "ui": true,
+    "native": false,
+    "windows": false
+  },
+  "ciJobs": {
+    "qualityJob": 119689759763,
+    "classifierJob": 119689709861,
+    "qualityLogExcerpts": [
+      "2026-10-22T07:11:33.9773170Z  Test Files  161 passed (161)",
+      "2026-10-22T07:11:33.9802086Z       Tests  1634 passed (1634)",
+      "2026-10-22T07:12:14.2164161Z quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-22T07:12:35.7322084Z quality:ui:recovery PASS — 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-22T07:12:40.4672302Z PASS: 13/13 development startup cases.",
+      "2026-10-22T07:12:42.4632882Z PASS: 13/13 production startup cases.",
+      "2026-10-22T07:12:43.4484574Z Artifact likha-sis-appearance-startup-verification successfully finalized. Artifact ID 12408835734",
+      "2026-10-22T07:12:43.4486123Z Artifact likha-sis-appearance-startup-verification has been successfully uploaded! Final size is 1332 bytes. Artifact ID is 12408835734",
+      "2026-10-22T07:12:44.4726851Z Artifact likha-sis-ui-verification successfully finalized. Artifact ID 12408371801",
+      "2026-10-22T07:12:44.4728193Z Artifact likha-sis-ui-verification has been successfully uploaded! Final size is 928009 bytes. Artifact ID is 12408371801"
+    ],
+    "securityJobs": [
+      {
+        "id": 119689709380,
+        "name": "Security / gitleaks",
+        "conclusion": "success"
+      },
+      {
+        "id": 119689709543,
+        "name": "Security / cargo-deny",
+        "conclusion": "success"
+      },
+      {
+        "id": 119689709662,
+        "name": "Security / osv-scanner",
+        "conclusion": "success"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 12408835734,
+        "name": "likha-sis-appearance-startup-verification",
+        "size_in_bytes": 1332,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12408835734",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12408835734/zip",
+        "expired": false,
+        "created_at": "2026-10-22T07:12:43Z",
+        "expires_at": "2026-10-29T07:12:42Z",
+        "updated_at": "2026-10-22T07:12:43Z",
+        "digest": "sha256:f8d08ac98ef4fe00318e68061d49c44f3d62fc3b0c715f9d598c9af58f6ee452",
+        "workflow_run": {
+          "id": 39738480234,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/assessment-draft-ack-20261022",
+          "head_sha": "54203b720f90e13e8279ca163616f8e450a5c2d0"
+        }
+      },
+      {
+        "id": 12408371801,
+        "name": "likha-sis-ui-verification",
+        "size_in_bytes": 928009,
+        "url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12408371801",
+        "archive_download_url": "https://api.github.com/repos/312810-spec/likha-sis-0.2/actions/artifacts/12408371801/zip",
+        "expired": false,
+        "created_at": "2026-10-22T07:12:44Z",
+        "expires_at": "2026-10-29T07:12:43Z",
+        "updated_at": "2026-10-22T07:12:44Z",
+        "digest": "sha256:d3e32f8e6c308ba766898766c294b56603fca576b9ac39967b92f23198ed7c2c",
+        "workflow_run": {
+          "id": 39738480234,
+          "repository_id": 1344185717,
+          "head_repository_id": 1344185717,
+          "head_branch": "forge/assessment-draft-ack-20261022",
+          "head_sha": "54203b720f90e13e8279ca163616f8e450a5c2d0"
+        }
+      }
+    ]
+  },
+  "localEvidence": "assessment-draft-evidence-2026-10-22.json",
+  "limits": [
+    "Synthetic in-memory creation/composition is not native persistence or actual device IME proof",
+    "Full PM-12 editing/deletion and Scores A1–A7 teacher/device/manual acceptance remain partial/pending",
+    "No main merge/deployment"
+  ]
+}

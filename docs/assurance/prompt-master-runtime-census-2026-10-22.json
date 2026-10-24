@@ -1,0 +1,685 @@
+{
+  "project": "LIKHA-SIS",
+  "source": "62f32eb602ab26a02d613034d9b5eaab410e4931",
+  "browser": "156.0.8078.47",
+  "fixtureSha256": "9f0a927b19e28493902fc0bdd018807c0923abc8346b4d70b3d94fa93026c3a7",
+  "method": "Read-only synthetic teacher and school-head navigation through actual shell/More buttons",
+  "checks": [
+    {
+      "role": "teacher",
+      "id": "review",
+      "owner": "PM-15",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "today",
+      "owner": "PM-07",
+      "path": "existing shell navigation",
+      "headings": ["Today", "Today’s schedule", "Choose a class"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "daily-planner",
+      "owner": "PM-07",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "record-library",
+      "owner": "PM-18",
+      "path": "More directory",
+      "headings": ["Class Records"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "workspace",
+      "owner": "PM-07",
+      "path": "existing shell navigation",
+      "headings": [
+        "My classes",
+        "Mabini",
+        "Class learners",
+        "Subject attendance",
+        "Class record",
+        "Forms"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "school-forms",
+      "owner": "PM-18",
+      "path": "existing shell navigation",
+      "headings": ["School Forms", "Attendance", "Grades", "Learners"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "calendar",
+      "owner": "PM-23",
+      "path": "More directory",
+      "headings": ["Calendar", "Thursday · October 22, 2026", "No scheduled classes for this day"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "more",
+      "owner": "PM-05",
+      "path": "existing shell navigation",
+      "headings": [
+        "More",
+        "My teaching",
+        "Daily Teaching",
+        "Class Overview",
+        "Learner Records",
+        "Grading",
+        "Creation Studio",
+        "Sync",
+        "Security"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "account",
+      "owner": "PM-29",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "learners",
+      "owner": "PM-19",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "sections",
+      "owner": "PM-20",
+      "path": "More directory",
+      "headings": ["Sections", "End-of-School-Year Summary (SF6)"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "section-roster",
+      "owner": "PM-20",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "teaching-assignments",
+      "owner": "PM-22",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "section-adviser",
+      "owner": "PM-20",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "schedule-meetings",
+      "owner": "PM-23",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "sf1-import",
+      "owner": "PM-21",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "my-day",
+      "owner": "PM-08",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "today-classes",
+      "owner": "PM-07",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "attendance",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": ["Attendance"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "subject-attendance",
+      "owner": "PM-10",
+      "path": "More directory",
+      "headings": ["Subject Attendance"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "subject-monitor",
+      "owner": "PM-10",
+      "path": "More directory",
+      "headings": ["Subject Monitor"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "adviser-view",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": [
+        "My Advisory",
+        "Advisory roster",
+        "Official daily attendance",
+        "Monthly attendance preview",
+        "Subject Attendance signals"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "teacher-load",
+      "owner": "PM-24",
+      "path": "More directory",
+      "headings": ["My Teaching Load", "Counted in this load"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "monthly-summary",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": ["Monthly Attendance Summary"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "grading-periods",
+      "owner": "PM-25",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "class-records",
+      "owner": "PM-13",
+      "path": "More directory",
+      "headings": ["My classes", "Mabini", "Mathematics — Mabini"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "lesson-plans",
+      "owner": "PM-26",
+      "path": "More directory",
+      "headings": [
+        "Creation Studio — Lesson Plan Builder",
+        "Intentions",
+        "Learning Experiences",
+        "Assessment",
+        "Ways Forward",
+        "Saved lesson plans for this class"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "audit-log",
+      "owner": "PM-29",
+      "path": "More directory",
+      "headings": ["Sign-in Activity"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "admin-password-reset",
+      "owner": "PM-29",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "school-members",
+      "owner": "PM-22",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "devices",
+      "owner": "PM-28",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "conflict-review",
+      "owner": "PM-27",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "sync-status",
+      "owner": "PM-27",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "teacher",
+      "id": "school-branding",
+      "owner": "PM-03",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "learning-support",
+      "owner": "PM-15",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "teacher",
+      "id": "schedule-planner",
+      "owner": "PM-24",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "review",
+      "owner": "PM-15",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "today",
+      "owner": "PM-07",
+      "path": "existing shell navigation",
+      "headings": ["Today", "Today’s schedule", "Choose a class"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "daily-planner",
+      "owner": "PM-07",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "record-library",
+      "owner": "PM-18",
+      "path": "More directory",
+      "headings": ["Class Records"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "workspace",
+      "owner": "PM-07",
+      "path": "existing shell navigation",
+      "headings": [
+        "My classes",
+        "Mabini",
+        "Class learners",
+        "Subject attendance",
+        "Class record",
+        "Forms"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "school-forms",
+      "owner": "PM-18",
+      "path": "existing shell navigation",
+      "headings": ["School Forms", "Attendance", "Grades", "Learners"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "calendar",
+      "owner": "PM-23",
+      "path": "More directory",
+      "headings": ["Calendar", "Thursday · October 22, 2026", "No scheduled classes for this day"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "more",
+      "owner": "PM-05",
+      "path": "existing shell navigation",
+      "headings": [
+        "More",
+        "My teaching",
+        "Daily Teaching",
+        "Class Overview",
+        "Learner Records",
+        "Grading",
+        "Creation Studio",
+        "Sync",
+        "Security"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "account",
+      "owner": "PM-29",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "learners",
+      "owner": "PM-19",
+      "path": "More directory",
+      "headings": ["Learners", "Enroll a learner"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "sections",
+      "owner": "PM-20",
+      "path": "More directory",
+      "headings": [
+        "Sections",
+        "Create a section",
+        "Enroll a learner",
+        "End-of-School-Year Summary (SF6)"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "section-roster",
+      "owner": "PM-20",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "teaching-assignments",
+      "owner": "PM-22",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "section-adviser",
+      "owner": "PM-20",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "schedule-meetings",
+      "owner": "PM-23",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "sf1-import",
+      "owner": "PM-21",
+      "path": "More directory",
+      "headings": ["SF1: Enrollment", "Import existing SF1"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "my-day",
+      "owner": "PM-08",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "today-classes",
+      "owner": "PM-07",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "attendance",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": ["Attendance"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "subject-attendance",
+      "owner": "PM-10",
+      "path": "More directory",
+      "headings": ["Subject Attendance"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "subject-monitor",
+      "owner": "PM-10",
+      "path": "More directory",
+      "headings": ["Subject Monitor"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "adviser-view",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": [
+        "My Advisory",
+        "Advisory roster",
+        "Official daily attendance",
+        "Monthly attendance preview",
+        "Subject Attendance signals"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "teacher-load",
+      "owner": "PM-24",
+      "path": "More directory",
+      "headings": ["My Teaching Load", "Counted in this load"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "monthly-summary",
+      "owner": "PM-11",
+      "path": "More directory",
+      "headings": ["Monthly Attendance Summary"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "grading-periods",
+      "owner": "PM-25",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "class-records",
+      "owner": "PM-13",
+      "path": "More directory",
+      "headings": ["My classes", "Mabini", "Mathematics — Mabini"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "lesson-plans",
+      "owner": "PM-26",
+      "path": "More directory",
+      "headings": [
+        "Creation Studio — Lesson Plan Builder",
+        "Intentions",
+        "Learning Experiences",
+        "Assessment",
+        "Ways Forward",
+        "Saved lesson plans for this class"
+      ],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "audit-log",
+      "owner": "PM-29",
+      "path": "More directory",
+      "headings": ["Sign-in Activity"],
+      "status": "OBSERVED synthetic fixture navigation",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "admin-password-reset",
+      "owner": "PM-29",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "school-members",
+      "owner": "PM-22",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "devices",
+      "owner": "PM-28",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "conflict-review",
+      "owner": "PM-27",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "sync-status",
+      "owner": "PM-27",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "school-branding",
+      "owner": "PM-03",
+      "path": "More directory",
+      "headings": [],
+      "status": "PLACEHOLDER / no direct fixture branch",
+      "limit": "Not native authorization, state coverage or teacher acceptance"
+    },
+    {
+      "role": "school_head",
+      "id": "learning-support",
+      "owner": "PM-15",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    },
+    {
+      "role": "school_head",
+      "id": "schedule-planner",
+      "owner": "PM-24",
+      "status": "NOT RUN",
+      "reason": "Not exposed through current fixture shell/More path; contextual/role/source review required"
+    }
+  ],
+  "limits": [
+    "Fixture role props are not native session/assignment authorization",
+    "Contextual children and unavailable fixture branches remain pending",
+    "Only navigation observed; no workflow write or full state/device/AT claim"
+  ]
+}

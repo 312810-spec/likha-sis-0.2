@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-22",
+  "timezone": "Asia/Manila",
+  "pr": 154,
+  "url": "https://github.com/312810-spec/likha-sis-0.2/pull/154",
+  "base": "d00278602ed843b1a841b1830de35b891013a9a3",
+  "checkedHead": "fee28f00391edca2707a00f4b5f9602c00b771fc",
+  "ciMerge": "38d904d1e37a562f52e3e1200a3eadb1c25bc25d",
+  "checkedTree": "a4b600536723fc8fbde5cc956a72a0c832689f7a",
+  "actualMerge": "6632a4d3b462a7b3eda520c3d12d7a6989b7cce9",
+  "actualMergeTree": "a4b600536723fc8fbde5cc956a72a0c832689f7a",
+  "qualityRun": 39698546428,
+  "securityRun": 39698546538,
+  "qualityConclusion": "success",
+  "securityConclusion": "success",
+  "classifier": {
+    "javascript": true,
+    "ui": false,
+    "native": false,
+    "windows": false
+  },
+  "local": {
+    "qualityTests": 1612,
+    "qualityFiles": 161,
+    "catalogConfigurations": 36,
+    "reflowChecks": 108,
+    "providerInteractionChecks": 2,
+    "deduplicatedProfiles": 12,
+    "cssDeclarations": 130,
+    "sampledSelectors": 22,
+    "computedStyleProperties": 21,
+    "build": "PASS",
+    "fixtureExclusion": "PASS",
+    "previewIsolationFiles": 21,
+    "internalRenderInspection": ["light comfortable desktop", "dark guided phone"]
+  },
+  "sourceBinding": "Measurement receipt records all production/probe SHA256 hashes; these remain unchanged in this documentation checkpoint.",
+  "decision": "KEEP_BASE",
+  "limits": [
+    "No production source change or school-record write",
+    "No fresh native/platform acceptance",
+    "Full81-consumer/brand scope pending",
+    "Scores teacher/device/manual A1–A7 pending",
+    "No main merge or deployment"
+  ],
+  "localLogSha256": {
+    "ds-quality-final.log": "ee4b190c4022a7c340dbf38266dacbd021434d05d7ac87331bbc7a484da1237b",
+    "ds-browser.log": "4f0b84ef5543828ba795f4aedda82b69ff7f0222942a4e55097851f93bc1f9ee",
+    "ds-build.log": "ab291ef8d128e682cfd376cc47d8a47e0b3ba4ee55062861b93c4252b3cbb8aa",
+    "ds-isolation.log": "be2003395758a470035c46eaf39f061a86bff0bb1adc5322ad214efc14f5e280"
+  },
+  "ciJobs": {
+    "qualityJob": 119561874445,
+    "classifierJob": 119561818562,
+    "securityJobs": [
+      {
+        "id": 119561819205,
+        "name": "Security / cargo-deny",
+        "conclusion": "success"
+      },
+      {
+        "id": 119561819353,
+        "name": "Security / gitleaks",
+        "conclusion": "success"
+      },
+      {
+        "id": 119561819427,
+        "name": "Security / osv-scanner",
+        "conclusion": "success"
+      }
+    ],
+    "qualityLogExcerpts": [
+      "2026-10-22T00:15:54.2515032Z All matched files use Prettier code style!",
+      "2026-10-22T00:16:55.2279220Z  Test Files  161 passed (161)",
+      "2026-10-22T00:16:55.2285829Z       Tests  1612 passed (1612)"
+    ]
+  }
+}

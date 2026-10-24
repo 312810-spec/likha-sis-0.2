@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import {spawn} from "node:child_process";
+import {readFile,writeFile} from "node:fs/promises";
+import {createHash} from "node:crypto";
+import {chromium} from "playwright";
+import {uiBrowserExecutable} from "../../scripts/ui-browser.mjs";
+const inventory=JSON.parse(await readFile("docs/assurance/prompt-master-inventory-2026-10-22.json","utf8"));
+const fixture=await readFile("src/dev-preview/DevPreviewApp.tsx","utf8");
+const server=spawn(process.execPath,["node_modules/vite/bin/vite.js","--host","127.0.0.1"],{stdio:"ignore"});
+const url="http://127.0.0.1:1420/dev-preview.html";
+let browser;
+const checks=[];
+try{
+ for(let n=0;n<80;n++){
+  try{if((await fetch(url)).ok)break;}catch{}
+  if(n===79)throw Error("server did not start");
+  await new Promise(r=>setTimeout(r,250));
+ }
+ browser=await chromium.launch({headless:true,executablePath:await uiBrowserExecutable()});
+ for(const role of ["teacher","school_head"]){
+  const page=await browser.newPage({viewport:{width:1280,height:1000}});
+  await page.goto(url+(role==="school_head"?"?role=school_head":""),{waitUntil:"networkidle"});
+  assert.equal(await page.getByRole("status").filter({hasText:"Development preview"}).count(),1);
+  for(const route of inventory.routes){
+   await page.getByRole("button",{name:"More",exact:true}).click();
+   const entry=page.locator(".workspace-directory").getByRole("button",{name:route.label,exact:true});
+   let action=entry.first(),path="More directory";
+   if(!(await entry.count())){
+    action=page.getByRole("button",{name:route.label,exact:true}).first();
+    path="existing shell navigation";
+   }
+   if(!(await action.count())||!(await action.isVisible())){
+    checks.push({role,id:route.id,owner:route.owner,status:"NOT RUN",reason:"Not exposed through current fixture shell/More path; contextual/role/source review required"});
+    continue;
+   }
+   await action.click();
+   const implemented=fixture.includes('activeTab === "'+route.id+'"');
+   const headings=await page.locator("main h2,main h3").allTextContents();
+   checks.push({role,id:route.id,owner:route.owner,path,headings:headings.slice(0,12),
+    status:implemented?"OBSERVED synthetic fixture navigation":"PLACEHOLDER / no direct fixture branch",
+    limit:"Not native authorization, state coverage or teacher acceptance"});
+  }
+  await page.close();
+ }
+ const data={project:"LIKHA-SIS",source:"62f32eb602ab26a02d613034d9b5eaab410e4931",browser:browser.version(),
+  fixtureSha256:createHash("sha256").update(fixture).digest("hex"),method:"Read-only synthetic teacher and school-head navigation through actual shell/More buttons",
+  checks,limits:["Fixture role props are not native session/assignment authorization","Contextual children and unavailable fixture branches remain pending","Only navigation observed; no workflow write or full state/device/AT claim"]};
+ await writeFile(".cache/prompt-master/runtime-census.json",JSON.stringify(data,null,2)+"\n");
+ console.log(JSON.stringify({cases:checks.length,observed:checks.filter(x=>x.status.startsWith("OBSERVED")).length,placeholder:checks.filter(x=>x.status.startsWith("PLACEHOLDER")).length,notRun:checks.filter(x=>x.status==="NOT RUN").length}));
+}finally{await browser?.close();server.kill();}

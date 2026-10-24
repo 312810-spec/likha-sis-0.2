@@ -1,6 +1,6 @@
 import { SessionDraftProvider } from "./SessionDraftProvider";
 import { clearSessionDrafts } from "./session-draft-store";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
@@ -315,5 +315,516 @@ describe("authoring draft continuity", () => {
     expect(screen.getByLabelText("Item name")).toHaveValue("Unfinished quiz");
     expect(repo.createCalls).toHaveLength(0);
     clearSessionDrafts();
+  });
+});
+
+describe("assessment creation acknowledgment continuity", () => {
+  it("retains the next Studio item and focused field while the previous creation finishes", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await user.clear(max);
+    await user.type(max, "10");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(max).toHaveValue(10);
+    expect(max).toHaveFocus();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("cr-1", "cat-1", "Quiz 2", 20);
+    expect(screen.getByText(/Quiz 2 added\./)).toBeVisible();
+  });
+  it("does not steal focus after a late list refresh while the next name is being prepared", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const original = repo.listItemsByClassRecord.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "listItemsByClassRecord").mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = async () => resolve(await original());
+        }),
+    );
+    const name = screen.getByLabelText("Item name"),
+      max = screen.getByLabelText("Max score");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await screen.findByText(/Quiz 2 added\./);
+    await user.type(name, "Quiz 3");
+    await user.click(max);
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 3");
+    expect(max).toHaveFocus();
+  });
+  it("does not create an item for an IME composition Enter", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const spy = vi.spyOn(repo, "createItem");
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    fireEvent.keyDown(name, { key: "Enter", code: "Enter", isComposing: true });
+    expect(spy).not.toHaveBeenCalled();
+    expect(name).toHaveValue("Quiz 2");
+  });
+});
+
+describe("Studio creation draft boundaries", () => {
+  it("retains a category-only change while acknowledging the submitted category", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue([
+      CATEGORY,
+      { ...CATEGORY, id: "cat-2", name: "Synthetic second category" },
+    ]);
+    const create = repo.createItem.bind(repo);
+    let release!: () => Promise<void>;
+    vi.spyOn(repo, "createItem").mockImplementationOnce(
+      (...args) =>
+        new Promise((resolve) => {
+          release = async () => resolve(await create(...args));
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name"),
+      category = screen.getByLabelText("Category", { exact: true });
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.selectOptions(category, "cat-2");
+    await act(async () => release());
+    expect(name).toHaveValue("Quiz 2");
+    expect(category).toHaveValue("cat-2");
+    expect(category).toHaveFocus();
+    expect(repo.createCalls).toEqual([
+      { classRecordId: "cr-1", categoryId: "cat-1", name: "Quiz 2", maxScore: 20 },
+    ]);
+  });
+  it("retains a newer Studio draft after a failed create without retrying it", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    let reject!: (e: Error) => void;
+    const spy = vi.spyOn(repo, "createItem").mockImplementationOnce(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    const name = screen.getByLabelText("Item name");
+    await user.type(name, "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.clear(name);
+    await user.type(name, "Quiz 3");
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(await screen.findByText("Could not add this item.")).toBeVisible();
+    expect(name).toHaveValue("Quiz 3");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PM-12 delayed edit receipts", () => {
+  const prefix = "authoring-";
+  async function begin(repo: FakeAssessmentRepository) {
+    renderScreen(repo);
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Edit" }).length).toBeGreaterThan(0),
+    );
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]!);
+    return screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` });
+  }
+
+  it("retains newer edit fields and focus after a delayed full update", async () => {
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue([
+      CATEGORY,
+      { ...CATEGORY, id: "cat-2", name: "Other category" },
+    ]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Saving…" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    const max = screen.getByLabelText("Max score", { selector: `#${prefix}edit-max-ai-1` });
+    fireEvent.change(max, { target: { value: "30" } });
+    fireEvent.change(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+      { target: { value: "cat-2" } },
+    );
+    max.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Newer revision");
+    expect(max).toHaveValue(30);
+    expect(max).toHaveFocus();
+    expect(
+      screen.getByLabelText("Category", { selector: `#${prefix}edit-category-ai-1` }),
+    ).toHaveValue("cat-2");
+    expect(save).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision", "cat-1", 20);
+    expect(await screen.findByText(/Submitted revision updated\./)).toBeVisible();
+  });
+
+  it("preserves a newer scored-item rename even when text returns to the submitted value", async () => {
+    const repo = new FakeAssessmentRepository([{ ...ITEM, recordedCount: 2 }]);
+    let resolve!: (item: AssessmentItem | null) => void;
+    const rename = vi
+      .spyOn(repo, "renameItem")
+      .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const update = vi.spyOn(repo, "updateItem");
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Temporary" } });
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Submitted revision");
+    expect(rename).toHaveBeenCalledExactlyOnceWith("ai-1", "Submitted revision");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "preserves a reopened editor after cancel; different target=%s",
+    async (different) => {
+      const repo = new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2" }]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      const save = vi
+        .spyOn(repo, "updateItem")
+        .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      const edits = screen.getAllByRole("button", { name: "Edit" });
+      await userEvent.click(edits[different ? 1 : 0]!);
+      const id = different ? "ai-2" : "ai-1";
+      const reopened = screen.getByLabelText("Item name", {
+        selector: `#${prefix}edit-name-${id}`,
+      });
+      fireEvent.change(reopened, { target: { value: "Reopened work" } });
+      await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+      expect(reopened).toBeVisible();
+      expect(reopened).toHaveValue("Reopened work");
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("retains newer work on rejection and retries only after explicit Save", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    const save = vi
+      .spyOn(repo, "updateItem")
+      .mockImplementationOnce(() => new Promise((_done, fail) => (reject = fail)))
+      .mockResolvedValueOnce({ ...ITEM, name: "Newer revision" });
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    await act(async () => reject(new Error("synthetic failure")));
+    expect(name).toHaveValue("Newer revision");
+    expect(await screen.findByText(/Could not save changes to “Submitted revision”/)).toBeVisible();
+    expect(save).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(save).toHaveBeenLastCalledWith("ai-1", "Newer revision", "cat-1", 20);
+    expect(await screen.findByText("Newer revision updated.")).toBeVisible();
+    expect(
+      screen.queryByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }),
+    ).not.toBeInTheDocument();
+  });
+  it("keeps an editor mounted while the post-save list read is delayed", async () => {
+    const repo = new FakeAssessmentRepository();
+    const read = repo.listItemsByClassRecord.bind(repo);
+    let listResolve!: (items: AssessmentItemDetail[]) => void;
+    vi.spyOn(repo, "listItemsByClassRecord")
+      .mockImplementationOnce(read)
+      .mockImplementationOnce(() => new Promise((done) => (listResolve = done)));
+    let resolve!: (item: AssessmentItem | null) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((done) => (resolve = done)),
+    );
+    const name = await begin(repo);
+    fireEvent.change(name, { target: { value: "Submitted revision" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(name, { target: { value: "Newer revision" } });
+    name.focus();
+    await act(async () => resolve({ ...ITEM, name: "Submitted revision" }));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    fireEvent.change(name, { target: { value: "Work during list read" } });
+    await act(async () => listResolve([ITEM]));
+    expect(name).toBeVisible();
+    expect(name).toHaveFocus();
+    expect(name).toHaveValue("Work during list read");
+  });
+
+  it.each(["null", "reject"])(
+    "identifies the old target on a delayed %s without clearing the next editor",
+    async (outcome) => {
+      const repo = new FakeAssessmentRepository([
+        ITEM,
+        { ...ITEM, id: "ai-2", name: "Second item" },
+      ]);
+      let resolve!: (item: AssessmentItem | null) => void;
+      let reject!: (error: Error) => void;
+      const save = vi.spyOn(repo, "updateItem").mockImplementationOnce(
+        () =>
+          new Promise((done, fail) => {
+            resolve = done;
+            reject = fail;
+          }),
+      );
+      const name = await begin(repo);
+      fireEvent.change(name, { target: { value: "Submitted revision" } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+      const next = screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-2` });
+      fireEvent.change(next, { target: { value: "Second unsaved work" } });
+      await act(async () =>
+        outcome === "null" ? resolve(null) : reject(new Error("synthetic rejection")),
+      );
+      expect(next).toBeVisible();
+      expect(next).toHaveValue("Second unsaved work");
+      expect(
+        await screen.findByText(/Could not save changes to “Submitted revision”/),
+      ).toBeVisible();
+      expect(save).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("ignores a rejected old write after the source screen is unmounted and reopened", async () => {
+    const repo = new FakeAssessmentRepository();
+    let reject!: (error: Error) => void;
+    vi.spyOn(repo, "updateItem").mockImplementationOnce(
+      () => new Promise((_done, fail) => (reject = fail)),
+    );
+    const mounted = renderScreen(repo);
+    await screen.findByRole("button", { name: "Edit" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Item name", { selector: `#${prefix}edit-name-ai-1` }), {
+      target: { value: "Old source revision" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    mounted.unmount();
+    const next = new FakeAssessmentRepository();
+    const name = await begin(next);
+    fireEvent.change(name, { target: { value: "Current source work" } });
+    await act(async () => reject(new Error("old source rejected")));
+    expect(name).toBeVisible();
+    expect(name).toHaveValue("Current source work");
+    expect(
+      screen.queryByText(/Could not save changes to “Old source revision”/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute("aria-disabled", "false");
+  });
+});
+
+describe("PM-12 deletion state ownership", () => {
+  async function begin(
+    items = [
+      { ...ITEM, recordedCount: 0 },
+      { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+    ],
+  ) {
+    const repo = new FakeAssessmentRepository(items);
+    renderScreen(repo);
+    await screen.findByRole("group", { name: "Actions for Quiz 1" });
+    return repo;
+  }
+  function group(name: string) {
+    return screen.getByRole("group", { name: `Actions for ${name}` });
+  }
+  async function arm(name: string) {
+    await userEvent.click(within(group(name)).getByRole("button", { name: "Delete" }));
+  }
+  async function submit(name: string) {
+    await arm(name);
+    await userEvent.click(within(group(name)).getByRole("button", { name: "Confirm delete" }));
+  }
+
+  it.each([true, false])(
+    "keeps the next prepared confirmation after an older result=%s",
+    async (result) => {
+      const repo = await begin();
+      let resolve!: (value: boolean) => void;
+      const remove = vi
+        .spyOn(repo, "deleteItem")
+        .mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+      await submit("Quiz 1");
+      await arm("Quiz 2");
+      await act(async () => resolve(result));
+      expect(within(group("Quiz 2")).getByRole("button", { name: "Confirm delete" })).toBeVisible();
+      expect(remove).toHaveBeenCalledExactlyOnceWith("ai-1");
+      if (!result) expect(await screen.findByText(/“Quiz 1” was not deleted/)).toBeVisible();
+    },
+  );
+
+  it("keeps another pending delete guarded after the first result arrives", async () => {
+    const repo = await begin();
+    const original = repo.deleteItem.bind(repo);
+    let first!: (value: boolean) => void;
+    let second!: (value: boolean) => void;
+    const remove = vi
+      .spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((done) => (second = done)))
+      .mockImplementation(original);
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => first(true));
+    const busy = within(group("Quiz 2")).getByRole("button", { name: "Deleting…" });
+    await userEvent.click(busy);
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(busy).toHaveAttribute("aria-disabled", "true");
+    await act(async () => second(false));
+    expect(await screen.findByText(/“Quiz 2” was not deleted/)).toBeVisible();
+  });
+
+  it("does not offer Cancel or Edit as executable actions after dispatch", async () => {
+    const repo = await begin();
+    vi.spyOn(repo, "deleteItem").mockImplementationOnce(() => new Promise(() => {}));
+    await submit("Quiz 1");
+    expect(
+      within(group("Quiz 1")).queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    expect(within(group("Quiz 1")).getByText(/Deletion requested/)).toBeVisible();
+    const edit = within(group("Quiz 1")).getByRole("button", { name: "Edit" });
+    expect(edit).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(edit);
+    expect(
+      screen.queryByLabelText("Item name", { selector: "#authoring-edit-name-ai-1" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("requires read-only reload after an unconfirmed result and never replays deletion", async () => {
+    const repo = await begin();
+    let reject!: (error: Error) => void;
+    const remove = vi
+      .spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((_done, fail) => (reject = fail)));
+    await submit("Quiz 1");
+    await arm("Quiz 2");
+    await act(async () => reject(new Error("synthetic unknown result")));
+    expect(await screen.findByText(/Deletion of “Quiz 1” was not confirmed/)).toBeVisible();
+    const reload = screen.getByRole("button", { name: "Reload items" });
+    expect(screen.queryByRole("button", { name: "Confirm delete" })).not.toBeInTheDocument();
+    expect(remove).toHaveBeenCalledTimes(1);
+    await userEvent.click(reload);
+    expect(await screen.findByRole("group", { name: "Actions for Quiz 2" })).toBeVisible();
+    expect(within(group("Quiz 2")).getByRole("button", { name: "Confirm delete" })).toBeVisible();
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a prepared deletion without a write", async () => {
+    const repo = await begin();
+    const remove = vi.spyOn(repo, "deleteItem");
+    await arm("Quiz 1");
+    await userEvent.click(within(group("Quiz 1")).getByRole("button", { name: "Cancel" }));
+    expect(within(group("Quiz 1")).getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(remove).not.toHaveBeenCalled();
+  });
+  it.each(["range", "name"])(
+    "retains invalid %s edit and never calls the repository",
+    async (kind) => {
+      const repo = await begin();
+      const update = vi.spyOn(repo, "updateItem");
+      await userEvent.click(within(group("Quiz 1")).getByRole("button", { name: "Edit" }));
+      const selector = kind === "range" ? "#authoring-edit-max-ai-1" : "#authoring-edit-name-ai-1";
+      const value = kind === "range" ? "0" : "x".repeat(101);
+      const field = screen.getByLabelText(kind === "range" ? "Max score" : "Item name", {
+        selector,
+      });
+      fireEvent.change(field, { target: { value } });
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(
+        await screen.findByText(
+          kind === "range"
+            ? /Max score must be a positive number/
+            : /Item name must be at most 100 characters/,
+        ),
+      ).toBeVisible();
+      expect(field).toBeVisible();
+      expect(update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns keyboard focus to a surviving item after the focused deletion succeeds", async () => {
+    const repo = await begin();
+    vi.spyOn(repo, "listItemsByClassRecord").mockResolvedValue([
+      { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+    ]);
+    let resolve!: (value: boolean) => void;
+    vi.spyOn(repo, "deleteItem").mockImplementationOnce(
+      () => new Promise((done) => (resolve = done)),
+    );
+    await submit("Quiz 1");
+    expect(within(group("Quiz 1")).getByRole("button", { name: "Deleting…" })).toHaveFocus();
+    await act(async () => resolve(true));
+    const second = group("Quiz 2").closest("li")!;
+    expect(second.contains(document.activeElement)).toBe(true);
+  });
+  it("does not let an older post-delete list read re-enable writes after an unconfirmed deletion", async () => {
+    const repo = await begin();
+    let first!: (value: boolean) => void;
+    let secondFail!: (error: Error) => void;
+    vi.spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((_done, fail) => (secondFail = fail)));
+    let read!: (items: AssessmentItemDetail[]) => void;
+    vi.spyOn(repo, "listItemsByClassRecord").mockImplementationOnce(
+      () => new Promise((done) => (read = done)),
+    );
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => first(true));
+    await act(async () => secondFail(new Error("synthetic unconfirmed deletion")));
+    await act(async () =>
+      read([
+        { ...ITEM, recordedCount: 0 },
+        { ...ITEM, id: "ai-2", name: "Quiz 2", recordedCount: 0 },
+      ]),
+    );
+    expect(await screen.findByRole("button", { name: "Reload items" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Actions for Quiz 2" })).not.toBeInTheDocument();
+  });
+  it("does not automatically recover an unconfirmed deletion when another delete acknowledges later", async () => {
+    const repo = await begin();
+    const read = vi.spyOn(repo, "listItemsByClassRecord");
+    let first!: (value: boolean) => void;
+    let secondFail!: (error: Error) => void;
+    vi.spyOn(repo, "deleteItem")
+      .mockImplementationOnce(() => new Promise((done) => (first = done)))
+      .mockImplementationOnce(() => new Promise((_done, fail) => (secondFail = fail)));
+    await submit("Quiz 1");
+    await submit("Quiz 2");
+    await act(async () => secondFail(new Error("synthetic unconfirmed deletion")));
+    await act(async () => first(true));
+    expect(await screen.findByRole("button", { name: "Reload items" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Actions for Quiz 2" })).not.toBeInTheDocument();
+    expect(read).not.toHaveBeenCalled();
   });
 });

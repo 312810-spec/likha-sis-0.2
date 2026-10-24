@@ -105,6 +105,8 @@ pub fn run() {
             commands::user::grant_school_member_role,
             commands::user::revoke_school_member_role,
             commands::setup::installation_status,
+            commands::setup::legacy_setup_recovery_available,
+            commands::setup::restore_legacy_setup_access,
             commands::backup::create_portable_backup,
             commands::backup::stage_portable_recovery,
             commands::setup::bootstrap_installation,
