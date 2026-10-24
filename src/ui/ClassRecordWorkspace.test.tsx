@@ -28,6 +28,8 @@ import type {
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
+import type { ReportReadinessRepository } from "../domain/ports/report-readiness-repository";
+import type { ReportCardReadiness } from "../domain/report-readiness";
 import type { AssessmentRepository } from "../domain/ports/assessment-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
@@ -302,6 +304,7 @@ function renderScreen(
     exportRepo?: FakeExportRepository;
     syncService?: LearnerScoreSyncStatusApplicationService;
     owner?: string;
+    readiness?: ReportReadinessRepository;
   } = {},
 ) {
   const assessmentRepo = options.assessmentRepo ?? new FakeAssessmentRepository();
@@ -317,7 +320,7 @@ function renderScreen(
           weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
           assessmentService={new AssessmentApplicationService(assessmentRepo)}
           learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
-          exportService={new ExportApplicationService(exportRepo)}
+          exportService={new ExportApplicationService(exportRepo, options.readiness)}
         />
       </ModeProvider>
     </SessionDraftProvider>,
@@ -3036,4 +3039,86 @@ describe("PM-13 saved-grade readiness with unsaved work", () => {
     expect(x.compute).toHaveBeenCalledTimes(2);
     expect(x.record).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("PM-13 reporting preview freshness", () => {
+  it.each(["null", "reject"])(
+    "retires the reporting snapshot after an unconfirmed %s correction without replay",
+    async (outcome) => {
+      const scoreRepo = new FakeLearnerScoreRepository([
+        { ...ROSTER_ENTRY, status: "scored", score: 18, updatedAt: "saved-before-check" },
+      ]);
+      const preview: ReportCardReadiness = {
+        classRecordId: "cr-1",
+        schoolYear: "2026-2027",
+        sectionName: "Synthetic Section",
+        subjectName: "Synthetic Subject",
+        gradingPeriodLabel: "Synthetic Term",
+        startsOn: "2026-06-08",
+        endsOn: "2026-09-15",
+        weightPolicyId: "synthetic-policy",
+        checkedAt: "before correction",
+        learnerCount: 1,
+        missingGradeCount: 0,
+        provisionalGradeCount: 0,
+        completeGradeCount: 1,
+        missingLrnCount: 0,
+        officialFidelity: "not_verified",
+        learners: [],
+        disclosure: { populatedFields: [], omittedFields: [] },
+      };
+      const previewReportCard = vi
+        .fn()
+        .mockResolvedValueOnce(preview)
+        .mockResolvedValueOnce({ ...preview, checkedAt: "fresh after uncertain write" });
+      const x = renderScreen({ scoreRepo, readiness: { previewReportCard } });
+      await userEvent.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+      await screen.findByLabelText("Score for Ana Cruz");
+      await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+      await screen.findByText(/Checked: before correction/);
+      const input = screen.getByLabelText("Score for Ana Cruz");
+      fireEvent.change(input, { target: { value: "19" } });
+      input.focus();
+      await userEvent.keyboard("{Enter}");
+      const reason = await screen.findByLabelText("Reason for changing Ana Cruz's recorded score");
+      fireEvent.change(reason, { target: { value: "Synthetic recheck reason" } });
+      let done!: (value: LearnerScore | null) => void;
+      let fail!: (error: Error) => void;
+      const write = vi.spyOn(scoreRepo, "record").mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            done = resolve;
+            fail = reject;
+          }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Save correction" }));
+      expect(screen.queryByText(/Checked: before correction/)).not.toBeInTheDocument();
+      await act(async () =>
+        outcome === "null" ? done(null) : fail(new Error("Synthetic unknown write outcome")),
+      );
+      await screen.findByText("Could not save this score.");
+      expect(screen.queryByText(/Checked: before correction/)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Run the check again to review the current saved records/),
+      ).toBeVisible();
+      expect(reason).toHaveValue("Synthetic recheck reason");
+      expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+      expect(reason).toBeVisible();
+      expect(previewReportCard).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+      expect(await screen.findByText(/Checked: fresh after uncertain write/)).toBeVisible();
+      expect(write).toHaveBeenCalledExactlyOnceWith(
+        "ai-1",
+        "l1",
+        "scored",
+        19,
+        "Synthetic recheck reason",
+      );
+      expect(previewReportCard.mock.calls).toEqual([["cr-1"], ["cr-1"]]);
+      expect(x.exportRepo.reportCardCalls).toHaveLength(0);
+      expect(screen.getByText("Change to: 19 / 20")).toBeVisible();
+      expect(reason).toBeVisible();
+      expect(reason).toHaveValue("Synthetic recheck reason");
+    },
+  );
 });
