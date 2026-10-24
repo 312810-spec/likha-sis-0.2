@@ -1,0 +1,4275 @@
+{
+  "project": "LIKHA-SIS",
+  "date": "2026-10-24",
+  "timezone": "Asia/Manila",
+  "base": "7ad600fe2ef03445ab38a652a539273e48370c71",
+  "scope": "PM-13 reporting preview freshness; R1\u2013R5",
+  "baseline": {
+    "component": "5 failed / 8 passed",
+    "final_exact_regressions": "7 failed / 131 skipped across two files",
+    "revision": "7ad600fe",
+    "failed_requirements": [
+      "R1: old result revives after disable/enable",
+      "R2: interrupted request remains busy",
+      "R3: prior record/revision/service snapshots revive",
+      "R4: null and rejected corrections revive old snapshot in real workspace"
+    ],
+    "source_restored_exactly": true
+  },
+  "focused": "PASS138 tests /2 files; seven added",
+  "browser": {
+    "project": "LIKHA-SIS",
+    "head": "7ad600fe2ef03445ab38a652a539273e48370c71",
+    "node": "v24.22.1",
+    "browser": "156.0.8078.47",
+    "sources": {
+      "src/ui/ReportCardReadinessPanel.tsx": "6804cf36263a5ef81e4f1cca67d8858d1984cfa06f20dbfa999a713abf87b056",
+      "src/ui/ReportCardReadinessPanel.test.tsx": "cae51d3b1298a49d7ecb34a0c47fe188559a8048d99329074e72e149f0c6ae4d",
+      "src/ui/ClassRecordWorkspace.tsx": "2520abee273a9ef17cca4b5db17c367985767a7315809f01a8d31bfd0d9dfa4b",
+      "src/ui/ClassRecordWorkspace.test.tsx": "0b84d685d6d74c9645c42fb62afb3fdb5f96500ac8e974c5409b63675d831a6e",
+      "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+      "scripts/assurance/reporting-preview-state-browser.mjs": "10ceca5971cc3f06bd0f76b69c3b585f035089615e891c07d86e80dc8373616c"
+    },
+    "cases": [
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 734.78125,
+          "bottom": 768.78125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:23.797Z",
+            "updatedAt": "2026-10-24T12:47:23.797Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:23.797Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 734.78125,
+          "bottom": 768.78125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:26.094Z",
+            "updatedAt": "2026-10-24T12:47:26.094Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:26.094Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 766.640625,
+          "bottom": 800.640625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:28.420Z",
+            "updatedAt": "2026-10-24T12:47:28.420Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:28.420Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 766.640625,
+          "bottom": 800.640625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:30.714Z",
+            "updatedAt": "2026-10-24T12:47:30.714Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:30.714Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 366,
+          "height": 37.78125,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 366,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 844.5625,
+          "bottom": 878.5625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:33.058Z",
+            "updatedAt": "2026-10-24T12:47:33.058Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:33.058Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 366,
+          "height": 37.78125,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 366,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 844.5625,
+          "bottom": 878.5625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:35.358Z",
+            "updatedAt": "2026-10-24T12:47:35.358Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:35.358Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 664.03125,
+          "bottom": 704.03125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:37.579Z",
+            "updatedAt": "2026-10-24T12:47:37.579Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:37.579Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 664.03125,
+          "bottom": 704.03125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:39.612Z",
+            "updatedAt": "2026-10-24T12:47:39.612Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:39.612Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 908.328125,
+          "bottom": 948.328125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:42.033Z",
+            "updatedAt": "2026-10-24T12:47:42.033Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:42.033Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 908.328125,
+          "bottom": 948.328125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:44.271Z",
+            "updatedAt": "2026-10-24T12:47:44.271Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:44.271Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 479.890625,
+          "bottom": 519.890625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:46.497Z",
+            "updatedAt": "2026-10-24T12:47:46.497Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:46.497Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 479.890625,
+          "bottom": 519.890625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:48.651Z",
+            "updatedAt": "2026-10-24T12:47:48.651Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:48.651Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.453125,
+          "bottom": 536.453125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:50.648Z",
+            "updatedAt": "2026-10-24T12:47:50.648Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:50.648Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.453125,
+          "bottom": 536.453125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:52.714Z",
+            "updatedAt": "2026-10-24T12:47:52.714Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:52.714Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 586,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 586,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.203125,
+          "bottom": 536.203125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:55.030Z",
+            "updatedAt": "2026-10-24T12:47:55.030Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:55.030Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 586,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 586,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.203125,
+          "bottom": 536.203125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:57.096Z",
+            "updatedAt": "2026-10-24T12:47:57.096Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:57.096Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.234375,
+          "bottom": 536.234375,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:47:59.164Z",
+            "updatedAt": "2026-10-24T12:47:59.164Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:47:59.164Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(88, 97, 116)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(88, 97, 116) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(23, 32, 51)",
+          "background": "rgb(238, 240, 246)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(23, 32, 51) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.234375,
+          "bottom": 536.234375,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:01.300Z",
+            "updatedAt": "2026-10-24T12:48:01.300Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:01.300Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 734.78125,
+          "bottom": 768.78125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:03.390Z",
+            "updatedAt": "2026-10-24T12:48:03.390Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:03.390Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 720,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 734.78125,
+          "bottom": 768.78125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:05.637Z",
+            "updatedAt": "2026-10-24T12:48:05.637Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:05.637Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 766.640625,
+          "bottom": 800.640625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:07.822Z",
+            "updatedAt": "2026-10-24T12:48:07.822Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:07.822Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 616,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 766.640625,
+          "bottom": 800.640625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:10.060Z",
+            "updatedAt": "2026-10-24T12:48:10.060Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:10.060Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 366,
+          "height": 37.78125,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 366,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 844.5625,
+          "bottom": 878.5625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:12.207Z",
+            "updatedAt": "2026-10-24T12:48:12.207Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:12.207Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 366,
+          "height": 37.78125,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 366,
+          "height": 18.890625,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "lineHeight": "18.9px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 215,
+          "height": 34,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "lineHeight": "21px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 12px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 844.5625,
+          "bottom": 878.5625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:14.423Z",
+            "updatedAt": "2026-10-24T12:48:14.423Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:14.423Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 664.03125,
+          "bottom": 704.03125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:16.611Z",
+            "updatedAt": "2026-10-24T12:48:16.611Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:16.611Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 696,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 664.03125,
+          "bottom": 704.03125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:18.660Z",
+            "updatedAt": "2026-10-24T12:48:18.660Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:18.660Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 908.328125,
+          "bottom": 948.328125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:20.726Z",
+            "updatedAt": "2026-10-24T12:48:20.726Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:20.726Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 604,
+          "height": 20.25,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 908.328125,
+          "bottom": 948.328125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:22.740Z",
+            "updatedAt": "2026-10-24T12:48:22.740Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:22.740Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 479.890625,
+          "bottom": 519.890625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:24.901Z",
+            "updatedAt": "2026-10-24T12:48:24.901Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:24.901Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 354,
+          "height": 40.5,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "13.5px",
+          "lineHeight": "20.25px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 242,
+          "height": 40,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15px",
+          "lineHeight": "22.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 18px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 479.890625,
+          "bottom": 519.890625,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:27.020Z",
+            "updatedAt": "2026-10-24T12:48:27.020Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:27.020Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 1280,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.453125,
+          "bottom": 536.453125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:29.043Z",
+            "updatedAt": "2026-10-24T12:48:29.043Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:29.043Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 1280,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 660,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.453125,
+          "bottom": 536.453125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:31.130Z",
+            "updatedAt": "2026-10-24T12:48:31.130Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:31.130Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 640,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 586,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 586,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.203125,
+          "bottom": 536.203125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:33.180Z",
+            "updatedAt": "2026-10-24T12:48:33.180Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:33.180Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 640,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 586,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 586,
+          "height": 22.9375,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.203125,
+          "bottom": 536.203125,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:35.239Z",
+            "updatedAt": "2026-10-24T12:48:35.239Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:35.239Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 390,
+        "motion": "no-preference",
+        "pendingStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0.12s, 0.12s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.234375,
+          "bottom": 536.234375,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:37.326Z",
+            "updatedAt": "2026-10-24T12:48:37.326Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:37.326Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 390,
+        "motion": "reduce",
+        "pendingStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "staleStyle": {
+          "width": 336,
+          "height": 45.875,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "15.3px",
+          "lineHeight": "22.95px",
+          "color": "rgb(179, 187, 207)",
+          "background": "rgba(0, 0, 0, 0)",
+          "padding": "0px",
+          "radius": "0px",
+          "outline": "rgb(179, 187, 207) none 3px",
+          "outlineOffset": "0px",
+          "transition": "0s",
+          "easing": "ease",
+          "opacity": "1"
+        },
+        "checkStyle": {
+          "width": 286,
+          "height": 72,
+          "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+          "fontSize": "17px",
+          "lineHeight": "25.5px",
+          "color": "rgb(240, 242, 250)",
+          "background": "rgb(27, 31, 45)",
+          "padding": "0px 27px",
+          "radius": "8px",
+          "outline": "rgb(240, 242, 250) none 3px",
+          "outlineOffset": "0px",
+          "transition": "1e-05s, 1e-05s",
+          "easing": "cubic-bezier(0.2, 0, 0, 1), cubic-bezier(0.2, 0, 0, 1)",
+          "opacity": "1"
+        },
+        "clearance": {
+          "hit": true,
+          "top": 464.234375,
+          "bottom": 536.234375,
+          "viewport": 1000
+        },
+        "pendingViolations": [],
+        "staleViolations": [],
+        "finalViolations": [],
+        "overflow": false,
+        "receipt": {
+          "writes": [
+            ["item-fixture-1", "l1", "scored", 18, null],
+            ["item-fixture-1", "l1", "scored", 19, "Synthetic rechecked evidence"]
+          ],
+          "reads": ["cr-fixture-4", "cr-fixture-4"],
+          "saved": {
+            "id": "score-fixture-16",
+            "schoolId": "fixture-school",
+            "assessmentItemId": "item-fixture-1",
+            "learnerId": "l1",
+            "status": "scored",
+            "score": 18,
+            "recordedByUserId": "fixture-user",
+            "recordedAt": "2026-10-24T12:48:39.455Z",
+            "updatedAt": "2026-10-24T12:48:39.455Z"
+          },
+          "roster": [
+            {
+              "learnerId": "l1",
+              "givenName": "Ana",
+              "familyName": "Santos",
+              "status": "scored",
+              "score": 18,
+              "updatedAt": "2026-10-24T12:48:39.455Z"
+            },
+            {
+              "learnerId": "l2",
+              "givenName": "Bayani",
+              "familyName": "Cruz",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            },
+            {
+              "learnerId": "l3",
+              "givenName": "Maria Corazon",
+              "familyName": "Dela Pe\u00f1a-Villanueva",
+              "status": null,
+              "score": null,
+              "updatedAt": null
+            }
+          ]
+        },
+        "status": "PASS"
+      }
+    ],
+    "limits": [
+      "Synthetic in-memory reads/writes only, not native grading or installed persistence",
+      "Both resolved appearances; System provider checks separate",
+      "Physical IME/manual AT/OS zoom/teacher acceptance NOT RUN"
+    ]
+  },
+  "renders_inspected": [
+    "pending-1280",
+    "fresh-check-1280",
+    "checked-1280",
+    "pending-390",
+    "fresh-check-390",
+    "checked-390"
+  ],
+  "diagnostics": [
+    "Initial browser selector expected correction-only on-device text before entering correction review; replaced with actual synthetic saved receipt",
+    "Second browser attempt and test review exposed detached score input during correction review. Replaced unsupported newer-zero assertion with visible proposed19 and retained reason. Final focused138 and browser36/108 are the corrected evidence; prior weak assertions do not prove preservation",
+    "Final exact seven regression tests rerun on original production component and all fail; candidate bytes restored before full quality"
+  ],
+  "candidate": {
+    "status": "Local gates PASS; candidate CI pending"
+  },
+  "limits": [
+    "Synthetic browser storage/read models only, not native persistence or grading arithmetic",
+    "Native authority from PR162 unchanged and not newly verified by this UI slice",
+    "System appearance provider separate from the two resolved themes tested here",
+    "Full PM-13/A1\u2013A7, installed Windows/Android, physical IME, manual AT/OS zoom and teacher comprehension remain partial/NOT RUN"
+  ],
+  "local": {
+    "quality": "PASS1699 tests/161 files",
+    "focused": "PASS138/2",
+    "build": "PASS",
+    "isolation": "PASS21 output files",
+    "ui": "PASS",
+    "recovery": "PASS50",
+    "diff": "PASS",
+    "score_journey": "PASS47 observations"
+  },
+  "sources_verified_after_gates": {
+    "src/ui/ReportCardReadinessPanel.tsx": "6804cf36263a5ef81e4f1cca67d8858d1984cfa06f20dbfa999a713abf87b056",
+    "src/ui/ReportCardReadinessPanel.test.tsx": "cae51d3b1298a49d7ecb34a0c47fe188559a8048d99329074e72e149f0c6ae4d",
+    "src/ui/ClassRecordWorkspace.tsx": "2520abee273a9ef17cca4b5db17c367985767a7315809f01a8d31bfd0d9dfa4b",
+    "src/ui/ClassRecordWorkspace.test.tsx": "0b84d685d6d74c9645c42fb62afb3fdb5f96500ac8e974c5409b63675d831a6e",
+    "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+    "scripts/assurance/reporting-preview-state-browser.mjs": "10ceca5971cc3f06bd0f76b69c3b585f035089615e891c07d86e80dc8373616c"
+  },
+  "score_journey": [
+    {
+      "check": "older acknowledgment preserves newer draft and focus",
+      "displayed": 19,
+      "fixturePersisted": 18,
+      "calls": 1
+    },
+    {
+      "check": "correction comparison and keyboard cancel without a write",
+      "result": "PASS"
+    },
+    {
+      "check": "explicit correction saves exact score and lineage",
+      "result": "PASS"
+    },
+    {
+      "check": "rejected write retains draft and has no saved claim",
+      "result": "PASS"
+    },
+    {
+      "check": "explicit keyboard retry saves retained value",
+      "result": "PASS"
+    },
+    {
+      "check": "native Tab exits at both score sequence boundaries",
+      "result": "PASS"
+    },
+    {
+      "check": "blank edit preserves recorded value and Escape restores it",
+      "result": "PASS"
+    },
+    {
+      "check": "clean interior score reaches History via native Tab",
+      "result": "PASS"
+    },
+    {
+      "check": "focused correction clears fixed navigation after resize",
+      "top": 730.765625,
+      "bottom": 770.765625,
+      "navTop": 783,
+      "hit": true,
+      "focused": true
+    },
+    {
+      "check": "focus clearance light/efficient/1280",
+      "top": 858.265625,
+      "bottom": 892.265625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/efficient/640",
+      "top": 346.859375,
+      "bottom": 380.859375,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/efficient/390",
+      "top": 465.890625,
+      "bottom": 499.890625,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/efficient/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/1280",
+      "top": 430.3125,
+      "bottom": 470.3125,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/640",
+      "top": 336.953125,
+      "bottom": 376.953125,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/comfortable/390",
+      "top": 512.765625,
+      "bottom": 552.765625,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/comfortable/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/1280",
+      "top": 413.515625,
+      "bottom": 485.515625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/640",
+      "top": 299.015625,
+      "bottom": 371.015625,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance light/guided/390",
+      "top": 692.828125,
+      "bottom": 764.828125,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility light/guided/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/1280",
+      "top": 858.265625,
+      "bottom": 892.265625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/640",
+      "top": 346.859375,
+      "bottom": 380.859375,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/efficient/390",
+      "top": 465.890625,
+      "bottom": 499.890625,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/efficient/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/1280",
+      "top": 430.3125,
+      "bottom": 470.3125,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/640",
+      "top": 336.953125,
+      "bottom": 376.953125,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/comfortable/390",
+      "top": 512.765625,
+      "bottom": 552.765625,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/comfortable/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/1280",
+      "top": 413.515625,
+      "bottom": 485.515625,
+      "navTop": 900,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/1280",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/640",
+      "top": 299.015625,
+      "bottom": 371.015625,
+      "navTop": 389,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/640",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "focus clearance dark/guided/390",
+      "top": 692.828125,
+      "bottom": 764.828125,
+      "navTop": 783,
+      "hit": true
+    },
+    {
+      "check": "render and accessibility dark/guided/390",
+      "overflow": false,
+      "violations": []
+    },
+    {
+      "check": "touch-emulated Cancel restores recorded score without writing",
+      "result": "PASS",
+      "limit": "Browser emulation; not installed Android evidence"
+    },
+    {
+      "check": "640px reflow models a 1280px workspace at 200% CSS zoom",
+      "result": "PASS",
+      "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
+    }
+  ]
+}

@@ -176,4 +176,65 @@ describe("ReportCardReadinessPanel", () => {
     expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
     expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
   });
+  it("requires a fresh check after availability returns without a revision change", async () => {
+    const t = setup();
+    await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+    await screen.findByText(/2 period learners:/);
+    t.rerender(t.view({ disabled: true, pendingEdits: true }));
+    expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
+    t.rerender(t.view({ pendingEdits: true }));
+    expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Run the check again to review the current saved records/),
+    ).toBeVisible();
+    expect(t.previewReportCard).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+    await screen.findByText(/2 period learners:/);
+    expect(t.previewReportCard).toHaveBeenNthCalledWith(2, "cr-1");
+    expect(t.exportCall).not.toHaveBeenCalled();
+  });
+
+  it("releases an interrupted pending check and ignores its late reply", async () => {
+    let old!: (value: ReportCardReadiness) => void;
+    let fresh!: (value: ReportCardReadiness) => void;
+    const t = setup(
+      vi
+        .fn()
+        .mockImplementationOnce(() => new Promise<ReportCardReadiness>((done) => (old = done)))
+        .mockImplementationOnce(() => new Promise<ReportCardReadiness>((done) => (fresh = done))),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+    t.rerender(t.view({ disabled: true }));
+    t.rerender(t.view());
+    expect(screen.getByRole("button", { name: "Check reporting preparation" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+    await act(async () => old(PREVIEW));
+    expect(screen.getByRole("button", { name: "Checking reporting…" })).toBeDisabled();
+    expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
+    await act(async () => fresh({ ...PREVIEW, checkedAt: "fresh receipt" }));
+    expect(await screen.findByText(/Checked: fresh receipt/)).toBeVisible();
+    expect(t.previewReportCard.mock.calls).toEqual([["cr-1"], ["cr-1"]]);
+    expect(t.exportCall).not.toHaveBeenCalled();
+  });
+
+  it.each(["record", "revision", "service"] as const)(
+    "does not revive a previous snapshot after a %s context cycle",
+    async (kind) => {
+      const t = setup();
+      await userEvent.click(screen.getByRole("button", { name: "Check reporting preparation" }));
+      await screen.findByText(/2 period learners:/);
+      const alternate =
+        kind === "record"
+          ? { classRecordId: "cr-2" }
+          : kind === "revision"
+            ? { revision: 1 }
+            : { service: new ExportApplicationService({} as ExportRepository) };
+      t.rerender(t.view(alternate));
+      expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
+      t.rerender(t.view());
+      expect(screen.queryByText(/2 period learners:/)).not.toBeInTheDocument();
+      expect(t.previewReportCard).toHaveBeenCalledTimes(1);
+      expect(t.exportCall).not.toHaveBeenCalled();
+    },
+  );
 });
