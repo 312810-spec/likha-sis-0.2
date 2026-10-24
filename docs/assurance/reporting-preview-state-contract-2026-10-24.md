@@ -33,3 +33,11 @@ Verification and export: Reproduce a remaining defect before editing. Run zero/m
 
 E — Deliver the task-specific contract and bounded implementation where called for, actual commands/results, remaining limits, source-bound receipts and one next action. Update the surface/task coverage register. Preserve prepared/attempted/confirmed action distinctions and the shared readiness rules; no unsupported whole-app or device claim.
 ```
+
+## Required security prerequisite — discovered before merge
+
+Initial UI-only headfc7ce1c passed Quality40095919498 but failed Security40095919479. Cargo-deny job120878042459 flags ctutils0.4.2 (RUSTSEC-2026-0385); OSV job120878042601 flags that plus undici8.11.2 (GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c) and zod4.4.3 (GHSA-mrhx-c7xc-m3w5). These unchanged baseline locks are a current required gate failure, not a regression caused by the panel source. No merge occurred.
+
+S1 (required before merge): update only the affected transitive lock entries to current compatible stable fixes, verify upstream registry/advisory metadata and checksums, preserve direct manifests/scanner rules/allowlists, re-run affected JS and native/Windows gates plus Security. Latest verified compatible versions: undici8.12.3, zod4.6.7 (npm registry), ctutils0.4.5 (official crates index blob c8e1d3863f67e0195261375719cd08680a85335f; checksum38d28fb6aa7dd680b3ffd1a3e64e115c177bdba63c0ae7f9cd48129ff05c4fa0, MSRV1.87, existing cmov^0.5.3 dependency retained). Cargo absent locally: single verified Cargo.lock version/checksum patch will be validated by real CI Cargo resolution/build/tests; no local cargo claim.
+
+Select minimal compatible patch updates: meets required scan gate while retaining current APIs and project manifests. Waiving/ignoring findings fails the frozen security gate; parking the blocker does not complete authorized integration. R1–R5 remain unchanged. S1 deliberately expands affected verification to the native dependency graph; final source/CI/artifact receipts must reflect this combined candidate and preserve initial failure evidence. Official sources: RustSec RUSTSEC-2026-0385 and the five advisory/registry links in the evidence receipt. No new scanner exception or downgraded threshold.

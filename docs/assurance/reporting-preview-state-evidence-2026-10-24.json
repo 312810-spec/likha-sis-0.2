@@ -3976,7 +3976,7 @@
     "Final exact seven regression tests rerun on original production component and all fail; candidate bytes restored before full quality"
   ],
   "candidate": {
-    "status": "Local gates PASS; candidate CI pending"
+    "status": "Combined UI + required security lock patches; renewed JS/browser/native/Windows/Security pending"
   },
   "limits": [
     "Synthetic browser storage/read models only, not native persistence or grading arithmetic",
@@ -4271,5 +4271,91 @@
       "result": "PASS",
       "limit": "Equivalent CSS viewport; not native OS/browser zoom or assistive technology"
     }
-  ]
+  ],
+  "security_prerequisite": {
+    "initial_head": "fc7ce1c750d691c0596b72f4cff0ff7d327793ff",
+    "initial_tree": "451afc2d34934b8c65ec753b74532b5f325b188a",
+    "quality": {
+      "run": 40095919498,
+      "result": "PASS UI-only; native/Windows skipped"
+    },
+    "security": {
+      "run": 40095919479,
+      "result": "FAIL five advisories/three baseline packages",
+      "jobs": [120878042459, 120878042601],
+      "excerpt": [
+        "2026-10-24T12:55:16.8702233Z Total 3 packages affected by 5 known vulnerabilities (0 Critical, 2 High, 2 Medium, 0 Low, 1 Unknown) from 2 ecosystems.",
+        "2026-10-24T12:55:16.8702661Z 5 vulnerabilities can be fixed.",
+        "2026-10-24T12:55:16.8704647Z | https://osv.dev/RUSTSEC-2026-0385   |      | crates.io | ctutils      | 0.4.2   | 0.4.4         | src-tauri/Cargo.lock |",
+        "2026-10-24T12:55:16.8705206Z | https://osv.dev/GHSA-4qv8-2p9j-2685 | 5.9  | npm       | undici (dev) | 8.11.2  | 8.12.2        | package-lock.json    |",
+        "2026-10-24T12:55:16.8705760Z | https://osv.dev/GHSA-f72v-6w45-q472 | 5.9  | npm       | undici (dev) | 8.11.2  | 8.12.2        | package-lock.json    |",
+        "2026-10-24T12:55:16.8707060Z | https://osv.dev/GHSA-xjj6-f33q-929c | 7.5  | npm       | undici (dev) | 8.11.2  | 8.12.2        | package-lock.json    |",
+        "2026-10-24T12:55:16.8707807Z | https://osv.dev/GHSA-mrhx-c7xc-m3w5 | 8.2  | npm       | zod (dev)    | 4.4.3   | 4.6.6         | package-lock.json    |",
+        "2026-10-24T12:55:16.8718056Z ##[error]Process completed with exit code 1."
+      ]
+    },
+    "selection": "Latest compatible stable lock-only transitive patches; no direct manifest/scanner policy change",
+    "changes": {
+      "ctutils": ["0.4.2", "0.4.5"],
+      "undici": ["8.11.2", "8.12.3"],
+      "zod": ["4.4.3", "4.6.7"]
+    },
+    "ctutils_registry": {
+      "name": "ctutils",
+      "vers": "0.4.5",
+      "deps": [
+        {
+          "name": "cmov",
+          "req": "^0.5.3",
+          "features": [],
+          "optional": false,
+          "default_features": true,
+          "target": null,
+          "kind": "normal"
+        },
+        {
+          "name": "proptest",
+          "req": "^1.11",
+          "features": [],
+          "optional": false,
+          "default_features": true,
+          "target": null,
+          "kind": "dev"
+        },
+        {
+          "name": "subtle",
+          "req": "^2.6",
+          "features": [],
+          "optional": true,
+          "default_features": false,
+          "target": null,
+          "kind": "normal"
+        }
+      ],
+      "cksum": "38d28fb6aa7dd680b3ffd1a3e64e115c177bdba63c0ae7f9cd48129ff05c4fa0",
+      "features": {
+        "alloc": []
+      },
+      "features2": {
+        "subtle": ["dep:subtle"]
+      },
+      "yanked": false,
+      "rust_version": "1.87",
+      "pubtime": "2026-10-23T04:02:07Z",
+      "v": 2
+    },
+    "registry_blob": "c8e1d3863f67e0195261375719cd08680a85335f",
+    "cargo_method": "Local cargo absent. Verified targeted Cargo.lock version/checksum edit; real CI Cargo resolution/build/test required before merge",
+    "sources": [
+      "https://rustsec.org/advisories/RUSTSEC-2026-0385.html",
+      "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "https://github.com/advisories/GHSA-f72v-6w45-q472",
+      "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+      "https://github.com/rust-lang/crates.io-index/blob/master/ct/ut/ctutils",
+      "https://registry.npmjs.org/undici",
+      "https://registry.npmjs.org/zod"
+    ],
+    "network_diagnostic": "Direct crates.io API denied; recovered official registry index through GitHub connector, no credential workaround"
+  }
 }

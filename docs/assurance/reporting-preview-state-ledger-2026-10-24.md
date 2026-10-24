@@ -43,3 +43,7 @@ Initial probe selector timeouts and the detached-input assertion correction are 
 | Returning to prior IDs restores old snapshot                         | Each context transition retires earlier snapshots/results       |
 
 Full Scores/PM-13/A1–A7 remains partial, with no teacher/device/official-output approval implied.
+
+## S1 security prerequisite
+
+Initial UI-only Quality40095919498 passed; Security40095919479 failed five current advisories in unchanged baseline locks. Required before merge: compatible lock-only ctutils0.4.2→0.4.5, undici8.11.2→8.12.3, zod4.4.3→4.6.7. Official RustSec/GitHub advisories and crates/npm registry metadata verified. No direct manifest, suppression or scanner-rule change. ctutils registry checksum/MSRV/dependency requirements recorded; local Cargo absent, targeted lock edit must be validated by actual CI Cargo/native/Windows builds and tests. Initial UI/browser evidence remains source-bound; renewed JS/browser/gates pending for combined candidate. A7 now includes required native and Windows dependency verification. Full installed-device/teacher/manual limits unchanged.
