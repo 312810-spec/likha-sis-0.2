@@ -3976,11 +3976,23 @@
     "Final exact seven regression tests rerun on original production component and all fail; candidate bytes restored before full quality"
   ],
   "candidate": {
-    "status": "Combined UI + required security lock patches; renewed JS/browser/native/Windows/Security pending"
+    "status": "PASS bounded R1–R5/S1; PR163 merged",
+    "checkedHead": "b001f58bd46852cec01866340d5596d3f0abbe12",
+    "checkedTree": "f8420f1ffb6b2dba254d1b8ccec516b190fc8b48",
+    "ciMerge": "3287dc5f0072fdd9c1f085a4319b7744eb71c7c5",
+    "actualMerge": "93f7bc95253a423a64d79e8b144e4bf24d0ee9f6",
+    "actualMergeTree": "f8420f1ffb6b2dba254d1b8ccec516b190fc8b48",
+    "qualityRun": 40096416825,
+    "securityRun": 40096416842,
+    "ubuntuNativeTests": 1542,
+    "windowsNativeTests": 1551,
+    "refreshedLocal": "PASS1699/161; browser36/108; Scores47; build/isolation21; UI/recovery50 on b001f58",
+    "receipt": "reporting-preview-state-ci-merge-2026-10-24.md",
+    "operationalLimit": "Executor disconnected after local checks. Final source/CI/merge/docs checkpoint verified via GitHub; local final resync and post-outage formatting command NOT RUN."
   },
   "limits": [
     "Synthetic browser storage/read models only, not native persistence or grading arithmetic",
-    "Native authority from PR162 unchanged and not newly verified by this UI slice",
+    "Native authority source from PR162 unchanged; full native regressions rerun on the combined dependency candidate",
     "System appearance provider separate from the two resolved themes tested here",
     "Full PM-13/A1\u2013A7, installed Windows/Android, physical IME, manual AT/OS zoom and teacher comprehension remain partial/NOT RUN"
   ],
