@@ -12004,5 +12004,16 @@
     "Source census does not prove runtime reachability, permissions or state completeness",
     "No native/device/teacher acceptance inferred",
     "Reconcile new/deleted routes, role conditions and source owners at each task"
+  ],
+  "continuationReceipts": [
+    {
+      "date": "2026-10-25",
+      "task": "PM-13 / PM-18 bounded period context",
+      "surface": "src/ui/ClassRecordsScreen.tsx",
+      "route": "record-library",
+      "contract": "docs/assurance/class-record-period-contract-2026-10-25.md",
+      "handoff": "docs/assurance/class-record-period-handoff-2026-10-25.md",
+      "scope": "Pending/error/retry/empty/stale period context; full task and role/device coverage remains partial"
+    }
   ]
 }

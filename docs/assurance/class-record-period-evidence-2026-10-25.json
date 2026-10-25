@@ -1,0 +1,2676 @@
+{
+  "base": "499e07d0d5df1df49797c594dd435f216f1dd420",
+  "baseline": {
+    "command": "npx vitest run src/ui/ClassRecordsScreen.test.tsx",
+    "failed": 5,
+    "passed": 10,
+    "newCases": [
+      "× blocks stale periods immediately while a new section year is loading 212ms",
+      "× retries a failed year read without creating or losing other choices 35ms",
+      "× does not restore an earlier response after switching away and back 39ms",
+      "× blocks an empty response without retaining the previous period 1032ms",
+      "× blocks an foreign-year response without retaining the previous period 1031ms"
+    ]
+  },
+  "candidate": {
+    "focused": 15,
+    "qualityTests": 1704,
+    "qualityFiles": 161,
+    "build": "PASS",
+    "fixtureIsolationFiles": 21,
+    "uiSmoke": "PASS",
+    "recoveryChecks": 50,
+    "scoresObservations": 47,
+    "finalQualityTests": 1704,
+    "finalQualityFiles": 161,
+    "inspectedRenders": [
+      "pending-1280",
+      "failed-1280",
+      "ready-1280",
+      "failed-390",
+      "empty-390",
+      "ready-390"
+    ]
+  },
+  "browser": {
+    "head": "499e07d0d5df1df49797c594dd435f216f1dd420",
+    "environment": "Chromium local dev preview; synthetic read failures, no native persistence",
+    "hashes": {
+      "src/ui/ClassRecordsScreen.tsx": "ba67d3801970167c9784514e27344182ea6cf49d557e72c66bdfa978aabe784e",
+      "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+      "scripts/assurance/class-record-period-browser.mjs": "3bf56235767c66805b329774b9fc9743b72e917fc4b2425bbcc135e71fa692c7"
+    },
+    "configurations": 36,
+    "states": 144,
+    "cases": [
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "efficient",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "light",
+        "density": "guided",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(23, 32, 51)",
+              "background": "rgb(246, 247, 250)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "efficient",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "34px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "comfortable",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "40px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 1280,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 1280,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 640,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 640,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 390,
+        "motion": "no-preference",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      },
+      {
+        "appearance": "dark",
+        "density": "guided",
+        "width": 390,
+        "motion": "reduce",
+        "observations": [
+          {
+            "state": "pending",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "failed",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "empty",
+            "violations": [],
+            "overflow": false,
+            "period": "",
+            "description": "_r_1_",
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028"],
+            "writes": []
+          },
+          {
+            "state": "ready",
+            "violations": [],
+            "overflow": false,
+            "period": "period-new",
+            "description": null,
+            "style": {
+              "font": "\"Public Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+              "color": "rgb(240, 242, 250)",
+              "background": "rgb(20, 23, 34)",
+              "height": "72px",
+              "radius": "8px"
+            },
+            "reads": ["2026-2027", "2027-2028", "2027-2028", "2026-2027", "2027-2028"],
+            "writes": []
+          }
+        ],
+        "submitted": [["period-new-section", "sub-math", "period-new", "wp-k10"]]
+      }
+    ]
+  }
+}

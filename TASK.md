@@ -1,9 +1,13 @@
 # Current task — CTOS / FORGE 4.0
 
-Updated: 2026-10-24 (Asia/Manila).
+Updated: 2026-10-25 (Asia/Manila).
 Read `CTOS.md`, compact `CTOS-STATE.md`, `AGENTS.md` and the latest relevant checkpoint.
 
 Continuation convention: when the user says **continue**, show the selected task-pack prompt first, execute it, then report before-and-after changes. See `docs/assurance/redesign-continuation-sequence.md`. Existing authorization and gates remain.
+
+## Current PM-13 period-context continuation — 25 October
+
+25 October 2026, Asia/Manila. Full PM-13 prompt shown before execution; frozen P1–P5. ClassRecordsScreen record-library form had five reproduced baseline regressions/ten incumbent passes. Scope period reads to section/year/service/retry identity, hide old options immediately, guard submitted ID, reject wrong-year replies and provide linked read-only Retry. Candidate focused15/full quality1,704 tests/161 files, build/isolation21 PASS. Changed-state browser36 configurations/144 states, UI smoke/recovery50 and existing Scores47 PASS; source-bound final receipt and integration CI pending in class-record-period-handoff-2026-10-25.md. No native/math/persistence/style/dependency/template changes. Unrelated primary-checkout skill edit preserved via isolated worktree. Full A1–A7 teacher/device/manual acceptance partial. Parent PR150 draft on149; next finish gated publication, then remaining Scores category-context coverage.
 
 ## Current PM-35 interruption recovery — 24 October
 
