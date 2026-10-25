@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { AssessmentApplicationService } from "../application/assessment-service";
 import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
@@ -76,10 +76,6 @@ export function ClassRecordWorkspace({
     classId: string;
   } | null>(null);
   const [itemsAttempt, setItemsAttempt] = useState(0);
-  const [categoriesSource, setCategoriesSource] = useState<{
-    service: AssessmentApplicationService;
-    setId: string;
-  } | null>(null);
   const [duplicateReview, setDuplicateReview] = useState(false);
   const itemsCurrent =
     itemsSource?.service === assessmentService && itemsSource.classId === classRecordId;
@@ -109,11 +105,44 @@ export function ClassRecordWorkspace({
     `${classRecordId}:record:categorySetId`,
     () => "",
   );
-  const [categories, setCategories] = useState<AssessmentCategory[]>([]);
   const [categoryId, setCategoryId] = useSessionDraft(
     `${classRecordId}:record:categoryId`,
     () => "",
   );
+  const [categoryAttempt, setCategoryAttempt] = useState(0);
+  // Every committed scope/retry transition retires its previous category response.
+  const categoryContext = useMemo(
+    () => ({
+      service: assessmentService,
+      classRecordId,
+      setId: categorySetId,
+      itemsAttempt,
+      categoryAttempt,
+    }),
+    [assessmentService, classRecordId, categorySetId, itemsAttempt, categoryAttempt],
+  );
+  const [categoryResponse, setCategoryResponse] = useState<{
+    context: typeof categoryContext;
+    categories: AssessmentCategory[];
+    failed: boolean;
+  } | null>(null);
+  const currentCategoryResponse =
+    categoryResponse?.context === categoryContext ? categoryResponse : null;
+  const categories = currentCategoryResponse?.categories ?? [];
+  const categoriesCurrent = !!currentCategoryResponse && !currentCategoryResponse.failed;
+  const currentCategoryId = categories.some((category) => category.id === categoryId)
+    ? categoryId
+    : "";
+  const categoryStatusId = useId();
+  const categoryStatus = !categorySetId
+    ? "Choose a current category set."
+    : !currentCategoryResponse
+      ? "Loading categories…"
+      : currentCategoryResponse.failed
+        ? "Could not load categories for this set. Your work is retained."
+        : categories.length === 0
+          ? "No categories are available for this set."
+          : null;
   const [itemName, setItemName] = useSessionDraft(`${classRecordId}:record:itemName`, () => "");
   const [maxScore, setMaxScore] = useSessionDraft(`${classRecordId}:record:maxScore`, () => "20");
   const [creatingItem, setCreatingItem] = useState(false);
@@ -279,29 +308,30 @@ export function ClassRecordWorkspace({
   }, [assessmentService, classRecordId, itemsAttempt]);
 
   useEffect(() => {
-    // Fresh reads invalidate actionable source state before awaiting the response.
-    setCategories([]);
-    setCategoriesSource(null);
-    if (!categorySetId) return;
+    if (!categoryContext.setId) return;
     let cancelled = false;
-    assessmentService
-      .listCategoriesForSet(categorySetId)
+    categoryContext.service
+      .listCategoriesForSet(categoryContext.setId)
       .then((result) => {
         if (cancelled) return;
-        setCategories(result);
-        setCategoriesSource({ service: assessmentService, setId: categorySetId });
+        if (result.some((category) => category.setId !== categoryContext.setId)) {
+          throw new Error("Category response does not match the selected set.");
+        }
+        setCategoryResponse({ context: categoryContext, categories: result, failed: false });
         if (!categoryId && result[0]) setCategoryId(result[0].id);
         else if (categoryId && !result.some((category) => category.id === categoryId))
           setCategoryId("");
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load categories for this set.");
+        if (!cancelled)
+          setCategoryResponse({ context: categoryContext, categories: [], failed: true });
       });
     return () => {
       cancelled = true;
     };
+    // Retained selection is reconciled only with this context's successful response.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assessmentService, categorySetId, itemsAttempt]);
+  }, [categoryContext]);
 
   const rosterItem = itemsCurrent ? items.find((item) => item.id === selectedItemId) : undefined;
   // A temporary write lock is not a new learner/assessment context.
@@ -358,9 +388,7 @@ export function ClassRecordWorkspace({
   }, [learnerScoreService, rosterIdentity]);
 
   const categoryReady =
-    categoriesSource?.service === assessmentService &&
-    categoriesSource.setId === categorySetId &&
-    categories.some((category) => category.id === categoryId);
+    categoriesCurrent && categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
     invalidateTermGrades();
     // An uncertain deletion requires explicit reload, even if another write completes.
@@ -479,7 +507,7 @@ export function ClassRecordWorkspace({
       !itemsReady ||
       !items.some((current) => current.id === item.id) ||
       (item.recordedCount === 0 &&
-        (!categoriesSource || !categories.some((category) => category.id === editCategoryId)))
+        (!categoriesCurrent || !categories.some((category) => category.id === editCategoryId)))
     )
       return;
     const isScored = item.recordedCount > 0;
@@ -1042,6 +1070,22 @@ export function ClassRecordWorkspace({
           </button>
         </Alert>
       )}
+      {categoryStatus && (
+        <div className="field">
+          <p
+            id={categoryStatusId}
+            className={currentCategoryResponse?.failed ? "field-error" : "field-hint"}
+            role={currentCategoryResponse?.failed ? "alert" : "status"}
+          >
+            {categoryStatus}
+          </p>
+          {currentCategoryResponse?.failed && (
+            <button type="button" onClick={() => setCategoryAttempt((attempt) => attempt + 1)}>
+              Retry categories
+            </button>
+          )}
+        </div>
+      )}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
       {duplicateReview && (
         <Alert tone="warning">
@@ -1119,8 +1163,16 @@ export function ClassRecordWorkspace({
             )}
             <select
               id="workspace-category"
-              aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
-              value={categoryId}
+              aria-describedby={
+                [
+                  mode === "guided" ? "workspace-category-hint" : "",
+                  categoryStatus ? categoryStatusId : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
+              value={currentCategoryId}
+              disabled={categories.length === 0}
               onChange={(event) => {
                 createDraftRevisionRef.current += 1;
                 setCategoryId(event.target.value);
@@ -1219,6 +1271,8 @@ export function ClassRecordWorkspace({
                             <select
                               id={`edit-category-${item.id}`}
                               value={editCategoryId}
+                              disabled={categories.length === 0}
+                              aria-describedby={categoryStatus ? categoryStatusId : undefined}
                               onChange={(event) => {
                                 editDraftRef.current.revision += 1;
                                 setEditCategoryId(event.target.value);
@@ -1260,7 +1314,8 @@ export function ClassRecordWorkspace({
                         editName.trim().length === 0 ||
                         !itemsReady ||
                         (!isScored &&
-                          !categories.some((category) => category.id === editCategoryId))
+                          (!categoriesCurrent ||
+                            !categories.some((category) => category.id === editCategoryId)))
                       }
                       onClick={() => void handleSaveEdit(item)}
                     >
