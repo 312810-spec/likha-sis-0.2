@@ -1,0 +1,1649 @@
+{
+  "base": "91974c28e55dcfd47ff5439fd9dd3a42200a4c48",
+  "branches": [
+    {
+      "name": "add-claude-github-actions-1788119184614",
+      "sha": "2681a847f135342f6f19b89421d415623c5a006c",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [1]
+    },
+    {
+      "name": "antigravity/likha-sis-wave3g-section-advisory-ui",
+      "sha": "b7fd977cc84d065c845ec7766a2611272e62eaf3",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation",
+      "sha": "35ed7f02e241b9ca3afd859694bd179cd35e0295",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 12,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "archive/pr55-pending-tasks-batch",
+      "sha": "fdcdabf1ec65f214444a294cd50770dc6f6162cf",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "archive/pr55-pending-tasks-batch-backup",
+      "sha": "fdcdabf1ec65f214444a294cd50770dc6f6162cf",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "chore/add-prompt-master-skill",
+      "sha": "5d5aec874be06274c734312d4f132bdf3b2a3751",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9,
+      "verifiedMergedPRs": [45]
+    },
+    {
+      "name": "chore/chatgpt-claude-wave-relay",
+      "sha": "8609925b30887260b48ea1b78fa9bf7d368d4928",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "chore/chatgpt-claude-wave-relay-main",
+      "sha": "14a0115b812d41ac8e3618c7cdee53eae9729b16",
+      "contained": false,
+      "equivalentPatches": 2,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": [3]
+    },
+    {
+      "name": "chore/claude-automation-bash-allowlist",
+      "sha": "ec045d2d2e4227782b61f612d02057f85628c83a",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [8]
+    },
+    {
+      "name": "chore/claude-automation-ci-dispatch",
+      "sha": "932ca1fcee6060eba3343505ceb9e241c94ea988",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [5]
+    },
+    {
+      "name": "chore/claude-automation-guard",
+      "sha": "e522e846d1fbe5abb3168eb08fb68810e9c0de70",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [4]
+    },
+    {
+      "name": "chore/claude-autonomous-delivery",
+      "sha": "f5f3a0069ba74b42cc5c4ee989e40dd3952fdb42",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "chore/harness-v3-model-routing",
+      "sha": "b50415b209b4babf1b25a7549694b6d79e482c49",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [59]
+    },
+    {
+      "name": "chore/remove-chatgpt-claude-automation",
+      "sha": "8b5efe111b473d1660cc2c12128f25094981dc83",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7,
+      "verifiedMergedPRs": [53]
+    },
+    {
+      "name": "chore/restore-claude-automation-new-account",
+      "sha": "a8ec48cdcd9197beb89a06d38a031266db203899",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 1,
+      "verifiedMergedPRs": [13]
+    },
+    {
+      "name": "chore/switch-to-chatgpt-codex",
+      "sha": "b3b2e62c991e050b5a6c6a47cedc7d49d59be553",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [12]
+    },
+    {
+      "name": "claude/auto-commit-merge-3sygid",
+      "sha": "45e33c87af8ae2dd5c8499b0511976e71cde7f09",
+      "contained": true
+    },
+    {
+      "name": "claude/automation-continuation-hroz95",
+      "sha": "b384eaaa72a292a76320baa35549ea85c4344bd7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": [71]
+    },
+    {
+      "name": "claude/cloudflare-likha-setup-a5oq5i",
+      "sha": "87a9b4626c41bf2080f3607bef1340cc62a4e262",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/continue-working-v7xzb3",
+      "sha": "9c1514cc589520d0e6cf490a96030a5df7421076",
+      "contained": true
+    },
+    {
+      "name": "claude/deped-teacher-likha-features-j7zfv6",
+      "sha": "b070998e39d899020ecad6894f9df07bdb7fd93a",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/gemini-chatgpt-alternative-joiyxi",
+      "sha": "b79fd2f006badaa1128b8b32359f7c88b78fbc98",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/github-app-install-mdhpi0",
+      "sha": "abd489f0005c3fee893d890c93cb7a08de508392",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/issue-16-20260901-1208",
+      "sha": "3f3a134391e239380b9d18b7c12096d8ad35e9c7",
+      "contained": true
+    },
+    {
+      "name": "claude/issue-6-20260831-1042",
+      "sha": "5bbeeaaa843db9fc4e3ed3f9bf8b7972b2ea4a6e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": [7]
+    },
+    {
+      "name": "claude/issue-9-20260831-1305",
+      "sha": "20480faa198f249bc170871f75e92f70afd2a48b",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-ux03-plan-plv80c",
+      "sha": "3951c3d247c9ef1de2887a33dfeb99ea9c1727b0",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2a-learner-core",
+      "sha": "428266914a7d0e2ae1daf647e7b0abd55729f062",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2s-placement-0ixw5v",
+      "sha": "8258c8c77eee2ddc5a2c0903640b46d8cb8d48bd",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/likha-sis-wave2t-teacher-slice",
+      "sha": "c51b46c209fbbf561a7b6915328e7159d06297fc",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2u-duplicate-warning",
+      "sha": "647ba0932b2043757cd71e599fb000a7e8dfd2ec",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2v-subject-attendance-foundation",
+      "sha": "4a7629e38dff2bcc0feabf5a04d6c7b414032038",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2w-subject-attendance-ui",
+      "sha": "bde802f6abf25aaaae41c3df0cee211e9460b5d6",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2x-todays-classes",
+      "sha": "361a2ba4ebe45af51f94d9761721a8564c8e689b",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2y-teaching-assignments",
+      "sha": "cbc3f746a9ece8541d259dfbd565b52f22a9df9b",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave2z-class-schedule",
+      "sha": "62c58e06a6a9467d5ea39a42f9595b733b2bba07",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3a-teacher-load",
+      "sha": "e465a4282c4ff23f7498614c40793336fadeb570",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3b-session-expiry-fix",
+      "sha": "72fc3cceb14c25662b87b011e68ed9a6de3a725d",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3c-teacher-load-colleague-view",
+      "sha": "f7d7029864b506cb468cbc76509b2dbc99cdc4c2",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3d-subject-monitor",
+      "sha": "00b4040d9fb856ac7621a3d848165144a64b7173",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3e-section-advisory-foundation",
+      "sha": "4de3973950387abbb68c37210412c5eabfcd8739",
+      "contained": true
+    },
+    {
+      "name": "claude/likha-sis-wave3f-adviser-view",
+      "sha": "2baae142e15359e5a4db1cc2442e683785a50997",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/likha-sis-wave3f-relay-base",
+      "sha": "61950aef8d5855e60eb5ad1725d356cd4f926e83",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/likha-verification-debt-6xrq4i",
+      "sha": "acd33551e0432fc2de45452e63c4e104ad87df36",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/pending-tasks-batch-vjy67v",
+      "sha": "fdcdabf1ec65f214444a294cd50770dc6f6162cf",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 73,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/phase-5-zero-cost-scenarios-6owlfm",
+      "sha": "a044428e53dec54978ece97f26fa4af76b89b0f7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/repo-priority-automation-8h96zx",
+      "sha": "96f103aa29d1cc5c11edd39c4322544c66aae829",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/research-agent-retry-recovery-zbbyp6",
+      "sha": "69e263e6c7eecba87d70d5ef4724b795098abced",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/reveal-exported-file",
+      "sha": "25da361d6660d12a0a3e4d5b2d8ffdc070abb69b",
+      "contained": true
+    },
+    {
+      "name": "claude/reveal-remaining-exports",
+      "sha": "3e7b495efdfd917640bc1e0ff3d4411f47222b85",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-fix",
+      "sha": "9310b1d93998781734b5e29d066a715c15414263",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-sweep-2",
+      "sha": "f04286e679b86b9d64bcfbb21a70c0128ab4caef",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-sweep-3",
+      "sha": "21b12f90c976085fcd6494d20df422ab409f59e2",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-sweep-4",
+      "sha": "192096d026a3758f3965091920e919b6b263234b",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-sweep-5",
+      "sha": "989b316896d09f3d55fe9d3d1bb2a918be288577",
+      "contained": true
+    },
+    {
+      "name": "claude/self-disabling-button-sweep-auth",
+      "sha": "ebb05d6d27cf68f0dbec18afcf04a99863c8b9f4",
+      "contained": true
+    },
+    {
+      "name": "claude/sf5-as-of-date-fix",
+      "sha": "1bb45422bfcbf099426304937b9caf2b7b247cf3",
+      "contained": true
+    },
+    {
+      "name": "claude/ux-02-03-review-fixes",
+      "sha": "c59ba1c0c3227decc49f2592a924c835ff31acd7",
+      "contained": true
+    },
+    {
+      "name": "claude/ux-04-review-fixes",
+      "sha": "c6905fd8024ac1cace6b19f6dd84252bd51d2398",
+      "contained": true
+    },
+    {
+      "name": "claude/verification-debt-sweep",
+      "sha": "942fe5d85abdf509fae5fa8facc23a02ff6310f1",
+      "contained": true
+    },
+    {
+      "name": "claude/verification-debts-1yyir7",
+      "sha": "ca63a11ec27e4459b3f45a938201834af4d759a7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 15,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "claude/wave-3j-sf4-export-ui-trigger",
+      "sha": "9bf39361def86bedee3898eebf2c3f8ee9476ba5",
+      "contained": true
+    },
+    {
+      "name": "claude/wave5-adr-0067-local-host-sync",
+      "sha": "6c3098197b095bec903fb2c1d29a1c3bbebc212d",
+      "contained": true
+    },
+    {
+      "name": "codex/all-current-priorities-20260904",
+      "sha": "34fe3b2fdf0d21c6eb9c7813c7245d3bc3e69a3d",
+      "contained": true
+    },
+    {
+      "name": "codex/class-record-sync-status",
+      "sha": "32fc5d798dbb1163f5a99eb536d8d63f91acac87",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 5,
+      "verifiedMergedPRs": [82]
+    },
+    {
+      "name": "codex/class-record-sync-status-adapter",
+      "sha": "1b02acef12f6cef301288b3072c4d82f24243087",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 10,
+      "verifiedMergedPRs": [83]
+    },
+    {
+      "name": "codex/complete-plans-20261004",
+      "sha": "da680ff7fcb7f347069865112b4f2788b3396b9e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "codex/likha-sis-wave3f-adviser-view",
+      "sha": "0c62884f9799a5e9622481e57e10cac22d10c280",
+      "contained": true
+    },
+    {
+      "name": "codex/merged-priorities-20260904",
+      "sha": "277f3256c3387e496db626ad663ad0bcba6fe47f",
+      "contained": true
+    },
+    {
+      "name": "codex/p0-windows-security-recovery",
+      "sha": "853a1d9c6f4cd11144e700d922667d19afed6ca2",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "codex/reconcile-issues-prs-20260901",
+      "sha": "4509727662b90c4bff388e0051512f804f42bd9f",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "codex/score-sync-status",
+      "sha": "f8c5c1dd798df3a1abbb6dfad96665e6f55b7281",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [81]
+    },
+    {
+      "name": "codex/windows-android-harness-reset",
+      "sha": "971fd889cc4bfc2f292816822fef03e33eb305d7",
+      "contained": true
+    },
+    {
+      "name": "ctos/compact-continuation-20261016",
+      "sha": "317ea74c5340d2b80682cc98f66be9da71a44c8a",
+      "contained": true
+    },
+    {
+      "name": "ctos/integration",
+      "sha": "962340650fd531b23fc391bc661ad3f095a98ce7",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "ctos/integration-v3",
+      "sha": "5ba3f7ca25e6434a81adf8ff25da6de6be211232",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 21,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "ctos/m10-classroom-lesson-origin-20261014",
+      "sha": "aa9eeb5cf26191ccc90d241c253cce07b3e8b974",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-draft-lineage-20261014",
+      "sha": "79a4d35b33ac0dd66d633103e0405259cfd890f7",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-draft-review-20261014",
+      "sha": "a521f0ec55030d79e847f2622783e6414896010d",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-lesson-context-20261013",
+      "sha": "aeb517e5985e9cc6bd7d43f6e6e9c9ce296f9998",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-amendments-20261013",
+      "sha": "7b8b28ddfa9aec5524567ffc3fc696034802c91d",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-date-scope-20261014",
+      "sha": "fbae7411d9f5b8b83e0be7e32c3d2cbb122521c5",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-grade-scope-20261014",
+      "sha": "701f1d7f0e8f30276a9b5f2ed2d36e69f8d336be",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-ingestion-20261014",
+      "sha": "ffd647800f57aaa09d39b86ee0ea372aa236f0e7",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-integrity-20261014",
+      "sha": "2e95fcc3689bbe6c00f824976e7c0fa3d9e46575",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-reference-20261013",
+      "sha": "f9f3ae82c6a05c6dcf47f2f0912a97b857b3e7d7",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-source-scope-20261013",
+      "sha": "240c97ad125c0e396a20e318e246c99b0b8bcfb1",
+      "contained": true
+    },
+    {
+      "name": "ctos/m10-year-lock-20261013",
+      "sha": "47b56475848a98f2fb2446ecc16f5e73fb10bdb0",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-annual-calendar-scope-20261015",
+      "sha": "8f3d4a3923a91be5ba90757fe5e990870389d6df",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-annual-policy-context-20261016",
+      "sha": "62e9e45dbdc4e111e09311931d098cdca353891b",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-applicability-verification-20261017",
+      "sha": "41d8421d8c8b53f76c39927c660821a2ed2c5756",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-assigned-subject-coverage-20261016",
+      "sha": "2380f0c298f32ada353ed313e46fe11d34950b14",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-configured-period-coverage-20261015",
+      "sha": "9c0890836666ddfe299bc384943aeeaa88048efb",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-draft-comparison-ui-20261014",
+      "sha": "b3b93011267272aeb63bcb802ec618ae221825b8",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-draft-freshness-20261014",
+      "sha": "754773336d2c696ddedcbe3616bb816f9cfddfbc",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-final-projection-completeness-20261015",
+      "sha": "b9331b04a2d08bd84ba04fffedaa53978a7db9cd",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-preparation-review-20261015",
+      "sha": "0164ceb34d0fb2563b2236a3f08c0336400128d4",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-preparation-review-ui-20261015",
+      "sha": "2c18c34143faf81bb1e6fda5fcda03bf25eff4b6",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-readiness-20261014",
+      "sha": "e11600141e60a18b16fcbd59a7444b4ff68e0624",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-readiness-ui-20261014",
+      "sha": "9c470f7acba1c97cfff0970cfaf901b783b92b7b",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-report-draft-ui-20261014",
+      "sha": "bf2b2fcd76abafdf0cfa446baf97f9b2c548e71c",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-report-drafts-20261014",
+      "sha": "aad6bbaec035b4ed00149f6e52803d79c76ef02b",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-reporting-continuation-20261016",
+      "sha": "db7f992995549e9e8ebf5bf07613412a65c48572",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-reporting-verification-20261016",
+      "sha": "f22f24cc2edc05caa8fb8f80779e724cd8dd2036",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-required-subject-applicability-20261017",
+      "sha": "1fb734674525abd6d0b3d114eb2e16bbbeeb8629",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-review-freshness-20261015",
+      "sha": "03e7bcfa22436854c3255d9034ec67293b683edb",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-review-freshness-ui-20261015",
+      "sha": "82c139e0b1ec0a3cb4c7d4cdedfe9741e321b9ea",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-school-report-authority-20261016",
+      "sha": "b955ddeade3ffe5798b6de65e09f52f8f1744061",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-source-check-ui-20261015",
+      "sha": "39837c076e2c84969497bd097a563b0d5753e458",
+      "contained": true
+    },
+    {
+      "name": "ctos/m11-source-lock-20261015",
+      "sha": "03f221281258ef6ed80317872011216737456aaf",
+      "contained": true
+    },
+    {
+      "name": "design/premium-school-ui-20261003",
+      "sha": "b8cd05da32c7f623f32fdae614e4cdb9db46a800",
+      "contained": true
+    },
+    {
+      "name": "docs/close-grade12-do8-rust-verification-debt",
+      "sha": "7497c104dd9c7529cacf2812bb08b99dfd4c2526",
+      "contained": true
+    },
+    {
+      "name": "docs/compact-current-handoff",
+      "sha": "b677b095e553ce6e8fca6e4779a68b722e7a0ddc",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [72]
+    },
+    {
+      "name": "docs/forge-audit-verification-20261012",
+      "sha": "d6ecdc5eb15dbbbf5e06c87ca2e56635fde93ecb",
+      "contained": true
+    },
+    {
+      "name": "docs/issue-workaround-memory",
+      "sha": "e82cbed2f3e4602939a28b78b1991d5937851fef",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [97]
+    },
+    {
+      "name": "feat/adviser-daily-attendance-boundary",
+      "sha": "0ccceffbaa520a42cbd4b8f8b850fabd20ec90ca",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4,
+      "verifiedMergedPRs": [93]
+    },
+    {
+      "name": "feat/adviser-daily-attendance-ui",
+      "sha": "2e07800b07ffef2454b26f1a7741271c6f74c98e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 21,
+      "verifiedMergedPRs": [94]
+    },
+    {
+      "name": "feat/adviser-monthly-attendance-preview",
+      "sha": "99a173508e4d94752844985ff1ee35802e430a15",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 13,
+      "verifiedMergedPRs": [95]
+    },
+    {
+      "name": "feat/adviser-monthly-panel",
+      "sha": "d7f7ab284ee5079044193bf60759a8dcb6ea6a2b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7,
+      "verifiedMergedPRs": [99]
+    },
+    {
+      "name": "feat/adviser-monthly-ui",
+      "sha": "c347529e9c645a2f05893406515eb2925e8e3f79",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 27,
+      "verifiedMergedPRs": [98]
+    },
+    {
+      "name": "feat/adviser-sf2-export-authorization",
+      "sha": "f38eb7bbc2b92e0bd5dcbdbc1cc06ee74eada910",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7,
+      "verifiedMergedPRs": [96]
+    },
+    {
+      "name": "feat/advisory-roster-context",
+      "sha": "682ab3f882d7fa93c4b2c52bc9a36de70f8ce5e2",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9,
+      "verifiedMergedPRs": [92]
+    },
+    {
+      "name": "feat/context7-freshness-gateway-20261007",
+      "sha": "130e8f65a15eb30983697a377c3c9cba331ed7b9",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 11,
+      "verifiedMergedPRs": [105]
+    },
+    {
+      "name": "feat/forge-premium-ui",
+      "sha": "21802b7266fa339f8c7a264be0aa855bba9da658",
+      "contained": true
+    },
+    {
+      "name": "feat/gj-class-record-local-save-ui",
+      "sha": "86dab376a7d2e09794dfc831cce43ea26dcf7cf6",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 8,
+      "verifiedMergedPRs": [77]
+    },
+    {
+      "name": "feat/gj-entity-sync-evidence",
+      "sha": "78df3d0f28038c1a85a985ab553bf27593ccd1e4",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": [80]
+    },
+    {
+      "name": "feat/gj-local-save-class-record",
+      "sha": "8d4a58067c75f90e6ac691b22e24b9e05dca24c6",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 25,
+      "verifiedMergedPRs": [76]
+    },
+    {
+      "name": "feat/gj-sync-status-evidence",
+      "sha": "a14c5dd32b78a9273a823b9e0f9fe67678227d26",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/golden-journey-app-context",
+      "sha": "28e10b374bf640c8e527b55e28100e830f60b44e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": [67]
+    },
+    {
+      "name": "feat/golden-journey-assessment-authoring",
+      "sha": "598cef071cbb52b0f3a1c59215ff69ad3c6e2a3d",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4,
+      "verifiedMergedPRs": [73]
+    },
+    {
+      "name": "feat/golden-journey-class-learners",
+      "sha": "4a5706575e2419b2a7ae989ffcf951265aac941b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 12,
+      "verifiedMergedPRs": [69]
+    },
+    {
+      "name": "feat/golden-journey-class-records",
+      "sha": "364247c3bdaac3e0ed99e2cd7542d6c441179584",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 8,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/golden-journey-grade-state",
+      "sha": "015b7248b07859b42356e26a1873a5c196cbab66",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [74]
+    },
+    {
+      "name": "feat/golden-journey-local-save-state",
+      "sha": "e8f86103c2976048ff5bacda737b0cf2078d0c9e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [75]
+    },
+    {
+      "name": "feat/golden-journey-work-context",
+      "sha": "29f1a22c822df6e204c51a33be364bf8f55b2360",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 14,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/golden-journey-work-context-checkpoint",
+      "sha": "c731aec531a780fe2910eb679f22c9815a53edfe",
+      "contained": false,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/golden-journey-work-context-main",
+      "sha": "7e54da4f3547bed6c9d923120ddcf40b4423a5b1",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6,
+      "verifiedMergedPRs": [63]
+    },
+    {
+      "name": "feat/hub-server-listener",
+      "sha": "381a587048ea80e7d5ba114b1fd465568a921cce",
+      "contained": true
+    },
+    {
+      "name": "feat/hub-server-startup-wiring",
+      "sha": "c1b071db1ff55655d6bfdc6757984c376a2337a2",
+      "contained": true
+    },
+    {
+      "name": "feat/my-advisory-context",
+      "sha": "b664cf3c2b06f10396bd3f72fef66c2883837828",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 16,
+      "verifiedMergedPRs": [91]
+    },
+    {
+      "name": "feat/precision-intelligence-shell",
+      "sha": "73b54f7268552a7da3be513a8bb3a765d79fcfbe",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 31,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/safe-resume-pointer",
+      "sha": "04ee88619aa014cf18f2ca36adc6dc74156e715f",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 17,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "feat/score-sync-composition",
+      "sha": "b5ef05ca0bc1277e9b07b23a60462a82a068a8de",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [85]
+    },
+    {
+      "name": "feat/score-sync-row-display",
+      "sha": "81d9768b3dc3e689de6402ba0362fa74dff020c3",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [86]
+    },
+    {
+      "name": "feat/sync-version-cache",
+      "sha": "42dd667a412d1c5b56b4deaa4312bd3ccdd8bf4a",
+      "contained": true
+    },
+    {
+      "name": "feat/wire-learner-create-sync",
+      "sha": "f564f48850f335152143ff8c38788a706941d123",
+      "contained": true
+    },
+    {
+      "name": "fix/forge-audit-20261011",
+      "sha": "684d2c06d8e94cf47a1c8ff0a7cb97a0546ddc30",
+      "contained": true
+    },
+    {
+      "name": "fix/gj-sync-status-truthfulness",
+      "sha": "01575e0e19677cf710ab6954c983d62e2c9d315a",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3,
+      "verifiedMergedPRs": [79]
+    },
+    {
+      "name": "fix/school-logo-magic-byte-validation",
+      "sha": "75f782c9540221fc69f5c7cdabedc35e92a23670",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [66]
+    },
+    {
+      "name": "fix/score-sync-permission-classification",
+      "sha": "bd61f752ba6365af6e1fc4f0bb19af1d72f1c730",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [84]
+    },
+    {
+      "name": "fix/spreadsheet-zip9-compat-20261016",
+      "sha": "23b306c0c1fbd302ab5854a9e25f638a37b31142",
+      "contained": true
+    },
+    {
+      "name": "fix/sspk-hub-persistence-and-enrollment-wiring",
+      "sha": "589f64834ed27b85c38569b185bd6146bbd68b5b",
+      "contained": true
+    },
+    {
+      "name": "fix/wire-sync-payload-key-module-v2",
+      "sha": "993001a7b433c1e2cf7194cc12a8a0f13cbf7668",
+      "contained": true
+    },
+    {
+      "name": "forge/assessment-delete-state-20261022",
+      "sha": "9c6ad148420cf6fa01c9658608a90ee0b7970e97",
+      "contained": true
+    },
+    {
+      "name": "forge/assessment-draft-ack-20261022",
+      "sha": "54203b720f90e13e8279ca163616f8e450a5c2d0",
+      "contained": true
+    },
+    {
+      "name": "forge/assessment-edit-ack-20261022",
+      "sha": "bf8fb342c465295e351b3d5c096d6cc894f92252",
+      "contained": true
+    },
+    {
+      "name": "forge/bounded-journey-assurance-20261018",
+      "sha": "10cfe8c16033a8ec260a2ba030f7518c4ec25741",
+      "contained": true
+    },
+    {
+      "name": "forge/class-record-period-state-20261024",
+      "sha": "d22bfd1abb2ab316c232ee042d16f517079f2108",
+      "contained": true
+    },
+    {
+      "name": "forge/design-system-contracts-20261022",
+      "sha": "fee28f00391edca2707a00f4b5f9602c00b771fc",
+      "contained": true
+    },
+    {
+      "name": "forge/legacy-setup-recovery-20261020",
+      "sha": "91974c28e55dcfd47ff5439fd9dd3a42200a4c48",
+      "contained": true
+    },
+    {
+      "name": "forge/opener-dependency-maintenance-20261018",
+      "sha": "237b7b5bfc1df50fe11b9069cf966288c3276877",
+      "contained": true
+    },
+    {
+      "name": "forge/prompt-master-scores-layout-20261022",
+      "sha": "62f32eb602ab26a02d613034d9b5eaab410e4931",
+      "contained": true
+    },
+    {
+      "name": "forge/remaining-batches-20261013",
+      "sha": "acf1c5bce6c12634f20bde49688c2ff83fe71617",
+      "contained": true
+    },
+    {
+      "name": "forge/reporting-preview-state-20261024",
+      "sha": "b001f58bd46852cec01866340d5596d3f0abbe12",
+      "contained": true
+    },
+    {
+      "name": "forge/score-decision-design-20261018",
+      "sha": "88e0686bab8c01d04fb293a737e0fd38dcaa99d5",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-component-comparison-20261021",
+      "sha": "58a9fc0433abc01ed5c5e0c4c17123a10d0aeec0",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-detail-20261019",
+      "sha": "d78374f220ed1cb64358725952a72b445840d9a2",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-export-feedback-20261022",
+      "sha": "3a34cd93c3e2e75391342ad2773aeb22b00e5451",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-grade-access-20261023",
+      "sha": "b2c3d954a5cb6be2b5e69d6d7d601a13dfc5b11c",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-grade-readiness-20261023",
+      "sha": "5f83f388192a2f1cf31cf90a4f72840dbf9e8198",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-grade-refresh-20261022",
+      "sha": "b15a91a3a63b8076e9c8ad0fdfdbeac7651e1d9d",
+      "contained": true
+    },
+    {
+      "name": "forge/scores-roster-refresh-20261022",
+      "sha": "8188eed7bffa49a8fd4e6a2b53806dd878d663a5",
+      "contained": true
+    },
+    {
+      "name": "forge/tauri-ui-forge4-20261021",
+      "sha": "80a6ebfdefac205eaa67a6b3a23db0c2effd3fd6",
+      "contained": true
+    },
+    {
+      "name": "main",
+      "sha": "ac4c3add56fb7a0677f1a0f745bf1de816ea55ee",
+      "contained": true
+    },
+    {
+      "name": "perf/affected-work-quality-gates",
+      "sha": "42fe7dcf89a5424f5114bd5ecb8bc31830109ceb",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 24,
+      "verifiedMergedPRs": [62]
+    },
+    {
+      "name": "perf/single-pr-quality-run",
+      "sha": "16ce639989c0a43c4e6790f43d5ab9bb5664b29b",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [68]
+    },
+    {
+      "name": "plan/legacy-soul-recalibration",
+      "sha": "7680192e60c728b1a7b6e054940a72ae620b8621",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [60]
+    },
+    {
+      "name": "reconcile/pr55-salvage",
+      "sha": "f9335741c8c06917c8309886735644a2cd87754b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 11,
+      "verifiedMergedPRs": [65]
+    },
+    {
+      "name": "recovery/forge-ux-20261010",
+      "sha": "7ff8f211ba0d21a786f7e555cc4a9361c73553fd",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 31,
+      "verifiedMergedPRs": []
+    },
+    {
+      "name": "test/native-score-evidence-lifecycle",
+      "sha": "d10f2bb6ea72b033fa2aed04f4d5ac7f274e2584",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [88]
+    },
+    {
+      "name": "test/score-command-recovery",
+      "sha": "eb9e0556534adfbde2fb69b8a1c85336321616f9",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [90]
+    },
+    {
+      "name": "test/score-evidence-restart",
+      "sha": "2c5c8dc7715bd17e1806d7587c50bfbb01dd069d",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2,
+      "verifiedMergedPRs": [89]
+    },
+    {
+      "name": "test/score-sync-reconnect-proof",
+      "sha": "2b5775e74efe02d8367bdacb5a75de4ab42eb64a",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0,
+      "verifiedMergedPRs": [87]
+    }
+  ],
+  "frontier": [
+    {
+      "name": "add-claude-github-actions-1788119184614",
+      "sha": "2681a847f135342f6f19b89421d415623c5a006c",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation",
+      "sha": "35ed7f02e241b9ca3afd859694bd179cd35e0295",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 12
+    },
+    {
+      "name": "claude/pending-tasks-batch-vjy67v",
+      "sha": "fdcdabf1ec65f214444a294cd50770dc6f6162cf",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 73
+    },
+    {
+      "name": "chore/add-prompt-master-skill",
+      "sha": "5d5aec874be06274c734312d4f132bdf3b2a3751",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9
+    },
+    {
+      "name": "chore/chatgpt-claude-wave-relay-main",
+      "sha": "14a0115b812d41ac8e3618c7cdee53eae9729b16",
+      "contained": false,
+      "equivalentPatches": 2,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "chore/claude-automation-bash-allowlist",
+      "sha": "ec045d2d2e4227782b61f612d02057f85628c83a",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "chore/claude-automation-ci-dispatch",
+      "sha": "932ca1fcee6060eba3343505ceb9e241c94ea988",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "chore/claude-automation-guard",
+      "sha": "e522e846d1fbe5abb3168eb08fb68810e9c0de70",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "chore/claude-autonomous-delivery",
+      "sha": "f5f3a0069ba74b42cc5c4ee989e40dd3952fdb42",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4
+    },
+    {
+      "name": "chore/harness-v3-model-routing",
+      "sha": "b50415b209b4babf1b25a7549694b6d79e482c49",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "chore/remove-chatgpt-claude-automation",
+      "sha": "8b5efe111b473d1660cc2c12128f25094981dc83",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7
+    },
+    {
+      "name": "chore/restore-claude-automation-new-account",
+      "sha": "a8ec48cdcd9197beb89a06d38a031266db203899",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 1
+    },
+    {
+      "name": "chore/switch-to-chatgpt-codex",
+      "sha": "b3b2e62c991e050b5a6c6a47cedc7d49d59be553",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "claude/automation-continuation-hroz95",
+      "sha": "b384eaaa72a292a76320baa35549ea85c4344bd7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "claude/cloudflare-likha-setup-a5oq5i",
+      "sha": "87a9b4626c41bf2080f3607bef1340cc62a4e262",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1
+    },
+    {
+      "name": "claude/deped-teacher-likha-features-j7zfv6",
+      "sha": "b070998e39d899020ecad6894f9df07bdb7fd93a",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9
+    },
+    {
+      "name": "claude/gemini-chatgpt-alternative-joiyxi",
+      "sha": "b79fd2f006badaa1128b8b32359f7c88b78fbc98",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "claude/github-app-install-mdhpi0",
+      "sha": "abd489f0005c3fee893d890c93cb7a08de508392",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "claude/issue-6-20260831-1042",
+      "sha": "5bbeeaaa843db9fc4e3ed3f9bf8b7972b2ea4a6e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "claude/likha-sis-wave2s-placement-0ixw5v",
+      "sha": "8258c8c77eee2ddc5a2c0903640b46d8cb8d48bd",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1
+    },
+    {
+      "name": "claude/likha-sis-wave3f-relay-base",
+      "sha": "61950aef8d5855e60eb5ad1725d356cd4f926e83",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "claude/likha-verification-debt-6xrq4i",
+      "sha": "acd33551e0432fc2de45452e63c4e104ad87df36",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 1
+    },
+    {
+      "name": "claude/phase-5-zero-cost-scenarios-6owlfm",
+      "sha": "a044428e53dec54978ece97f26fa4af76b89b0f7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "claude/repo-priority-automation-8h96zx",
+      "sha": "96f103aa29d1cc5c11edd39c4322544c66aae829",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4
+    },
+    {
+      "name": "claude/research-agent-retry-recovery-zbbyp6",
+      "sha": "69e263e6c7eecba87d70d5ef4724b795098abced",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "claude/verification-debts-1yyir7",
+      "sha": "ca63a11ec27e4459b3f45a938201834af4d759a7",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 15
+    },
+    {
+      "name": "codex/class-record-sync-status",
+      "sha": "32fc5d798dbb1163f5a99eb536d8d63f91acac87",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 5
+    },
+    {
+      "name": "codex/class-record-sync-status-adapter",
+      "sha": "1b02acef12f6cef301288b3072c4d82f24243087",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 10
+    },
+    {
+      "name": "codex/complete-plans-20261004",
+      "sha": "da680ff7fcb7f347069865112b4f2788b3396b9e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "codex/p0-windows-security-recovery",
+      "sha": "853a1d9c6f4cd11144e700d922667d19afed6ca2",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "codex/reconcile-issues-prs-20260901",
+      "sha": "4509727662b90c4bff388e0051512f804f42bd9f",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "codex/score-sync-status",
+      "sha": "f8c5c1dd798df3a1abbb6dfad96665e6f55b7281",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "ctos/integration-v3",
+      "sha": "5ba3f7ca25e6434a81adf8ff25da6de6be211232",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 21
+    },
+    {
+      "name": "docs/compact-current-handoff",
+      "sha": "b677b095e553ce6e8fca6e4779a68b722e7a0ddc",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "docs/issue-workaround-memory",
+      "sha": "e82cbed2f3e4602939a28b78b1991d5937851fef",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "feat/adviser-daily-attendance-boundary",
+      "sha": "0ccceffbaa520a42cbd4b8f8b850fabd20ec90ca",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4
+    },
+    {
+      "name": "feat/adviser-daily-attendance-ui",
+      "sha": "2e07800b07ffef2454b26f1a7741271c6f74c98e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 21
+    },
+    {
+      "name": "feat/adviser-monthly-attendance-preview",
+      "sha": "99a173508e4d94752844985ff1ee35802e430a15",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 13
+    },
+    {
+      "name": "feat/adviser-monthly-panel",
+      "sha": "d7f7ab284ee5079044193bf60759a8dcb6ea6a2b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7
+    },
+    {
+      "name": "feat/adviser-monthly-ui",
+      "sha": "c347529e9c645a2f05893406515eb2925e8e3f79",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 27
+    },
+    {
+      "name": "feat/adviser-sf2-export-authorization",
+      "sha": "f38eb7bbc2b92e0bd5dcbdbc1cc06ee74eada910",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 7
+    },
+    {
+      "name": "feat/advisory-roster-context",
+      "sha": "682ab3f882d7fa93c4b2c52bc9a36de70f8ce5e2",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 9
+    },
+    {
+      "name": "feat/context7-freshness-gateway-20261007",
+      "sha": "130e8f65a15eb30983697a377c3c9cba331ed7b9",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 11
+    },
+    {
+      "name": "feat/gj-class-record-local-save-ui",
+      "sha": "86dab376a7d2e09794dfc831cce43ea26dcf7cf6",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 8
+    },
+    {
+      "name": "feat/gj-entity-sync-evidence",
+      "sha": "78df3d0f28038c1a85a985ab553bf27593ccd1e4",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "feat/gj-local-save-class-record",
+      "sha": "8d4a58067c75f90e6ac691b22e24b9e05dca24c6",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 25
+    },
+    {
+      "name": "feat/gj-sync-status-evidence",
+      "sha": "a14c5dd32b78a9273a823b9e0f9fe67678227d26",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "feat/golden-journey-app-context",
+      "sha": "28e10b374bf640c8e527b55e28100e830f60b44e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "feat/golden-journey-assessment-authoring",
+      "sha": "598cef071cbb52b0f3a1c59215ff69ad3c6e2a3d",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 4
+    },
+    {
+      "name": "feat/golden-journey-class-learners",
+      "sha": "4a5706575e2419b2a7ae989ffcf951265aac941b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 12
+    },
+    {
+      "name": "feat/golden-journey-class-records",
+      "sha": "364247c3bdaac3e0ed99e2cd7542d6c441179584",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 8
+    },
+    {
+      "name": "feat/golden-journey-grade-state",
+      "sha": "015b7248b07859b42356e26a1873a5c196cbab66",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "feat/golden-journey-local-save-state",
+      "sha": "e8f86103c2976048ff5bacda737b0cf2078d0c9e",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "feat/golden-journey-work-context",
+      "sha": "29f1a22c822df6e204c51a33be364bf8f55b2360",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 14
+    },
+    {
+      "name": "feat/golden-journey-work-context-main",
+      "sha": "7e54da4f3547bed6c9d923120ddcf40b4423a5b1",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 6
+    },
+    {
+      "name": "feat/my-advisory-context",
+      "sha": "b664cf3c2b06f10396bd3f72fef66c2883837828",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 16
+    },
+    {
+      "name": "feat/precision-intelligence-shell",
+      "sha": "73b54f7268552a7da3be513a8bb3a765d79fcfbe",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 31
+    },
+    {
+      "name": "feat/safe-resume-pointer",
+      "sha": "04ee88619aa014cf18f2ca36adc6dc74156e715f",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 17
+    },
+    {
+      "name": "feat/score-sync-composition",
+      "sha": "b5ef05ca0bc1277e9b07b23a60462a82a068a8de",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "feat/score-sync-row-display",
+      "sha": "81d9768b3dc3e689de6402ba0362fa74dff020c3",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "fix/gj-sync-status-truthfulness",
+      "sha": "01575e0e19677cf710ab6954c983d62e2c9d315a",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 3
+    },
+    {
+      "name": "fix/school-logo-magic-byte-validation",
+      "sha": "75f782c9540221fc69f5c7cdabedc35e92a23670",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "fix/score-sync-permission-classification",
+      "sha": "bd61f752ba6365af6e1fc4f0bb19af1d72f1c730",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "perf/affected-work-quality-gates",
+      "sha": "42fe7dcf89a5424f5114bd5ecb8bc31830109ceb",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 24
+    },
+    {
+      "name": "perf/single-pr-quality-run",
+      "sha": "16ce639989c0a43c4e6790f43d5ab9bb5664b29b",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "plan/legacy-soul-recalibration",
+      "sha": "7680192e60c728b1a7b6e054940a72ae620b8621",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    },
+    {
+      "name": "reconcile/pr55-salvage",
+      "sha": "f9335741c8c06917c8309886735644a2cd87754b",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 11
+    },
+    {
+      "name": "recovery/forge-ux-20261010",
+      "sha": "7ff8f211ba0d21a786f7e555cc4a9361c73553fd",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 31
+    },
+    {
+      "name": "test/native-score-evidence-lifecycle",
+      "sha": "d10f2bb6ea72b033fa2aed04f4d5ac7f274e2584",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "test/score-command-recovery",
+      "sha": "eb9e0556534adfbde2fb69b8a1c85336321616f9",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "test/score-evidence-restart",
+      "sha": "2c5c8dc7715bd17e1806d7587c50bfbb01dd069d",
+      "contained": false,
+      "equivalentPatches": 0,
+      "unmatchedPatches": 2
+    },
+    {
+      "name": "test/score-sync-reconnect-proof",
+      "sha": "2b5775e74efe02d8367bdacb5a75de4ab42eb64a",
+      "contained": false,
+      "equivalentPatches": 1,
+      "unmatchedPatches": 0
+    }
+  ]
+}

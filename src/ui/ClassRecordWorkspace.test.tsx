@@ -3122,3 +3122,176 @@ describe("PM-13 reporting preview freshness", () => {
     },
   );
 });
+
+describe("PM-13 category read recovery", () => {
+  function deferred() {
+    let resolve!: (value: AssessmentCategory[]) => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise<AssessmentCategory[]>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    return { promise, resolve, reject };
+  }
+  const secondSet = {
+    ...CATEGORY_SET,
+    id: "set-2",
+    name: "Synthetic alternative set",
+    isDefault: false,
+  };
+  const secondCategory = {
+    ...CATEGORY,
+    id: "cat-2",
+    setId: secondSet.id,
+    name: "Synthetic second category",
+  };
+
+  it("retries categories without reloading items/roster or replacing zero and authoring drafts", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const scoreRepo = new FakeLearnerScoreRepository();
+    const first = deferred(),
+      retry = deferred();
+    const reads = vi
+      .spyOn(repo, "listCategoriesForSet")
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(retry.promise);
+    const items = vi.spyOn(repo, "listItemsByClassRecord");
+    const rosters = vi.spyOn(scoreRepo, "rosterForItem");
+    renderScreen({ assessmentRepo: repo, scoreRepo });
+    await user.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const score = await screen.findByLabelText("Score for Ana Cruz");
+    fireEvent.change(score, { target: { value: "0" } });
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
+    const name = screen.getByLabelText("Item name", { selector: "#workspace-item-name" });
+    fireEvent.change(name, { target: { value: "Retained synthetic draft" } });
+    fireEvent.change(screen.getByLabelText("Max score", { selector: "#workspace-max-score" }), {
+      target: { value: "30" },
+    });
+    await act(async () => first.reject(Error("Synthetic offline")));
+    expect(screen.getByLabelText("Category", { selector: "#workspace-category" })).toBeDisabled();
+    const retryButton = screen.getByRole("button", { name: "Retry categories" });
+    await user.click(retryButton);
+    expect(items).toHaveBeenCalledTimes(1);
+    expect(rosters).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Score for Ana Cruz")).toBe(score);
+    expect(score).toHaveValue(0);
+    expect(name).toHaveValue("Retained synthetic draft");
+    expect(screen.getByLabelText("Max score", { selector: "#workspace-max-score" })).toHaveValue(
+      30,
+    );
+    expect(scoreRepo.recordCalls).toEqual([]);
+    expect(repo.createCalls).toEqual([]);
+    await act(async () => retry.resolve([CATEGORY]));
+    expect(reads.mock.calls).toEqual([[CATEGORY_SET.id], [CATEGORY_SET.id]]);
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(repo.createCalls).toEqual([
+      {
+        classRecordId: "cr-1",
+        categoryId: CATEGORY.id,
+        name: "Retained synthetic draft",
+        maxScore: 30,
+      },
+    ]);
+    expect(scoreRepo.recordCalls).toEqual([]);
+  });
+
+  it.each(["empty", "wrong-set"])(
+    "fails closed for %s categories with an honest linked explanation",
+    async (kind) => {
+      const repo = new FakeAssessmentRepository([]);
+      vi.spyOn(repo, "listCategoriesForSet").mockResolvedValue(
+        kind === "empty" ? [] : [secondCategory],
+      );
+      renderScreen({ assessmentRepo: repo });
+      const category = await screen.findByLabelText("Category", {
+        selector: "#workspace-category",
+      });
+      if (kind === "empty") await screen.findByText("No categories are available for this set.");
+      else await screen.findByRole("button", { name: "Retry categories" });
+      expect(category).toBeDisabled();
+      expect(category).toHaveAccessibleDescription();
+      fireEvent.change(screen.getByLabelText("Item name"), { target: { value: "Blocked draft" } });
+      await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+      expect(repo.createCalls).toEqual([]);
+    },
+  );
+
+  it("ignores the old reply when returning to the same set during a newer read", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository([]);
+    vi.spyOn(repo, "listCategorySets").mockResolvedValue([CATEGORY_SET, secondSet]);
+    const old = deferred(),
+      current = deferred();
+    vi.spyOn(repo, "listCategoriesForSet")
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce([secondCategory])
+      .mockReturnValueOnce(current.promise);
+    renderScreen({ assessmentRepo: repo });
+    const set = await screen.findByLabelText("Category set");
+    await waitFor(() => expect(set).toHaveValue(CATEGORY_SET.id));
+    await user.selectOptions(set, secondSet.id);
+    await screen.findByRole("option", { name: secondCategory.name });
+    await user.selectOptions(set, CATEGORY_SET.id);
+    await act(async () => old.resolve([CATEGORY]));
+    expect(screen.getByLabelText("Category", { selector: "#workspace-category" })).toBeDisabled();
+    await act(async () => current.resolve([CATEGORY]));
+    expect(screen.getByLabelText("Category", { selector: "#workspace-category" })).toBeEnabled();
+    expect(screen.queryByRole("option", { name: secondCategory.name })).not.toBeInTheDocument();
+  });
+  it("does not reload assessments when recovering the category read", async () => {
+    const repo = new FakeAssessmentRepository();
+    const reads = vi.spyOn(repo, "listItemsByClassRecord");
+    vi.spyOn(repo, "listCategoriesForSet")
+      .mockRejectedValueOnce(Error("Synthetic offline"))
+      .mockResolvedValueOnce([CATEGORY]);
+    renderScreen({ assessmentRepo: repo });
+    await screen.findByRole("alert");
+    await userEvent.click(
+      screen.queryByRole("button", { name: "Retry categories" }) ??
+        screen.getByRole("button", { name: "Reload items" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(repo.createCalls).toEqual([]);
+  });
+
+  it("retains an unscored item's edit draft through category failure and retry", async () => {
+    const repo = new FakeAssessmentRepository();
+    const first = deferred(),
+      retry = deferred();
+    vi.spyOn(repo, "listCategoriesForSet")
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(retry.promise);
+    renderScreen({ assessmentRepo: repo });
+    await userEvent.click((await screen.findAllByRole("button", { name: "Edit" }))[0]!);
+    const name = screen.getByLabelText("Item name", { selector: "#edit-name-ai-1" });
+    const max = screen.getByLabelText("Max score", { selector: "#edit-max-ai-1" });
+    fireEvent.change(name, { target: { value: "Retained edit" } });
+    fireEvent.change(max, { target: { value: "40" } });
+    await act(async () => first.reject(Error("Synthetic offline")));
+    await userEvent.click(screen.getByRole("button", { name: "Retry categories" }));
+    expect(screen.getByLabelText("Item name", { selector: "#edit-name-ai-1" })).toBe(name);
+    expect(name).toHaveValue("Retained edit");
+    expect(max).toHaveValue(40);
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAttribute("aria-disabled", "true");
+    await act(async () => retry.resolve([CATEGORY]));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(repo.updateCalls).toEqual([
+      { id: ITEM.id, name: "Retained edit", categoryId: CATEGORY.id, maxScore: 40 },
+    ]);
+  });
+
+  it("allows scored-item rename without requiring category recovery", async () => {
+    const repo = new FakeAssessmentRepository([{ ...ITEM, recordedCount: 2 }]);
+    vi.spyOn(repo, "listCategoriesForSet").mockRejectedValue(Error("Synthetic offline"));
+    renderScreen({ assessmentRepo: repo });
+    await userEvent.click((await screen.findAllByRole("button", { name: "Edit" }))[0]!);
+    fireEvent.change(screen.getByLabelText("Item name", { selector: "#edit-name-ai-1" }), {
+      target: { value: "Rename only" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(repo.renameCalls).toEqual([{ id: ITEM.id, name: "Rename only" }]);
+    expect(repo.updateCalls).toEqual([]);
+  });
+});

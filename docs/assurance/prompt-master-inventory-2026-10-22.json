@@ -12014,6 +12014,15 @@
       "contract": "docs/assurance/class-record-period-contract-2026-10-25.md",
       "handoff": "docs/assurance/class-record-period-handoff-2026-10-25.md",
       "scope": "Pending/error/retry/empty/stale period context; full task and role/device coverage remains partial"
+    },
+    {
+      "date": "2026-10-25",
+      "task": "PM-13 bounded category recovery",
+      "surface": "src/ui/ClassRecordWorkspace.tsx",
+      "route": "class-records / record-library workspace",
+      "contract": "docs/assurance/scores-category-contract-2026-10-25.md",
+      "handoff": "docs/assurance/scores-category-handoff-2026-10-25.md",
+      "scope": "Current category read, retry/empty/error and draft preservation; full task and external acceptance partial"
     }
   ]
 }
