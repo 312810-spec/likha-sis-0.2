@@ -1,0 +1,50 @@
+{
+  "project": "LIKHA-SIS",
+  "parent_revision": "9775b22ad7385ff381578d494adb49da1ae306c7",
+  "contract": "docs/assurance/forge4-vite-security-contract-2026-10-21.md",
+  "vite_version": "8.3.5",
+  "source_artifact_sha256": {
+    "package.json": "7d4b2789d7efd40deb3477153ae469856c15a627696735d70df41a14733d69cf",
+    "package-lock.json": "2166eddfd38c60833728ff66e2fcbbab3646b981675122b13aec840c00d5c876",
+    ".github/workflows/quality.yml": "ab59514d2bc7b864a5b7a1f9ff337a9819d8d99dee006d5dc5d16a17dc3cc8b4",
+    "index.html": "350551abf1fb5a01b461fbd0c8d0abf6ee48535d37aa3a65e9de66f25b2634b5",
+    "src/ui/theme/appearance-bootstrap.test.ts": "446155c3e38ac47ce615782254480de0ccdd314e82c779c26ff8023442b1e2b1",
+    "scripts/assurance/appearance-startup-browser.mjs": "2c7a004c7530f6b442b60f5fbf8a35f7140d4534802cc49ada685cfd845f3e24",
+    "docs/assurance/forge4-vite-security-contract-2026-10-21.md": "889b8c2b893bea48a749bacea4fc78634331f4a4bd0f5d37e000e5ff8b081b87",
+    "dist/index.html": "29db9b56cb8fa2ac161916c45b18791f250c33f38170edfe2b7fda0e6fb97529",
+    "dist/assets/index-Ckem8M8k.js": "da7f0f74d4bd851cc960bd70f3e3003be93572f2dfcac27bcd48ccf3f1a6ac5d",
+    "dist/assets/index-DRpV9_vO.css": "08fd0873dbf7de5e816b5b7593f2422a6b2d61d510a412cbc27d77397eb2415a",
+    "docs/assurance/forge4-vite-startup-development-2026-10-21.json": "b91a2838e5c15e56055f829d409e57bc44f5c25268f32fb10377bd8fb2087e90",
+    "docs/assurance/forge4-vite-startup-production-2026-10-21.json": "bba546f480a88acf216cdd91c002fdaeb075b6eefa6e229a0e822165dbbe1a26",
+    "docs/assurance/forge4-vite-quality-2026-10-21.txt": "97c0665fd5723bac601360d25e0253d38804bfac54a56e00d93f829e31e60e15",
+    "docs/assurance/forge4-vite-build-2026-10-21.txt": "22182506ca27153fe6cd568129277a3b0734314005a07ed66e7b37b17cabf0da",
+    "docs/assurance/forge4-vite-score-2026-10-21.json": "9397077d70e47603d7ed2a45803b9d97de974d66a9544c1686b3e79bb7abcaaa",
+    "docs/assurance/forge4-vite-recovery-2026-10-21.json": "c09a5bd0ad9dae6ce432ff58162cd335209581bc56790e638c607c802d9c34a2"
+  },
+  "local_results": {
+    "quality": "PASS:1604 tests/161 files and required gates",
+    "build": "PASS",
+    "startup_development": "PASS:13/13",
+    "startup_built": "PASS:13/13",
+    "ui_smoke": "PASS:2x3x4 matrix",
+    "recovery": "PASS:50 checks",
+    "score_browser": "PASS:47 checks"
+  },
+  "initial_ci": {
+    "source": "9775b22ad7385ff381578d494adb49da1ae306c7",
+    "merge": "26210574d95c186e7fdbeb0935a2fd6503a580db",
+    "security_run": 39604170717,
+    "osv_job": 119236001290,
+    "result": "FAIL: Vite8.3.2 affected by three reported advisories",
+    "gitleaks": "PASS",
+    "cargo_deny": "PASS"
+  },
+  "fresh_ci": "NOT RUN until published candidate gates execute",
+  "T7": "INCONCLUSIVE pending fresh Security gate",
+  "T8": "INCONCLUSIVE pending executed workflow step and receipt artifact",
+  "limits": [
+    "No scanner ignores or policy changes",
+    "No installed Windows GUI/Android/teacher/manual-AT or real sync proof",
+    "Prior8.3.2 output hashes stay historical; these hashes bind8.3.5 local outputs"
+  ]
+}

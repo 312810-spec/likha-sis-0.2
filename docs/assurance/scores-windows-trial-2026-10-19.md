@@ -22,15 +22,15 @@ the real artifact ZIP comparison are NOT RUN until executed on the target machin
 
 ## Exact candidate
 
-Source: `fdf007dda30d016ebcbf04c42c6e75a4c3dc3f77`.
-Quality39204212688 and Security39204212659 passed; Quality job steps were inspected
+Source: `52a761cc3d1368a2cc91c95c1ab59a06a07ef266`.
+Quality39338547483 and Security39338547311 passed; Quality job steps were inspected
 and both Ubuntu/Windows native gates executed. These receipts bind this source,
-not later helper-only changes. PR149 remains draft; no merge/deployment.
+not later helper-only changes. PR150 depends on draft PR149 and remains draft; no merge/deployment.
 
-[Download the original Windows test-installer ZIP](https://github.com/312810-spec/likha-sis-0.2/actions/runs/39204212688/artifacts/12165548257).
-GitHub artifact12165548257:22,956,730 bytes;
-SHA-256 `548a6862c593530f2bf13b8c46404e59158ea38081f81e7dbffa4ffec8c85978`.
-Expiry reported by GitHub:2026-11-02T05:45:39Z. Metadata was retrieved on2026-10-19.
+[Download the original Windows test-installer ZIP](https://github.com/312810-spec/likha-sis-0.2/actions/runs/39338547483/artifacts/12228374752).
+GitHub artifact12228374752:22,970,803 bytes;
+SHA-256 `f43f96151e69ad1dbb64b124cc9f499c173e46c01a2a54c2648b551c9efcb1bc`.
+Expiry reported by GitHub:2026-11-02T23:23:52Z. Metadata was retrieved on2026-10-20.
 This digest covers the original downloaded ZIP, not an extracted MSI/EXE or a
 repacked ZIP. A digest match establishes identity against this recorded metadata;
 it is not a code-signature, installed-app or release approval claim.

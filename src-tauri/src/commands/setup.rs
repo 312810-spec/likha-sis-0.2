@@ -25,6 +25,31 @@ pub fn installation_status(db: State<'_, Mutex<Connection>>) -> AppResult<Instal
     })
 }
 
+#[tauri::command]
+pub fn legacy_setup_recovery_available(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<bool> {
+    auth::legacy_setup_recovery::legacy_setup_recovery_available(&lock_db(&db), &sessions)
+}
+
+#[tauri::command]
+pub fn restore_legacy_setup_access(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    mut password: String,
+) -> AppResult<CurrentSession> {
+    let conn = lock_db(&db);
+    let result =
+        auth::legacy_setup_recovery::restore_legacy_setup_access(&conn, &sessions, &password);
+    password.zeroize();
+    result?;
+    let session = sessions
+        .current()
+        .ok_or(crate::error::AppError::Unauthorized)?;
+    to_dto(&conn, &session)
+}
+
 /// Creates the first school, first user, and their membership atomically,
 /// then signs the new user in. See `auth::bootstrap_installation` for the
 /// one-time-only guarantee and why the check happens inside the

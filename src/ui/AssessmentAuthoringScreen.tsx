@@ -47,6 +47,9 @@ export function AssessmentAuthoringScreen({
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsRefreshing, setItemsRefreshing] = useState(false);
+  const itemReadGenerationRef = useRef(0);
+  const itemsRequireReloadRef = useRef(false);
   const [itemsSource, setItemsSource] = useState<{
     service: AssessmentApplicationService;
     classId: string;
@@ -57,10 +60,9 @@ export function AssessmentAuthoringScreen({
     setId: string;
   } | null>(null);
   const [duplicateReview, setDuplicateReview] = useState(false);
-  const itemsReady =
-    !itemsLoading &&
-    itemsSource?.service === assessmentService &&
-    itemsSource.classId === classRecordId;
+  const itemsCurrent =
+    itemsSource?.service === assessmentService && itemsSource.classId === classRecordId;
+  const itemsReady = !itemsRefreshing && !itemsLoading && itemsCurrent;
   const activeSource = useRef({
     service: assessmentService,
     classId: classRecordId,
@@ -97,6 +99,8 @@ export function AssessmentAuthoringScreen({
     () => "20",
   );
   const [creatingItem, setCreatingItem] = useState(false);
+  // User edits belong to a newer draft even if its text returns to the submitted value.
+  const createDraftRevisionRef = useRef(0);
   const [addedCount, setAddedCount] = useState(0);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,15 +118,22 @@ export function AssessmentAuthoringScreen({
     () => "",
   );
   const [savingEdit, setSavingEdit] = useState(false);
+  // Opening/cancelling is a new editing choice even for the same item/text.
+  const editDraftRef = useRef({ revision: 0, open: editingItemId !== null });
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const pendingDeleteIds = useRef(new Set<string>());
+  const deleteButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [deletingItemIds, setDeletingItemIds] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
+    const generation = ++itemReadGenerationRef.current;
+    itemsRequireReloadRef.current = false;
     // Fresh reads invalidate actionable source state before awaiting the response.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setItemsLoading(true);
+    setItemsRefreshing(false);
     setItemsSource(null);
     setItems([]);
     setError(null);
@@ -131,7 +142,7 @@ export function AssessmentAuthoringScreen({
       assessmentService.listCategorySets(),
     ])
       .then(([itemList, sets]) => {
-        if (cancelled) return;
+        if (cancelled || itemReadGenerationRef.current !== generation) return;
         setItems(itemList);
         setItemsSource({ service: assessmentService, classId: classRecordId });
         setCategorySets(sets);
@@ -141,10 +152,11 @@ export function AssessmentAuthoringScreen({
           setCategorySetId("");
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this class record's assessment items.");
+        if (!cancelled && itemReadGenerationRef.current === generation)
+          setError("Could not load this class record's assessment items.");
       })
       .finally(() => {
-        if (!cancelled) setItemsLoading(false);
+        if (!cancelled && itemReadGenerationRef.current === generation) setItemsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -190,17 +202,28 @@ export function AssessmentAuthoringScreen({
     categoriesSource.setId === categorySetId &&
     categories.some((category) => category.id === categoryId);
   async function refreshItemsAfterWrite() {
-    setItemsSource(null);
+    // An uncertain deletion requires explicit reload, even if another write completes.
+    if (itemsRequireReloadRef.current) return;
+    const generation = ++itemReadGenerationRef.current;
+    const isCurrentRead = () => isActiveSource() && itemReadGenerationRef.current === generation;
+    // Keep current editors mounted during a read; block writes until it finishes.
+    setItemsRefreshing(true);
     try {
       const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-      if (!isActiveSource()) return;
+      if (!isCurrentRead()) return;
       setItems(refreshed);
       setItemsSource({ service: assessmentService, classId: classRecordId });
     } catch {
-      if (!isActiveSource()) return;
+      if (!isCurrentRead()) return;
+      setItemsSource(null);
       setError(
         "The change is saved, but the item list could not refresh. Reload items before making another change.",
       );
+    } finally {
+      if (isCurrentRead()) {
+        setItemsRefreshing(false);
+        setItemsLoading(false);
+      }
     }
   }
 
@@ -221,6 +244,8 @@ export function AssessmentAuthoringScreen({
     setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
+    const submittedDraftRevision = createDraftRevisionRef.current;
+    const initiatingElement = document.activeElement;
     setCreatingItem(true);
     try {
       const created = await assessmentService.createItem(
@@ -233,11 +258,20 @@ export function AssessmentAuthoringScreen({
       if (created === null) {
         setError("Could not add this item — check the category and class record.");
       } else {
-        setItemName("");
+        const hasNewerDraft = createDraftRevisionRef.current !== submittedDraftRevision;
+        if (!hasNewerDraft) setItemName("");
         setAddedCount((count) => count + 1);
-        setConfirmation(`${created.name} added.`);
+        setConfirmation(
+          `${created.name} added.${hasNewerDraft ? " Your newer item draft is retained." : ""}`,
+        );
         await refreshItemsAfterWrite();
-        nameInputRef.current?.focus();
+        if (
+          !hasNewerDraft &&
+          isActiveSource() &&
+          createDraftRevisionRef.current === submittedDraftRevision &&
+          document.activeElement === initiatingElement
+        )
+          nameInputRef.current?.focus();
       }
     } catch (err) {
       setError(err instanceof ValidationError ? err.message : "Could not add this item.");
@@ -247,6 +281,9 @@ export function AssessmentAuthoringScreen({
   }
 
   function startEditingItem(item: AssessmentItemDetail) {
+    if (pendingDeleteIds.current.has(item.id)) return;
+    editDraftRef.current.revision += 1;
+    editDraftRef.current.open = true;
     setItemActionError(null);
     setConfirmingDeleteItemId(null);
     setEditingItemId(item.id);
@@ -270,6 +307,8 @@ export function AssessmentAuthoringScreen({
     )
       return;
     const isScored = item.recordedCount > 0;
+    const submittedRevision = editDraftRef.current.revision;
+    const submittedName = editName.trim();
     setSavingEdit(true);
     setItemActionError(null);
     try {
@@ -284,22 +323,37 @@ export function AssessmentAuthoringScreen({
       if (!isActiveSource()) return;
       if (updated === null) {
         setItemActionError(
-          isScored
-            ? "Could not rename this item."
-            : "Could not save changes — this item may already have recorded scores.",
+          `Could not save changes to “${submittedName}”. ${
+            isScored
+              ? "The item could not be renamed."
+              : "This item may already have recorded scores."
+          }`,
         );
       } else {
-        setEditingItemId(null);
-        setEditName("");
-        setEditCategoryId("");
-        setEditMaxScore("");
-        setConfirmation(`${updated.name} updated.`);
+        const hasNewerEdit = editDraftRef.current.revision !== submittedRevision;
+        if (!hasNewerEdit) {
+          editDraftRef.current.open = false;
+          setEditingItemId(null);
+          setEditName("");
+          setEditCategoryId("");
+          setEditMaxScore("");
+        }
+        setConfirmation(
+          `${updated.name} updated.${
+            hasNewerEdit && editDraftRef.current.open ? " Your newer item edits are retained." : ""
+          }`,
+        );
         await refreshItemsAfterWrite();
       }
     } catch (err) {
-      setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
+      if (!isActiveSource()) return;
+      setItemActionError(
+        `Could not save changes to “${submittedName}”. ${
+          err instanceof ValidationError ? err.message : "Try Save again when ready."
+        }`,
+      );
     } finally {
-      setSavingEdit(false);
+      if (isActiveSource()) setSavingEdit(false);
     }
   }
 
@@ -307,31 +361,53 @@ export function AssessmentAuthoringScreen({
    * controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
     if (
-      deletingItemId === item.id ||
+      pendingDeleteIds.current.has(item.id) ||
+      item.recordedCount > 0 ||
       !itemsReady ||
       !items.some((current) => current.id === item.id)
     )
       return;
-    setDeletingItemId(item.id);
+    pendingDeleteIds.current.add(item.id);
+    setDeletingItemIds(new Set(pendingDeleteIds.current));
+    setConfirmation(null);
     setItemActionError(null);
     try {
       const deleted = await assessmentService.deleteItem(item.id);
       if (!isActiveSource()) return;
       if (!deleted) {
-        setItemActionError("Could not delete this item — it may already have recorded scores.");
-        setConfirmingDeleteItemId(null);
+        setItemActionError(`“${item.name}” was not deleted. It may already have recorded scores.`);
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
       } else {
+        const row = deleteButtonRefs.current[item.id]?.closest("li");
+        const restoreFocus = Boolean(row?.contains(document.activeElement));
+        const adjacentRow = row?.nextElementSibling ?? row?.previousElementSibling;
+        const nextFocus = adjacentRow?.querySelector<HTMLElement>(
+          'button:not([aria-disabled="true"]):not(:disabled)',
+        );
         setItems((current) => current.filter((existing) => existing.id !== item.id));
-        setConfirmingDeleteItemId(null);
+        setConfirmingDeleteItemId((current) => (current === item.id ? null : current));
         setConfirmation(`${item.name} deleted.`);
         await refreshItemsAfterWrite();
+        if (restoreFocus && isActiveSource() && document.activeElement === document.body) {
+          (nextFocus?.isConnected ? nextFocus : nameInputRef.current)?.focus();
+        }
       }
     } catch (err) {
+      if (!isActiveSource()) return;
       setItemActionError(
-        err instanceof ValidationError ? err.message : "Could not delete this item.",
+        `Deletion of “${item.name}” was not confirmed.${
+          err instanceof ValidationError ? ` ${err.message}` : ""
+        }`,
       );
+      itemsRequireReloadRef.current = true;
+      itemReadGenerationRef.current += 1;
+      setItemsLoading(false);
+      setItemsRefreshing(false);
+      setItemsSource(null);
+      setError("Reload items to check the deletion result before making another change.");
     } finally {
-      setDeletingItemId(null);
+      pendingDeleteIds.current.delete(item.id);
+      if (isActiveSource()) setDeletingItemIds(new Set(pendingDeleteIds.current));
     }
   }
 
@@ -393,7 +469,10 @@ export function AssessmentAuthoringScreen({
           <select
             id="authoring-category-set"
             value={categorySetId}
-            onChange={(event) => setCategorySetId(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setCategorySetId(event.target.value);
+            }}
           >
             <option value="" disabled>
               Select a current category set
@@ -411,7 +490,10 @@ export function AssessmentAuthoringScreen({
           <select
             id="authoring-category"
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setCategoryId(event.target.value);
+            }}
           >
             <option value="" disabled>
               Select a current category
@@ -431,8 +513,12 @@ export function AssessmentAuthoringScreen({
             type="text"
             placeholder="e.g. Item 1"
             value={itemName}
-            onChange={(event) => setItemName(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setItemName(event.target.value);
+            }}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
               if (event.key === "Enter") {
                 event.preventDefault();
                 void handleAddItem();
@@ -447,7 +533,10 @@ export function AssessmentAuthoringScreen({
             type="number"
             min="1"
             value={maxScore}
-            onChange={(event) => setMaxScore(event.target.value)}
+            onChange={(event) => {
+              createDraftRevisionRef.current += 1;
+              setMaxScore(event.target.value);
+            }}
           />
         </div>
       </div>
@@ -472,7 +561,7 @@ export function AssessmentAuthoringScreen({
       <h3>Items in this class record</h3>
       {itemsLoading ? (
         <Loading label="Loading items…" />
-      ) : !itemsReady ? (
+      ) : !itemsCurrent ? (
         <EmptyState>Reload items to review current records. Your draft is retained.</EmptyState>
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above to start building this set.</EmptyState>
@@ -500,7 +589,10 @@ export function AssessmentAuthoringScreen({
                           id={`authoring-edit-name-${item.id}`}
                           type="text"
                           value={editName}
-                          onChange={(event) => setEditName(event.target.value)}
+                          onChange={(event) => {
+                            editDraftRef.current.revision += 1;
+                            setEditName(event.target.value);
+                          }}
                         />
                       </div>
                       {!isScored && (
@@ -510,7 +602,10 @@ export function AssessmentAuthoringScreen({
                             <select
                               id={`authoring-edit-category-${item.id}`}
                               value={editCategoryId}
-                              onChange={(event) => setEditCategoryId(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditCategoryId(event.target.value);
+                              }}
                             >
                               {categories.map((category) => (
                                 <option key={category.id} value={category.id}>
@@ -532,7 +627,10 @@ export function AssessmentAuthoringScreen({
                               type="number"
                               min="1"
                               value={editMaxScore}
-                              onChange={(event) => setEditMaxScore(event.target.value)}
+                              onChange={(event) => {
+                                editDraftRef.current.revision += 1;
+                                setEditMaxScore(event.target.value);
+                              }}
                             />
                           </div>
                         </>
@@ -554,6 +652,8 @@ export function AssessmentAuthoringScreen({
                     <button
                       type="button"
                       onClick={() => {
+                        editDraftRef.current.revision += 1;
+                        editDraftRef.current.open = false;
                         setEditingItemId(null);
                         setEditName("");
                         setEditCategoryId("");
@@ -571,13 +671,33 @@ export function AssessmentAuthoringScreen({
                         ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
                     </span>
                     <div role="group" aria-label={`Actions for ${item.name}`}>
-                      <button type="button" onClick={() => startEditingItem(item)}>
+                      <button
+                        type="button"
+                        aria-disabled={deletingItemIds.has(item.id)}
+                        onClick={() => startEditingItem(item)}
+                      >
                         Edit
                       </button>
                       {isScored ? (
                         <span className="field-hint">
                           Can&rsquo;t delete — already has recorded scores.
                         </span>
+                      ) : deletingItemIds.has(item.id) ? (
+                        <>
+                          <span className="field-hint" role="status">
+                            Deletion requested. Waiting for the result; it can’t be cancelled here.
+                          </span>
+                          <button
+                            type="button"
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled="true"
+                            onClick={() => void handleDeleteItem(item)}
+                          >
+                            Deleting…
+                          </button>
+                        </>
                       ) : isConfirmingDelete ? (
                         <>
                           <span className="field-hint">
@@ -585,10 +705,13 @@ export function AssessmentAuthoringScreen({
                           </span>
                           <button
                             type="button"
-                            aria-disabled={deletingItemId === item.id}
+                            ref={(node) => {
+                              deleteButtonRefs.current[item.id] = node;
+                            }}
+                            aria-disabled={!itemsReady}
                             onClick={() => void handleDeleteItem(item)}
                           >
-                            {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
+                            Confirm delete
                           </button>
                           <button type="button" onClick={() => setConfirmingDeleteItemId(null)}>
                             Cancel

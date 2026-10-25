@@ -116,6 +116,23 @@ jobs:
       - name: Verify UX recovery journeys
         if: needs.classify.outputs.ui == 'true'
         run: npm run quality:ui:recovery
+
+      - name: Verify pre-React appearance in development and production
+        if: needs.classify.outputs.ui == 'true'
+        run: |
+          npm run build
+          node scripts/assurance/appearance-startup-browser.mjs
+          node scripts/assurance/appearance-startup-browser.mjs --built
+
+      - name: Upload appearance startup verification receipts
+        if: needs.classify.outputs.ui == 'true' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: likha-sis-appearance-startup-verification
+          path: .cache/appearance-startup/*.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload UI verification screenshots
         if: needs.classify.outputs.ui == 'true' && github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

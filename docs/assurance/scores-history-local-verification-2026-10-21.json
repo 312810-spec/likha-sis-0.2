@@ -1,0 +1,35 @@
+{
+  "project": "LIKHA-SIS",
+  "base": "7bea54ac4b3e26baea3f30fd02963d606ceb154e",
+  "kind": "Local verification receipt; not a FORGE checker result",
+  "sourceSha256": {
+    "src/ui/components/ScoreCorrectionHistory.tsx": "75296c25f11bfc69458207e9cb0963db932c59a3c7fdff0045034c22fcdc6a3a",
+    "src/ui/components/ScoreCorrectionHistory.test.tsx": "efe4f3fedd33d5dfd81018c8f78e5900bddc417da6abaa1c032cccaa0aff970d",
+    "src/ui/theme/styles.css": "46a69f42a0a218f30804b8e12ae402693f8945749902892769bb10b7f36a3fcc",
+    "src/ui/ClassRecordWorkspace.tsx": "8410f8d73fcb813e2a916c3dfa39926abf16bcdda0d0a06e30119bd7d239256f",
+    "package.json": "7d4b2789d7efd40deb3477153ae469856c15a627696735d70df41a14733d69cf",
+    "package-lock.json": "2166eddfd38c60833728ff66e2fcbbab3646b981675122b13aec840c00d5c876"
+  },
+  "gates": {
+    "quality": "PASS; 1612 tests / 161 files",
+    "build": "PASS",
+    "ui": "PASS",
+    "recovery": "PASS; 50 checks",
+    "scoresBrowser": "PASS; 47 checks",
+    "comparison": "PASS; 43 checks, KEEP_BASE"
+  },
+  "logSha256": {
+    "history-quality-final.log": "d3ee5456ef609f409ebb7dcf89a8e87b3a0d963494fd726f50beb6a28f0dfbcc",
+    "history-lint-clean.log": "2e1d0f0a49c4cae4e650f592c0f05742d24e6280db543a13d84333303ca285c3",
+    "history-build.log": "8f22bb343342415fbdd6774dac3c901e1eca9df86da9f56786c0a57a4cdf3aff",
+    "history-ui.log": "9b628cc102b563fddf0adc6a78727270f45e69377b03cd2657ddec3b8f1c963a",
+    "history-recovery.log": "a523aef93009dbfd0110a00d19dec5bd88c4b161552c2541502023bc09d7f902",
+    "history-score-browser.log": "23842557dd12e2c9d02a02ff7053fac0493af7498d5afe35066848f70f857e51"
+  },
+  "dependencies": "npm ci --ignore-scripts restored locked closure; @base-ui/react absent; manifests unchanged",
+  "limits": [
+    "No native source change or new native/device readiness claim",
+    "Manual AT, OS zoom, teacher/device acceptance NOT RUN; Scores A1\u2013A7 INCONCLUSIVE",
+    "Exact remote source/CI receipt recorded separately after publication"
+  ]
+}

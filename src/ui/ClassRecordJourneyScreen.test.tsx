@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AssessmentApplicationService } from "../application/assessment-service";
@@ -172,7 +172,8 @@ describe("ClassRecordJourneyScreen", () => {
       records: [savedRecord, { ...savedRecord, id: "cr-2" }],
     });
     await screen.findByRole("heading", { name: "Class Record Workspace" });
-    expect(assessment.listItemsByClassRecord).toHaveBeenCalledWith("cr-2");
+    // The workspace heading can render before its item-loading effect runs.
+    await waitFor(() => expect(assessment.listItemsByClassRecord).toHaveBeenCalledWith("cr-2"));
     expect(classRecord.createClassRecord).not.toHaveBeenCalled();
   });
 

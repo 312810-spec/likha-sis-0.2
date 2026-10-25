@@ -1,3 +1,5 @@
+import { LegacySetupRecoveryApplicationService } from "./application/legacy-setup-recovery-service";
+import { TauriLegacySetupRecoveryRepository } from "./infrastructure/tauri/legacy-setup-recovery-repository";
 import { ClassroomDraftApplicationService } from "./application/classroom-draft-service";
 import { TauriClassroomDraftRepository } from "./infrastructure/tauri/classroom-draft-repository";
 import { AssessmentApplicationService } from "./application/assessment-service";
@@ -160,4 +162,8 @@ export const schedulePlanningService = new SchedulePlanningApplicationService(
 
 export const classroomDraftService = new ClassroomDraftApplicationService(
   new TauriClassroomDraftRepository(),
+);
+
+export const legacySetupRecoveryService = new LegacySetupRecoveryApplicationService(
+  new TauriLegacySetupRecoveryRepository(),
 );

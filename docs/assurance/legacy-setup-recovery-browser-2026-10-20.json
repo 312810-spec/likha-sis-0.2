@@ -1,0 +1,293 @@
+{
+  "method": "Production App with injected synthetic IPC; native/device checks separate",
+  "checks": [
+    {
+      "theme": "light",
+      "density": "efficient",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "efficient",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "efficient",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "guided",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "guided",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "light",
+      "density": "guided",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "light",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "efficient",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "efficient",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "efficient",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "efficient"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "comfortable"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "guided",
+      "width": 1280,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "guided",
+      "width": 640,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    },
+    {
+      "theme": "dark",
+      "density": "guided",
+      "width": 390,
+      "cancelWrites": 0,
+      "restoreRequests": 1,
+      "geometry": {
+        "visible": true,
+        "hit": true,
+        "overflow": false,
+        "theme": "dark",
+        "density": "guided"
+      },
+      "violations": [],
+      "receiptUpdatesAppRoles": true
+    }
+  ]
+}

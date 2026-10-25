@@ -1,0 +1,73 @@
+{
+  "project": "LIKHA-SIS",
+  "date": "2026-10-23",
+  "timezone": "Asia/Manila",
+  "baseline": {
+    "head": "6f580f056cc5286d1a0174f4f5a4d1a80334bf61",
+    "tree": "d69966e69870219243dd52c2217cbf7997b6d6ef",
+    "ci_merge": "a972f80e37c1e98d41454c2147270c4d3d8b029c",
+    "quality_run": 39873544705,
+    "ubuntu_job": 120153813956,
+    "passed": 1315,
+    "failed": 3,
+    "excerpt": [
+      "2026-10-22T23:44:10.1121498Z   stable-x86_64-unknown-linux-gnu updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))",
+      "2026-10-22T23:44:10.1463304Z rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "2026-10-22T23:44:10.1746696Z cargo 1.99.1 (5f94df478 2026-08-27)",
+      "2026-10-22T23:48:32.1674907Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 56s",
+      "2026-10-22T23:50:14.8096952Z test commands::learner_score::tests::grade_read_keeps_foreign_unknown_record_and_revoked_session_closed ... ok",
+      "2026-10-22T23:50:15.4448223Z test commands::learner_score::tests::grade_read_preserves_zero_and_missing_without_writing ... ok",
+      "2026-10-22T23:50:16.6916946Z test commands::learner_score::tests::grade_read_rechecks_assignment_replacement_for_existing_session ... FAILED",
+      "2026-10-22T23:50:16.8014512Z test commands::learner_score::tests::grade_read_rechecks_school_head_role_revocation ... FAILED",
+      "2026-10-22T23:50:17.3064417Z test commands::learner_score::tests::grade_read_rejects_unassigned_same_school_teacher ... FAILED",
+      "2026-10-22T23:53:49.4157793Z ---- commands::learner_score::tests::grade_read_rechecks_assignment_replacement_for_existing_session stdout ----",
+      "2026-10-22T23:53:49.4158788Z thread 'commands::learner_score::tests::grade_read_rechecks_assignment_replacement_for_existing_session' (23801) panicked at src/commands/learner_score.rs:484:9:",
+      "2026-10-22T23:53:49.4162262Z assertion failed: matches!(compute_term_grade_for_session(&conn, &sessions, &record, &learner),",
+      "2026-10-22T23:53:49.4164203Z ---- commands::learner_score::tests::grade_read_rechecks_school_head_role_revocation stdout ----",
+      "2026-10-22T23:53:49.4165045Z thread 'commands::learner_score::tests::grade_read_rechecks_school_head_role_revocation' (23802) panicked at src/commands/learner_score.rs:522:9:",
+      "2026-10-22T23:53:49.4165862Z assertion failed: matches!(compute_term_grade_for_session(&conn, &sessions, &record, &learner),",
+      "2026-10-22T23:53:49.4178142Z ---- commands::learner_score::tests::grade_read_rejects_unassigned_same_school_teacher stdout ----",
+      "2026-10-22T23:53:49.4179056Z thread 'commands::learner_score::tests::grade_read_rejects_unassigned_same_school_teacher' (23803) panicked at src/commands/learner_score.rs:460:9:",
+      "2026-10-22T23:53:49.4180039Z unexpected grade read: Ok(Some(ComputedTermGrade { initial_grade: 0.0, term_grade: 60, was_transmuted: true, was_floored: false, complete: true }))",
+      "2026-10-22T23:53:49.4181054Z     commands::learner_score::tests::grade_read_rechecks_assignment_replacement_for_existing_session",
+      "2026-10-22T23:53:49.4181657Z     commands::learner_score::tests::grade_read_rechecks_school_head_role_revocation",
+      "2026-10-22T23:53:49.4182197Z     commands::learner_score::tests::grade_read_rejects_unassigned_same_school_teacher",
+      "2026-10-22T23:53:49.4183379Z test result: FAILED. 1315 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 316.72s"
+    ]
+  },
+  "first_attempt": {
+    "head": "93ed78457ee3ab3684c6082e1618da947247d11a",
+    "quality_run": 39873175682,
+    "result": "fmt-only failure; two wraps corrected before actual native reproduction"
+  },
+  "candidate": {
+    "status": "PASS bounded G1\u2013G5; merged PR162",
+    "sources": {
+      "src-tauri/src/commands/learner_score.rs": "717bab2f5259d04e08cc87e40a6cd0e3d9ee030e7a0fcb7fa2274018a2f7ed5b",
+      "scripts/assurance/score-native-negative-controls.py": "43cec891d9493b16d76e85c8ed88308cf696b6d3141f14c2358e6fdf80df61d0"
+    },
+    "head": "b2c3d954a5cb6be2b5e69d6d7d601a13dfc5b11c",
+    "tree": "86bcef43f7cc4b1277c8f381e91619c96273e7b0",
+    "ci_merge": "0eb4bc9de58c4896196bbf9674d08d12de84beea",
+    "actual_merge": "43ca7bc1371e776362e18a663506340f8412cb03",
+    "actual_merge_tree": "86bcef43f7cc4b1277c8f381e91619c96273e7b0",
+    "quality_run": 39875036566,
+    "security_run": 39875036619,
+    "ubuntu_native_tests": 1542,
+    "windows_native_tests": 1551,
+    "negative_controls": "Five actual assertion failures against pinned old bodies, source restored exactly",
+    "receipt": "scores-grade-access-ci-merge-2026-10-23.json"
+  },
+  "local": {
+    "javascript_quality": "PASS1692 tests/161 files",
+    "cargo": "NOT RUN: absent",
+    "python_compile": "PASS",
+    "diff_check": "PASS"
+  },
+  "unchanged_prior_visual_sources": {
+    "src/ui/ClassRecordWorkspace.tsx": "2520abee273a9ef17cca4b5db17c367985767a7315809f01a8d31bfd0d9dfa4b",
+    "src/ui/ClassRecordWorkspace.test.tsx": "77c9df4d6e2b44b94fd79c92b80a44f3ed92ceb92960d64ef223dfb91d2d00c0",
+    "src/ui/theme/styles.css": "3486a53c6d13bc4045ebe46f9b6c6d42d3196dfcb59c65136269eca16110ca03",
+    "scripts/assurance/scores-grade-readiness-browser.mjs": "c1eba5525fd9a2dbc1dc0f8c2312a7c2b1c23419f9be365b5338ac970c573fc6"
+  }
+}

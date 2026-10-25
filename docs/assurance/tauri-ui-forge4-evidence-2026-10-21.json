@@ -1,0 +1,79 @@
+{
+  "project": "LIKHA-SIS",
+  "base_revision": "d5fa6dbd44ea4d8a932a326afef4a3cba19913b8",
+  "branch": "forge/tauri-ui-forge4-20261021",
+  "method": "Local executed gates and browser synthetic cases; manual internal render inspection",
+  "environment": "Linux / Node v24.19.0; browser version in startup receipt",
+  "artifacts": {
+    "index.html": "350551abf1fb5a01b461fbd0c8d0abf6ee48535d37aa3a65e9de66f25b2634b5",
+    "src/ui/theme/appearance-bootstrap.test.ts": "446155c3e38ac47ce615782254480de0ccdd314e82c779c26ff8023442b1e2b1",
+    "scripts/assurance/appearance-startup-browser.mjs": "2c7a004c7530f6b442b60f5fbf8a35f7140d4534802cc49ada685cfd845f3e24",
+    "docs/ctos/FORGE-V4-ADAPTER.md": "3c8e0f10e9f8f6ca2f72a35da7c825aa8d8f759d8dc2bdee04d59426273c99a0",
+    "docs/assurance/tauri-ui-forge4-contract-2026-10-21.md": "8d764c28950ee8416f08ad2d8cb2047f6e44f04c4cb65c8f552149e4bfe4c355",
+    "dist/index.html": "3caac4b33c86ae19c82eb87c40d4319d6fa3e36d898580e358b50295cc33b93f",
+    "dist/assets/index-CfM4IRn8.js": "d4b309323911970b4513cfdc8d775aec4d78a9e3f0d881d5544cdbdc182af44b",
+    "dist/assets/index-DRpV9_vO.css": "08fd0873dbf7de5e816b5b7593f2422a6b2d61d510a412cbc27d77397eb2415a",
+    "docs/assurance/appearance-startup-development-2026-10-21.json": "b91a2838e5c15e56055f829d409e57bc44f5c25268f32fb10377bd8fb2087e90",
+    "docs/assurance/appearance-startup-production-2026-10-21.json": "bba546f480a88acf216cdd91c002fdaeb075b6eefa6e229a0e822165dbbe1a26",
+    "docs/assurance/forge4-score-regression-2026-10-21.json": "3a582f38ceebde3a5644350dade856efc1cd764c92c42bd852df3e57faa7ad34",
+    "docs/assurance/forge4-recovery-2026-10-21.json": "11b0b9da5a909a872f74b53c40e29a2b510e85833addacba7899cc14f5204d6e",
+    "docs/assurance/forge4-quality-2026-10-21.txt": "b1c5b686288e0cc5ed6d268befd5510917872bcb126fc23979255e36c1e9182f",
+    ".cache/score-assurance/design-dark-comfortable-390.png": "b682e7b296f53fa3e2742c96f308a818eb0d7f414535cf9cd0775305466208b1",
+    "docs/design/class-folio/scores-dark.png": "7051ec692d4afd278d32eaad38be9435252c26486a7f530ca393e590c3f1500a",
+    "docs/design/class-folio/scores-phone-light.png": "4cc3d2b5603e63a67cb13a88f7a6073c3ed2280c08a91520599274375e16ffab"
+  },
+  "checks": [
+    {
+      "id": "T1",
+      "status": "PASS",
+      "method": "Source mapping and instruction reconciliation",
+      "coverage": "v4 LIKHA adapter + operating spec + repository instructions"
+    },
+    {
+      "id": "T2",
+      "status": "PASS",
+      "method": "11 initializer tests (combined T2/T3/order) + held-entrypoint browser cases",
+      "coverage": "12 preference/system cases per development and built mode"
+    },
+    {
+      "id": "T3",
+      "status": "PASS",
+      "method": "actual-script exception tests and live root startup",
+      "coverage": "storage denied/media absent/media throws; actual App with denied storage in each server mode"
+    },
+    {
+      "id": "T4",
+      "status": "PASS",
+      "method": "existing AppearanceProvider tests + same storage key/provider; native source unchanged",
+      "coverage": "3 provider tests; source comparison"
+    },
+    {
+      "id": "T5",
+      "status": "PASS",
+      "method": "focused Vitest + existing score journey + recovery + smoke",
+      "coverage": "91 focused tests across 4 files; 47 score browser checks; 50 recovery checks; smoke matrix 2 themes x3 densities x4 widths"
+    },
+    {
+      "id": "T6",
+      "status": "PASS",
+      "method": "npm run quality; npm run build; internal render inspection",
+      "coverage": "1604 tests/161 files + typecheck/lint/format/architecture/deadcode/batch checks; three inspected score renders"
+    }
+  ],
+  "not_run": [
+    "installed Windows startup/upgrade/GUI",
+    "actual Android",
+    "real two-device exchange",
+    "teacher comprehension",
+    "manual assistive technology",
+    "new candidate native CI",
+    "shadcn component comparison",
+    "FORGE local checker"
+  ],
+  "readiness": "READY FOR REVIEW for T1\u2013T6 bounded appearance/instruction slice; full A1\u2013A7 pilot INCONCLUSIVE",
+  "notes": [
+    "No checker was installed or executed; this is a custom evidence manifest, not forge.assurance/1 input.",
+    "Hashes bind bytes, not authenticity. Browser mocks are not native storage or device proof.",
+    "Initial standalone-server probe failed with connection refused; owned-server rerun reproduced baseline correctly."
+  ]
+}

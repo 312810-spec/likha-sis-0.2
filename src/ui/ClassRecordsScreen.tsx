@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { AssessmentApplicationService } from "../application/assessment-service";
 import type { ClassRecordApplicationService } from "../application/class-record-service";
 import type { ExportApplicationService } from "../application/export-service";
@@ -70,7 +70,31 @@ export function ClassRecordsScreen({
   const [sectionId, setSectionId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [gradingPeriodId, setGradingPeriodId] = useState("");
-  const [periodsForSection, setPeriodsForSection] = useState<GradingPeriod[]>([]);
+  const [periodAttempt, setPeriodAttempt] = useState(0);
+  const selectedSection = sections.find((section) => section.id === sectionId);
+  // Identity changes on every committed scope/retry transition, including A → B → A.
+  // Hide old options in this render, before the replacement read effect runs.
+  const periodContext = useMemo(
+    () => ({
+      service: gradingService,
+      sectionId,
+      schoolYear: selectedSection?.schoolYear,
+      attempt: periodAttempt,
+    }),
+    [gradingService, sectionId, selectedSection?.schoolYear, periodAttempt],
+  );
+  const [periodResponse, setPeriodResponse] = useState<{
+    context: typeof periodContext;
+    periods: GradingPeriod[];
+    failed: boolean;
+  } | null>(null);
+  const currentResponse = periodResponse?.context === periodContext ? periodResponse : null;
+  const periodsForSection = currentResponse?.periods ?? [];
+  const currentPeriodId = periodsForSection.some((period) => period.id === gradingPeriodId)
+    ? gradingPeriodId
+    : "";
+  const periodsLoading = !!selectedSection && !currentResponse;
+  const periodDescriptionId = useId();
   const [weightPolicyId, setWeightPolicyId] = useState("");
   const [weightPolicies, setWeightPolicies] = useState<GradingWeightPolicy[]>([]);
   const [creating, setCreating] = useState(false);
@@ -109,24 +133,25 @@ export function ClassRecordsScreen({
   }, [classRecordService, sectionService, subjectService]);
 
   useEffect(() => {
-    const section = sections.find((s) => s.id === sectionId);
-    if (!section) return;
+    if (!periodContext.schoolYear) return;
     let cancelled = false;
-    gradingService
-      .listPeriodsBySchoolYear(section.schoolYear)
+    periodContext.service
+      .listPeriodsBySchoolYear(periodContext.schoolYear)
       .then((result) => {
         if (cancelled) return;
-        setPeriodsForSection(result);
-        if (result[0]) setGradingPeriodId(result[0].id);
-        else setGradingPeriodId("");
+        if (result.some((period) => period.schoolYear !== periodContext.schoolYear)) {
+          throw new Error("Grading periods do not match the requested school year.");
+        }
+        setPeriodResponse({ context: periodContext, periods: result, failed: false });
+        setGradingPeriodId(result[0]?.id ?? "");
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load grading periods for this section's school year.");
+        if (!cancelled) setPeriodResponse({ context: periodContext, periods: [], failed: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [gradingService, sectionId, sections]);
+  }, [periodContext]);
 
   function handleSectionChange(value: string) {
     setError(null);
@@ -166,7 +191,7 @@ export function ClassRecordsScreen({
   }
 
   async function handleCreateClassRecord() {
-    if (creating || !sectionId || !subjectId || !gradingPeriodId || !weightPolicyId) return;
+    if (creating || !sectionId || !subjectId || !currentPeriodId || !weightPolicyId) return;
     setError(null);
     setConfirmation(null);
     setCreating(true);
@@ -174,7 +199,7 @@ export function ClassRecordsScreen({
       const created = await classRecordService.createClassRecord(
         sectionId,
         subjectId,
-        gradingPeriodId,
+        currentPeriodId,
         weightPolicyId,
       );
       if (created === null) {
@@ -287,17 +312,46 @@ export function ClassRecordsScreen({
           <label htmlFor="class-record-period">Grading period</label>
           <select
             id="class-record-period"
-            value={gradingPeriodId}
+            value={currentPeriodId}
             onChange={(event) => setGradingPeriodId(event.target.value)}
             disabled={periodsForSection.length === 0}
+            aria-describedby={periodsForSection.length === 0 ? periodDescriptionId : undefined}
           >
-            {periodsForSection.length === 0 && <option value="">No grading periods yet</option>}
+            {periodsForSection.length === 0 && (
+              <option value="">
+                {periodsLoading
+                  ? "Loading grading periods…"
+                  : currentResponse?.failed
+                    ? "Grading periods unavailable"
+                    : "No grading periods yet"}
+              </option>
+            )}
             {periodsForSection.map((period) => (
               <option key={period.id} value={period.id}>
                 {period.label}
               </option>
             ))}
           </select>
+          {periodsForSection.length === 0 && (
+            <p
+              id={periodDescriptionId}
+              className={currentResponse?.failed ? "field-error" : "field-hint"}
+              role={currentResponse?.failed ? "alert" : "status"}
+            >
+              {periodsLoading
+                ? `Loading grading periods for ${selectedSection?.schoolYear}…`
+                : currentResponse?.failed
+                  ? `Could not load grading periods for ${selectedSection?.schoolYear}. Retry before opening a class record.`
+                  : selectedSection
+                    ? `No grading periods for ${selectedSection.schoolYear}.`
+                    : "Select a section to load grading periods."}
+            </p>
+          )}
+          {currentResponse?.failed && (
+            <button type="button" onClick={() => setPeriodAttempt((attempt) => attempt + 1)}>
+              Retry grading periods
+            </button>
+          )}
         </div>
         <div className="field">
           <label htmlFor="class-record-weight-policy">DepEd grading weighting</label>
@@ -325,7 +379,7 @@ export function ClassRecordsScreen({
 
       <button
         type="button"
-        aria-disabled={creating || !sectionId || !subjectId || !gradingPeriodId || !weightPolicyId}
+        aria-disabled={creating || !sectionId || !subjectId || !currentPeriodId || !weightPolicyId}
         onClick={handleCreateClassRecord}
       >
         {creating ? "Opening…" : "Open class record"}

@@ -2673,6 +2673,57 @@ pub fn migrations() -> Migrations<'static> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn pre_rbac_sole_owner_can_explicitly_recover_after_real_schema_upgrade() {
+        use crate::auth::legacy_setup_recovery::{
+            legacy_setup_recovery_available, restore_legacy_setup_access,
+        };
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrations().to_version(&mut conn, 15).unwrap();
+        // Historical Argon2 0.5.3 PHC fixture, never a real account/hash.
+        let hash = "$argon2id$v=19$m=19456,t=2,p=1$bGVnYWN5LXNhbHQtZm9yLXRlc3Q$qKHgI++bAXEdwMNXeIZeCJKQIgnRxvbw1XVfRreqCBA";
+        conn.execute(
+            "INSERT INTO schools(id,name) VALUES('synthetic-school','Synthetic school')",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO users(id,username,password_hash,display_name) VALUES('synthetic-owner','synthetic.owner',?1,'Synthetic owner')", [hash]).unwrap();
+        conn.execute("INSERT INTO user_school_memberships(user_id,school_id) VALUES('synthetic-owner','synthetic-school')", []).unwrap();
+        crate::repository::installation::claim_bootstrap_slot(&conn).unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let roles: i64 = conn
+            .query_row("SELECT count(*) FROM user_school_roles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            roles, 0,
+            "upgrade reproduction: existing roles are not silently invented"
+        );
+        let sessions = crate::auth::SessionManager::new();
+        crate::auth::login(
+            &conn,
+            &sessions,
+            "synthetic.owner",
+            "synthetic-upgrade-test",
+            "synthetic-school",
+        )
+        .unwrap();
+        assert!(legacy_setup_recovery_available(&conn, &sessions).unwrap());
+        restore_legacy_setup_access(&conn, &sessions, "synthetic-upgrade-test").unwrap();
+        assert_eq!(
+            crate::repository::role::list_roles(&conn, "synthetic-owner", "synthetic-school")
+                .unwrap(),
+            vec!["registrar", "school_head", "teacher"]
+        );
+        let retained: String = conn
+            .query_row(
+                "SELECT password_hash FROM users WHERE id='synthetic-owner'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(retained, hash);
+    }
     use super::*;
     use rusqlite::Connection;
 

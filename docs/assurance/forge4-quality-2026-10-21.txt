@@ -1,0 +1,68 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 quality
+> npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run check:deadcode && npm run test:batch-runner && npm run test
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 typecheck
+> node node_modules/typescript-compiler/bin/tsc -b --noEmit
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 lint
+> eslint .
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 format:check
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 check:architecture
+> node scripts/check-architecture.mjs
+
+Architecture check passed: no restricted imports found.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 check:deadcode
+> knip
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 test:batch-runner
+> node --test scripts/ctos/verify-batches.node-test.mjs
+
+✔ a successful executed check passes (61.678178ms)
+✔ failure cannot be reported as pass (59.608987ms)
+✔ missing execution capability stays not run (3.144477ms)
+✔ timeout cannot be reported as completed (32.971237ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 242.589552
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> likha-sis@0.2.0 test
+> vitest run
+
+
+ RUN  v5.0.3 /workspace/scratch/2b4a6f776035/likha-sis
+
+
+ Test Files  161 passed (161)
+      Tests  1604 passed (1604)
+   Start at  07:42:11
+   Duration  41.37s (environment 44%, tests 40%, import 6%, setup 5%, transform 4%, worker 1%)
+
+Environment  jsdom was created 161 times · 114.07s total, 44% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

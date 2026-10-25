@@ -1,0 +1,330 @@
+{
+  "source": "52a761cc3d1368a2cc91c95c1ab59a06a07ef266",
+  "tree": "1ed35b828a649b5a6bfa376acf7359e2fe7814c9",
+  "ciMerge": "4e5a951a2bd17816c3365442a577772613938c27",
+  "mergeTreeIdentical": true,
+  "quality": {
+    "run": 39338547483,
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 118354109635,
+        "name": "Quality / classify affected work",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Determine changed files",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify classifier behavior",
+            "conclusion": "success"
+          },
+          {
+            "name": "Classify affected work",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout full history for diff classification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 118354179062,
+        "name": "Quality (Ubuntu)",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Update npm to current stable",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Node dependencies",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run documentation formatting gate",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Verify harness contract",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run JavaScript and TypeScript quality gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Chromium for deterministic UI verification",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run UI workflow and accessibility smoke gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify UX recovery journeys",
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload UI verification screenshots",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Tauri Linux build dependencies",
+            "conclusion": "success"
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify opener compatibility source provenance",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify cold SQLCipher initialization mechanism",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run native Rust quality gate",
+            "conclusion": "success"
+          },
+          {
+            "name": "Exercise opener compatibility on a private synthetic D-Bus",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify bounded score native baseline negative controls",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 118354179127,
+        "name": "Quality (Windows)",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Confirm Rust toolchain is present",
+            "conclusion": "success"
+          },
+          {
+            "name": "Update npm to current stable",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Node dependencies",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify spreadsheet compatibility source provenance",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify opener compatibility source provenance",
+            "conclusion": "success"
+          },
+          {
+            "name": "Build the Windows-native Tauri application",
+            "conclusion": "success"
+          },
+          {
+            "name": "Test native Windows behavior",
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload Windows test installers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Set up Node.js",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Checkout",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ]
+  },
+  "security": {
+    "run": 39338547311,
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 118354074841,
+        "name": "Security / osv-scanner",
+        "conclusion": "success"
+      },
+      {
+        "id": 118354075002,
+        "name": "Security / gitleaks",
+        "conclusion": "success"
+      },
+      {
+        "id": 118354075064,
+        "name": "Security / cargo-deny",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "ubuntu": {
+    "job": 118354179062,
+    "nativeTests": 1535,
+    "focusedLog": [
+      "2026-10-19T23:01:40.0830271Z quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+      "2026-10-19T23:02:01.8877488Z quality:ui:recovery PASS — 50 checks, recovery workflows, draft retention, confirmation focus, 200% text and touch.",
+      "2026-10-19T23:09:08.5181727Z test db::migrations::tests::pre_rbac_sole_owner_can_explicitly_recover_after_real_schema_upgrade ... ok",
+      "2026-10-19T23:12:10.1842340Z test result: ok. 1313 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 303.69s",
+      "2026-10-19T23:12:10.1977964Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T23:12:14.1673926Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s",
+      "2026-10-19T23:12:24.3078957Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.14s",
+      "2026-10-19T23:12:29.1609558Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.85s",
+      "2026-10-19T23:12:29.7989500Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s",
+      "2026-10-19T23:12:33.2198472Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.42s",
+      "2026-10-19T23:12:44.4373890Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.21s",
+      "2026-10-19T23:13:08.9205185Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.48s",
+      "2026-10-19T23:13:14.3337308Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.41s",
+      "2026-10-19T23:13:26.8117794Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.48s",
+      "2026-10-19T23:13:31.4028469Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.59s",
+      "2026-10-19T23:13:33.9002835Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.49s",
+      "2026-10-19T23:13:39.2525168Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.35s",
+      "2026-10-19T23:13:41.3959530Z test expired_session_cannot_recover_even_with_correct_password ... ok",
+      "2026-10-19T23:13:42.8481402Z test concurrent_connections_can_commit_only_one_recovery ... ok",
+      "2026-10-19T23:13:42.9321374Z test audit_failure_rolls_back_every_role_and_every_recovery_audit ... ok",
+      "2026-10-19T23:13:44.0672000Z test no_session_or_revoked_session_cannot_recover ... ok",
+      "2026-10-19T23:13:46.1511068Z test stale_positive_status_cannot_authorize_later_changed_state ... ok",
+      "2026-10-19T23:13:46.5843129Z test sole_authenticated_owner_explicitly_restores_setup_with_password_and_real_audits ... ok",
+      "2026-10-19T23:13:49.0036401Z test wrong_password_counts_toward_lockout_and_never_grants_roles ... ok",
+      "2026-10-19T23:13:50.9583812Z test ambiguous_existing_managed_or_unclaimed_installations_fail_closed ... ok",
+      "2026-10-19T23:13:50.9584594Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.70s",
+      "2026-10-19T23:13:51.3236046Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+      "2026-10-19T23:13:53.4910888Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s",
+      "2026-10-19T23:14:00.3810821Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.89s",
+      "2026-10-19T23:14:11.2151984Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.83s",
+      "2026-10-19T23:14:13.2336853Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.01s",
+      "2026-10-19T23:14:20.8252183Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.59s",
+      "2026-10-19T23:14:26.7179372Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.89s",
+      "2026-10-19T23:14:26.7459446Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+      "2026-10-19T23:14:38.3545693Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.61s",
+      "2026-10-19T23:14:45.9944187Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.64s",
+      "2026-10-19T23:14:46.9758336Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T23:16:47.9698372Z SCORE_NATIVE_NEGATIVE_CONTROLS_JSON={\"baseline\": \"ac4c3add56fb7a0677f1a0f745bf1de816ea55ee\", \"evidence\": \"Native cargo regression execution against pinned pre-fix production code with candidate tests/fixture\", \"source_restored\": true, \"results\": [{\"case\": \"command_rejects_unassigned_same_school_teacher_without_writing\", \"baseline_failed_as_expected\": true}, {\"case\": \"command_local_correction_failure_rolls_back_history\", \"baseline_failed_as_expected\": true}]}"
+    ]
+  },
+  "windows": {
+    "job": 118354179127,
+    "nativeTests": 1544,
+    "focusedLog": [
+      "2026-10-19T23:12:50.5574483Z        Built application at: D:\\a\\likha-sis-0.2\\likha-sis-0.2\\src-tauri\\target\\debug\\app.exe\r",
+      "2026-10-19T23:18:05.8448322Z test db::migrations::tests::pre_rbac_sole_owner_can_explicitly_recover_after_real_schema_upgrade ... ok\r",
+      "2026-10-19T23:21:20.0668667Z test result: ok. 1322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 323.87s\r",
+      "2026-10-19T23:21:20.1013480Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-19T23:21:24.3635157Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.24s\r",
+      "2026-10-19T23:21:33.4512009Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.07s\r",
+      "2026-10-19T23:21:37.6918212Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s\r",
+      "2026-10-19T23:21:38.5073249Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s\r",
+      "2026-10-19T23:21:41.7967149Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.27s\r",
+      "2026-10-19T23:21:52.5322951Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.72s\r",
+      "2026-10-19T23:22:15.5095185Z test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.96s\r",
+      "2026-10-19T23:22:21.5319026Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.00s\r",
+      "2026-10-19T23:22:32.2917885Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.74s\r",
+      "2026-10-19T23:22:36.3338957Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.02s\r",
+      "2026-10-19T23:22:39.0793093Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.72s\r",
+      "2026-10-19T23:22:44.8528697Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.75s\r",
+      "2026-10-19T23:22:47.0063493Z test expired_session_cannot_recover_even_with_correct_password ... ok\r",
+      "2026-10-19T23:22:48.2451673Z test audit_failure_rolls_back_every_role_and_every_recovery_audit ... ok\r",
+      "2026-10-19T23:22:48.4504691Z test concurrent_connections_can_commit_only_one_recovery ... ok\r",
+      "2026-10-19T23:22:49.3867824Z test no_session_or_revoked_session_cannot_recover ... ok\r",
+      "2026-10-19T23:22:51.2690081Z test sole_authenticated_owner_explicitly_restores_setup_with_password_and_real_audits ... ok\r",
+      "2026-10-19T23:22:51.4228664Z test stale_positive_status_cannot_authorize_later_changed_state ... ok\r",
+      "2026-10-19T23:22:54.1406286Z test wrong_password_counts_toward_lockout_and_never_grants_roles ... ok\r",
+      "2026-10-19T23:22:54.9057410Z test ambiguous_existing_managed_or_unclaimed_installations_fail_closed ... ok\r",
+      "2026-10-19T23:22:54.9058149Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.03s\r",
+      "2026-10-19T23:22:55.2285077Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s\r",
+      "2026-10-19T23:22:57.0341910Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.79s\r",
+      "2026-10-19T23:23:04.5061583Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.45s\r",
+      "2026-10-19T23:23:14.5004421Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.97s\r",
+      "2026-10-19T23:23:16.1373143Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.62s\r",
+      "2026-10-19T23:23:23.6345169Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.48s\r",
+      "2026-10-19T23:23:30.2019344Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.55s\r",
+      "2026-10-19T23:23:30.2572155Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s\r",
+      "2026-10-19T23:23:41.7142515Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.44s\r",
+      "2026-10-19T23:23:49.2644473Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.53s\r",
+      "2026-10-19T23:23:51.4072143Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r"
+    ]
+  },
+  "installer": {
+    "id": 12228374752,
+    "bytes": 22970803,
+    "digest": "sha256:f43f96151e69ad1dbb64b124cc9f499c173e46c01a2a54c2648b551c9efcb1bc",
+    "expiresAt": "2026-11-02T23:23:52Z",
+    "source": "52a761cc3d1368a2cc91c95c1ab59a06a07ef266",
+    "url": "https://github.com/312810-spec/likha-sis-0.2/actions/runs/39338547483/artifacts/12228374752"
+  },
+  "limits": [
+    "GitHub-reported original archive digest; the real ZIP was not independently downloaded/hashed locally.",
+    "Installed recovery on the user's device remains NOT RUN; no password/database was obtained.",
+    "R1-R7 technically ready for review within this bounded recovery; full Scores pilot still INCONCLUSIVE.",
+    "Subsequent receipt/helper pin changes leave production UI/native/test/workflow source unchanged."
+  ]
+}

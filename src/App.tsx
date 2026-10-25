@@ -1,8 +1,10 @@
+import { LegacySetupRecovery } from "./ui/LegacySetupRecovery";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   assessmentService,
   attendanceService,
   authService,
+  legacySetupRecoveryService,
   backupService,
   classRecordService,
   classroomDraftService,
@@ -499,6 +501,19 @@ function App() {
             schoolLogoService={schoolLogoService}
           >
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
+            {session.roles.length === 0 && (
+              <LegacySetupRecovery
+                key={`${session.userId}:${session.schoolId}`}
+                service={legacySetupRecoveryService}
+                onRestored={(updated) =>
+                  setSession((current) =>
+                    current?.userId === updated.userId && current.schoolId === updated.schoolId
+                      ? updated
+                      : current,
+                  )
+                }
+              />
+            )}
             <ErrorBoundary
               key={`${session.userId}:${session.schoolId}:${activeTab}`}
               message="This screen could not be shown."

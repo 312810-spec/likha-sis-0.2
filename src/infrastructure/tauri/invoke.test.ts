@@ -66,6 +66,7 @@ describe("invoke", () => {
   // actually matters is proving the mechanism works, and that it does
   // not accidentally cover every command (the next test below).
   it.each([
+    "restore_legacy_setup_access",
     "create_teaching_assignment",
     "get_teacher_load",
     "open_subject_attendance_session",

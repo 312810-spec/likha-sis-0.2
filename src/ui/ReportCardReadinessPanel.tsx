@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ExportApplicationService } from "../application/export-service";
 import type { ReportCardReadiness } from "../domain/report-readiness";
 import { Alert } from "./components/Alert";
@@ -13,9 +13,7 @@ interface Props {
   pendingEdits?: boolean;
 }
 interface Result {
-  service: ExportApplicationService;
-  classRecordId: string;
-  revision: unknown;
+  context: object;
   kind: "loading" | "error" | "missing" | "preview";
   preview?: ReportCardReadiness;
 }
@@ -29,6 +27,13 @@ export function ReportCardReadinessPanel({
   pendingEdits = false,
 }: Props) {
   const { mode } = useTeacherMode();
+  // Each availability/context transition retires prior snapshots and busy state,
+  // including a return to the same ids after an unconfirmed score write.
+  const context = useMemo(
+    () => ({ service, classRecordId, revision, disabled }),
+    [service, classRecordId, revision, disabled],
+  );
+  const checkHintId = useId();
   const [result, setResult] = useState<Result | null>(null);
   const request = useRef(0);
   const pending = useRef(false);
@@ -41,19 +46,18 @@ export function ReportCardReadinessPanel({
       pending.current = false;
       request.current += 1;
     };
-  }, [service, classRecordId, revision, disabled]);
-  const current =
-    !disabled &&
-    result?.service === service &&
-    result.classRecordId === classRecordId &&
-    result.revision === revision
-      ? result
+  }, [context]);
+  const current = !disabled && result?.context === context ? result : null;
+  const checkHint = disabled
+    ? "Reporting check is unavailable while records are loading or a score save is pending."
+    : result !== null && current === null
+      ? "Run the check again to review the current saved records."
       : null;
   async function check() {
     if (disabled || pending.current) return;
     pending.current = true;
     const id = ++request.current;
-    const source = { service, classRecordId, revision };
+    const source = { context };
     setResult({ ...source, kind: "loading" });
     try {
       const preview = await service.previewReportCard(classRecordId);
@@ -94,8 +98,14 @@ export function ReportCardReadinessPanel({
           evidence that policy applicability, templates or professional approval are verified.
         </p>
       )}
+      {checkHint && (
+        <p className="field-hint" id={checkHintId} role="status">
+          {checkHint}
+        </p>
+      )}
       <button
         type="button"
+        aria-describedby={checkHint ? checkHintId : undefined}
         disabled={disabled || current?.kind === "loading"}
         onClick={() => void check()}
       >

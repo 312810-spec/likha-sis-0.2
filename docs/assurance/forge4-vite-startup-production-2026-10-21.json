@@ -1,0 +1,159 @@
+{
+  "project": "LIKHA-SIS",
+  "method": "Playwright browser / synthetic local preferences",
+  "browser": "156.0.8078.47",
+  "mode": "production build",
+  "sourceSha256": "350551abf1fb5a01b461fbd0c8d0abf6ee48535d37aa3a65e9de66f25b2634b5",
+  "expectedCases": 13,
+  "checks": [
+    {
+      "system": "light",
+      "preference": null,
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "light",
+      "preference": "light",
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "light",
+      "preference": "dark",
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "light",
+      "preference": "system",
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "light",
+      "preference": "invalid",
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "light",
+      "preference": "storage-denied",
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": null,
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": "light",
+      "expected": "light",
+      "actual": {
+        "appearance": "light",
+        "background": "rgb(246, 247, 250)",
+        "colorScheme": "light",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": "dark",
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": "system",
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": "invalid",
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "system": "dark",
+      "preference": "storage-denied",
+      "expected": "dark",
+      "actual": {
+        "appearance": "dark",
+        "background": "rgb(20, 23, 34)",
+        "colorScheme": "dark",
+        "children": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "case": "real React startup with denied preference storage",
+      "status": "PASS"
+    }
+  ],
+  "limits": "Held entrypoint is fault injection, not installed Windows timing or native startup proof."
+}
