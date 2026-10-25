@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
 import { ClassRecordApplicationService } from "../application/class-record-service";
 import { ExportApplicationService } from "../application/export-service";
@@ -205,6 +205,24 @@ class FakeGradingRepository implements GradingRepository {
   }
 }
 
+const NEXT_SECTION: Section = { ...SECTION, id: "sec-2", name: "Rizal", schoolYear: "2027-2028" };
+const NEXT_PERIOD: GradingPeriod = {
+  ...PERIOD,
+  id: "gp-2",
+  schoolYear: NEXT_SECTION.schoolYear,
+  label: "Next year term",
+};
+
+function deferredPeriods() {
+  let resolve!: (periods: GradingPeriod[]) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<GradingPeriod[]>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
 const WEIGHT_POLICY: GradingWeightPolicy = {
   id: "wp-1",
   name: "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)",
@@ -304,6 +322,125 @@ beforeEach(() => {
 });
 
 describe("ClassRecordsScreen", () => {
+  it("blocks stale periods immediately while a new section year is loading", async () => {
+    const user = userEvent.setup();
+    const pending = deferredPeriods();
+    const gradingRepo = new FakeGradingRepository();
+    vi.spyOn(gradingRepo, "listPeriodsBySchoolYear")
+      .mockResolvedValueOnce([PERIOD])
+      .mockReturnValueOnce(pending.promise);
+    const { classRecordRepo } = renderScreen({
+      gradingRepo,
+      sectionRepo: new FakeSectionRepository([SECTION, NEXT_SECTION]),
+    });
+    await waitFor(() => expect(screen.getByLabelText("Grading period")).toHaveValue(PERIOD.id));
+    await user.selectOptions(screen.getByLabelText("Section"), NEXT_SECTION.id);
+    expect(screen.getByLabelText("Grading period")).toBeDisabled();
+    expect(screen.queryByRole("option", { name: PERIOD.label })).not.toBeInTheDocument();
+    const open = screen.getByRole("button", { name: "Open class record" });
+    expect(open).toHaveAttribute("aria-disabled", "true");
+    await user.click(open);
+    open.focus();
+    await user.keyboard("{Enter}");
+    expect(classRecordRepo.createCalls).toEqual([]);
+    await act(async () => pending.resolve([NEXT_PERIOD]));
+    expect(screen.getByLabelText("Grading period")).toHaveValue(NEXT_PERIOD.id);
+  });
+
+  it("retries a failed year read without creating or losing other choices", async () => {
+    const user = userEvent.setup();
+    const pending = deferredPeriods();
+    const retry = deferredPeriods();
+    const gradingRepo = new FakeGradingRepository();
+    const reads = vi
+      .spyOn(gradingRepo, "listPeriodsBySchoolYear")
+      .mockResolvedValueOnce([PERIOD])
+      .mockReturnValueOnce(pending.promise)
+      .mockReturnValueOnce(retry.promise);
+    const { classRecordRepo } = renderScreen({
+      gradingRepo,
+      sectionRepo: new FakeSectionRepository([SECTION, NEXT_SECTION]),
+    });
+    await waitFor(() => expect(screen.getByLabelText("Grading period")).toHaveValue(PERIOD.id));
+    await user.selectOptions(screen.getByLabelText("Section"), NEXT_SECTION.id);
+    await act(async () => pending.reject(new Error("offline")));
+    expect(screen.getByLabelText("Grading period")).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(NEXT_SECTION.schoolYear);
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(classRecordRepo.createCalls).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Retry grading periods" }));
+    expect(screen.getByLabelText("Section")).toHaveValue(NEXT_SECTION.id);
+    expect(screen.getByLabelText("Subject")).toHaveValue(SUBJECT.id);
+    expect(screen.getByLabelText("DepEd grading weighting")).toHaveValue(WEIGHT_POLICY.id);
+    expect(classRecordRepo.createCalls).toEqual([]);
+    await act(async () => retry.resolve([NEXT_PERIOD]));
+    expect(reads.mock.calls).toEqual([
+      [SECTION.schoolYear],
+      [NEXT_SECTION.schoolYear],
+      [NEXT_SECTION.schoolYear],
+    ]);
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(classRecordRepo.createCalls).toEqual([
+      {
+        sectionId: NEXT_SECTION.id,
+        subjectId: SUBJECT.id,
+        gradingPeriodId: NEXT_PERIOD.id,
+        weightPolicyId: WEIGHT_POLICY.id,
+      },
+    ]);
+  });
+
+  it("does not restore an earlier response after switching away and back", async () => {
+    const user = userEvent.setup();
+    const old = deferredPeriods();
+    const current = deferredPeriods();
+    const gradingRepo = new FakeGradingRepository();
+    vi.spyOn(gradingRepo, "listPeriodsBySchoolYear")
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce([NEXT_PERIOD])
+      .mockReturnValueOnce(current.promise);
+    renderScreen({ gradingRepo, sectionRepo: new FakeSectionRepository([SECTION, NEXT_SECTION]) });
+    await screen.findByLabelText("Section");
+    await user.selectOptions(screen.getByLabelText("Section"), NEXT_SECTION.id);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Grading period")).toHaveValue(NEXT_PERIOD.id),
+    );
+    await user.selectOptions(screen.getByLabelText("Section"), SECTION.id);
+    await act(async () => old.resolve([PERIOD]));
+    expect(screen.getByLabelText("Grading period")).toBeDisabled();
+    await act(async () => current.resolve([PERIOD]));
+    expect(screen.getByLabelText("Grading period")).toHaveValue(PERIOD.id);
+  });
+
+  it.each(["empty", "foreign-year"])(
+    "blocks an %s response without retaining the previous period",
+    async (kind) => {
+      const user = userEvent.setup();
+      const gradingRepo = new FakeGradingRepository();
+      vi.spyOn(gradingRepo, "listPeriodsBySchoolYear")
+        .mockResolvedValueOnce([PERIOD])
+        .mockResolvedValueOnce(kind === "empty" ? [] : [PERIOD]);
+      const { classRecordRepo } = renderScreen({
+        gradingRepo,
+        sectionRepo: new FakeSectionRepository([SECTION, NEXT_SECTION]),
+      });
+      await waitFor(() => expect(screen.getByLabelText("Grading period")).toHaveValue(PERIOD.id));
+      await user.selectOptions(screen.getByLabelText("Section"), NEXT_SECTION.id);
+      if (kind === "empty")
+        expect(
+          await screen.findByText(`No grading periods for ${NEXT_SECTION.schoolYear}.`),
+        ).toBeInTheDocument();
+      else
+        expect(
+          await screen.findByRole("button", { name: "Retry grading periods" }),
+        ).toBeInTheDocument();
+      expect(screen.getByLabelText("Grading period")).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Open class record" }));
+      expect(classRecordRepo.createCalls).toEqual([]);
+      await expectNoAccessibilityViolations(document.body);
+    },
+  );
+
   it("opens a class record for the selected section, subject, grading period, and weight policy", async () => {
     const user = userEvent.setup();
     const { classRecordRepo } = renderScreen();
