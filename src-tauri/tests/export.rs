@@ -48,7 +48,15 @@ fn export_as_current_session(
     year: i32,
     month: u32,
 ) -> app_lib::error::AppResult<Option<Sf2Export>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        2 => 28,
+        _ => return Err(AppError::Unauthorized),
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+    let school_id = auth::authorize_section_form_read(conn, sessions, section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -58,13 +66,6 @@ fn export_as_current_session(
     };
     let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
 
-    let days_in_month = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
-        _ => 28,
-    };
-    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
     let adviser =
         section_advisory::current_adviser_for_section(conn, &school_id, section_id, &as_of_date)?;
     let adviser_name = if let Some(adv) = adviser {
@@ -86,7 +87,8 @@ fn export_learner_roster_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
 ) -> app_lib::error::AppResult<Option<LearnerRosterExport>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id =
+        auth::authorize_capability(conn, sessions, auth::Capability::ManageLearners)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -110,11 +112,22 @@ fn setup_enrolled_learner_with_session(
     (s.id, sec.id, sessions)
 }
 
+fn assign_logged_in_adviser(
+    conn: &rusqlite::Connection,
+    school_id: &str,
+    section_id: &str,
+    sessions: &SessionManager,
+) {
+    let (actor, _) = sessions.require_active_session(conn).unwrap();
+    section_advisory::assign(conn, school_id, section_id, &actor, "2026-06-01").unwrap();
+}
+
 #[test]
 fn a_teacher_can_export_their_own_sections_monthly_sf2() {
     let conn = open_test_db();
-    let (_school_id, section_id, sessions) =
+    let (school_id, section_id, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
+    assign_logged_in_adviser(&conn, &school_id, &section_id, &sessions);
 
     let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
         .unwrap()
@@ -127,10 +140,12 @@ fn a_teacher_can_export_their_own_sections_monthly_sf2() {
 #[test]
 fn sf2_export_renders_assigned_adviser_name() {
     let conn = open_test_db();
-    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_id, section_id, _sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
     let adviser = user::create_user(&conn, "adviser.a", "password", "Maria Clara").unwrap();
     user::add_school_membership(&conn, &adviser.id, &school_id).unwrap();
     section_advisory::assign(&conn, &school_id, &section_id, &adviser.id, "2026-06-01").unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "adviser.a", "password", &school_id).unwrap();
 
     let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
         .unwrap()
@@ -140,32 +155,25 @@ fn sf2_export_renders_assigned_adviser_name() {
 }
 
 #[test]
-fn sf2_export_renders_blank_for_unassigned_adviser() {
+fn an_unassigned_teacher_cannot_export_sf2() {
     let conn = open_test_db();
     let (_school_id, section_id, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
-        .unwrap()
-        .unwrap();
-
-    assert!(export.csv.contains("Class Adviser,"));
+    let result = export_as_current_session(&conn, &sessions, &section_id, 2026, 8);
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]
-fn exporting_a_foreign_schools_section_returns_none_not_an_error() {
+fn exporting_a_foreign_schools_section_is_unauthorized() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
     let school_b = school::create(&conn, "School B").unwrap();
     let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
 
-    let result = export_as_current_session(&conn, &sessions, &section_b.id, 2026, 8).unwrap();
-
-    assert!(
-        result.is_none(),
-        "a foreign section_id must not resolve to any data"
-    );
+    let result = export_as_current_session(&conn, &sessions, &section_b.id, 2026, 8);
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]
@@ -194,7 +202,8 @@ fn the_export_never_includes_another_schools_learners() {
         "2026-08-01",
     )
     .unwrap();
-    let (_school_a, section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_a, section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    assign_logged_in_adviser(&conn, &school_a, &section_a, &sessions);
 
     let export = export_as_current_session(&conn, &sessions, &section_a, 2026, 8)
         .unwrap()
@@ -205,17 +214,13 @@ fn the_export_never_includes_another_schools_learners() {
 }
 
 #[test]
-fn a_teacher_can_export_their_own_schools_learner_roster() {
+fn a_teacher_cannot_export_the_whole_school_learner_roster() {
     let conn = open_test_db();
     let (_school_id, _section_id, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let export = export_learner_roster_as_current_session(&conn, &sessions)
-        .unwrap()
-        .unwrap();
-
-    assert!(export.csv.contains("Juan"));
-    assert!(export.csv.contains("Dela Cruz"));
+    let result = export_learner_roster_as_current_session(&conn, &sessions);
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]
@@ -233,7 +238,9 @@ fn the_learner_roster_export_never_includes_another_schools_learners() {
     let conn = open_test_db();
     let school_b = school::create(&conn, "School B").unwrap();
     learner::create(&conn, &school_b.id, "Maria", "Santos", None, None).unwrap();
-    let (_school_a, _section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_a, _section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (actor, _) = sessions.require_active_session(&conn).unwrap();
+    role::grant(&conn, &actor, &school_a, role::REGISTRAR).unwrap();
 
     let export = export_learner_roster_as_current_session(&conn, &sessions)
         .unwrap()

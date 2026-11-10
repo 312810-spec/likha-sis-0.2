@@ -321,9 +321,9 @@ fn enroll_learner_in_section_with_optional_sync(
 /// isolation holds because
 /// `repository::section_membership::current_roster` scopes its query by
 /// `school_id` AND `section_id` together, so a `section_id` from another
-/// school returns an empty roster rather than leaking rows. Ungated beyond
-/// an active session, matching this codebase's "reads stay open, writes are
-/// capability-gated" convention.
+/// school returns an empty roster rather than leaking rows. Same-school
+/// membership alone is insufficient: the caller must administer learners,
+/// advise the section, or teach an assigned subject in it.
 #[tauri::command]
 pub fn section_roster(
     db: State<'_, Mutex<Connection>>,
@@ -332,7 +332,16 @@ pub fn section_roster(
     as_of_date: String,
 ) -> AppResult<Vec<CurrentRosterMember>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    if !auth::data_scope::can_read_section_roster(
+        &conn,
+        &user_id,
+        &school_id,
+        &section_id,
+        &as_of_date,
+    )? {
+        return Err(AppError::Unauthorized);
+    }
     section_membership::current_roster(&conn, &school_id, &section_id, &as_of_date)
 }
 
@@ -648,9 +657,8 @@ fn correct_same_day_placement_with_optional_sync(
     Ok(outcome)
 }
 
-/// A learner's full enrollment (section-placement) history -- ungated
-/// beyond an active session, matching `commands::learner::get_learner`'s
-/// existing "reads stay open, writes are capability-gated" convention.
+/// A learner's enrollment history follows the same scoped read boundary as
+/// `commands::learner::get_learner`, including current assignments.
 #[tauri::command]
 pub fn list_learner_enrollment_history(
     db: State<'_, Mutex<Connection>>,
@@ -658,7 +666,10 @@ pub fn list_learner_enrollment_history(
     learner_id: String,
 ) -> AppResult<Vec<SectionMembership>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    if !auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner_id)? {
+        return Err(AppError::Unauthorized);
+    }
     section_membership::list_by_learner_in_school(&conn, &school_id, &learner_id)
 }
 
@@ -672,7 +683,10 @@ pub fn get_current_enrollment(
     learner_id: String,
 ) -> AppResult<Option<SectionMembership>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    if !auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner_id)? {
+        return Err(AppError::Unauthorized);
+    }
     section_membership::current_membership_for_learner_in_school(&conn, &school_id, &learner_id)
 }
 

@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::{AppError, AppResult};
 use crate::export::sanitize_filename_component;
@@ -40,11 +40,8 @@ use crate::repository::{learner, school, section, section_membership};
 /// separator characters that would make a `..` sequence meaningful).
 ///
 /// `school_id` is session-derived, never a parameter. `section_id` is
-/// caller-supplied the same legitimate way `export_section_monthly_sf2`
-/// already accepts one — isolation holds because
-/// `section::find_by_id_in_school` resolves to `None` for a foreign
-/// section, and this command returns `Ok(None)` rather than generating
-/// anything.
+/// caller-supplied, but the native boundary requires a current advisory
+/// assignment or Registrar/School Head authority before reading the roster.
 #[tauri::command]
 pub fn generate_sf1_form(
     app: AppHandle,
@@ -54,7 +51,8 @@ pub fn generate_sf1_form(
     as_of_date: String,
 ) -> AppResult<Option<Sf1GenerationResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -126,11 +124,9 @@ pub fn generate_sf1_form(
 /// class record, per docs/adr/0049-multi-form-official-form-contract.md
 /// ("SF9 is a presentation/export concern").
 ///
-/// Same authorization/output-path discipline as `generate_sf1_form`:
-/// `school_id` is session-derived, `section_id`/`learner_id` are
-/// caller-supplied but only ever resolve within that school, and the
-/// output path is derived entirely from sanitized, authorized data —
-/// never a caller parameter.
+/// Same native adviser/administrator authorization as `generate_sf1_form`.
+/// `section_id`/`learner_id` still resolve within the authorized school;
+/// output paths are derived from sanitized data, never caller parameters.
 #[tauri::command]
 pub fn generate_sf9_form(
     app: AppHandle,
@@ -141,7 +137,8 @@ pub fn generate_sf9_form(
     as_of_date: String,
 ) -> AppResult<Option<Sf9GenerationResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);

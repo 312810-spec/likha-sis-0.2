@@ -563,6 +563,78 @@ pub fn resolve_adviser_view_scope(
     Ok((user_id, school_id, can_review_all))
 }
 
+/// Exporting a section form is limited to its current adviser or a school
+/// Registrar/School Head. An ordinary teacher in another section is not a
+/// legitimate recipient merely because both sections share a school.
+pub fn authorize_section_form_read(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<String> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !data_scope::can_read_section_form(conn, &user_id, &school_id, section_id, as_of_date)? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(school_id)
+}
+
+pub fn authorize_class_record_read(
+    conn: &Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> AppResult<String> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !data_scope::can_read_class_record(conn, &user_id, &school_id, class_record_id)? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(school_id)
+}
+
+pub fn authorize_class_record_write(
+    conn: &Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !data_scope::can_edit_class_record(conn, &user_id, &school_id, class_record_id)? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok((user_id, school_id))
+}
+
+pub fn authorize_section_subject_write(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    subject_id: &str,
+) -> AppResult<String> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !data_scope::can_edit_section_subject(conn, &user_id, &school_id, section_id, subject_id)? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(school_id)
+}
+
+pub fn authorize_assessment_item_access(
+    conn: &Connection,
+    sessions: &SessionManager,
+    assessment_item_id: &str,
+    write: bool,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !data_scope::can_access_assessment_item(
+        conn,
+        &user_id,
+        &school_id,
+        assessment_item_id,
+        write,
+    )? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok((user_id, school_id))
+}
+
 /// The trusted authorization boundary for a capability-gated command.
 /// Mirrors `require_active_school_scope`'s fail-closed shape exactly,
 /// with one addition: the session's user must also hold one of
