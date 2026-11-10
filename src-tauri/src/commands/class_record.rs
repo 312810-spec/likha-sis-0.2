@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::class_record::{self, ClassRecord, ClassRecordDetail};
@@ -17,8 +17,17 @@ pub fn list_class_records_by_school(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Vec<ClassRecordDetail>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
-    class_record::list_by_school(&conn, &school_id)
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    class_record::list_by_school(&conn, &school_id)?
+        .into_iter()
+        .filter_map(|record| {
+            match auth::data_scope::can_read_class_record(&conn, &user_id, &school_id, &record.id) {
+                Ok(true) => Some(Ok(record)),
+                Ok(false) => None,
+                Err(error) => Some(Err(error)),
+            }
+        })
+        .collect()
 }
 
 /// Reference data, not scoped to any session/school — every school sees
@@ -58,7 +67,8 @@ pub fn create_class_record(
     weight_policy_id: String,
 ) -> AppResult<Option<ClassRecord>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_section_subject_write(&conn, &sessions, &section_id, &subject_id)?;
     class_record::create(
         &conn,
         &school_id,

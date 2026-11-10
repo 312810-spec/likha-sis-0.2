@@ -218,7 +218,15 @@ pub fn export_section_monthly_sf2(
     month: u32,
 ) -> AppResult<Option<Sf2ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        2 => 28,
+        _ => return Err(crate::error::AppError::Unauthorized),
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+    let school_id = auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -228,13 +236,6 @@ pub fn export_section_monthly_sf2(
     };
     let report = attendance::monthly_grid_for_section(&conn, &school_id, &section_id, year, month)?;
 
-    let days_in_month = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
-        _ => 28,
-    };
-    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
     let adviser =
         section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &as_of_date)?;
     let adviser_name = if let Some(adv) = adviser {
@@ -291,7 +292,7 @@ pub fn export_class_record_report_card(
     class_record_id: String,
 ) -> AppResult<Option<ReportCardExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_class_record_read(&conn, &sessions, &class_record_id)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -392,7 +393,7 @@ pub fn export_class_record_summary(
     class_record_id: String,
 ) -> AppResult<Option<ClassSummaryExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_class_record_read(&conn, &sessions, &class_record_id)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -475,7 +476,7 @@ pub fn export_learner_roster(
     sessions: State<'_, SessionManager>,
 ) -> AppResult<Option<LearnerRosterExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);

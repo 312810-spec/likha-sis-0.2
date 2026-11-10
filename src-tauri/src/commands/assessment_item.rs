@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::db;
@@ -25,7 +25,7 @@ pub fn list_assessment_items_by_class_record(
     class_record_id: String,
 ) -> AppResult<Vec<AssessmentItemDetail>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_class_record_read(&conn, &sessions, &class_record_id)?;
     assessment_item::list_by_class_record(&conn, &school_id, &class_record_id)
 }
 
@@ -68,7 +68,8 @@ pub fn create_assessment_item(
     max_score: f64,
 ) -> AppResult<Option<AssessmentItem>> {
     let conn = lock_db(&db);
-    let (actor_user_id, school_id) = sessions.require_active_session(&conn)?;
+    let (actor_user_id, school_id) =
+        auth::authorize_class_record_write(&conn, &sessions, &class_record_id)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     create_assessment_item_with_optional_sync(
@@ -208,7 +209,7 @@ pub fn rename_assessment_item(
     name: String,
 ) -> AppResult<Option<AssessmentItem>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (_, school_id) = auth::authorize_assessment_item_access(&conn, &sessions, &id, true)?;
     assessment_item::rename(&conn, &school_id, &id, &name)
 }
 
@@ -226,7 +227,7 @@ pub fn update_assessment_item(
     max_score: f64,
 ) -> AppResult<Option<AssessmentItem>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (_, school_id) = auth::authorize_assessment_item_access(&conn, &sessions, &id, true)?;
     assessment_item::update(&conn, &school_id, &id, &name, &category_id, max_score)
 }
 
@@ -239,7 +240,7 @@ pub fn delete_assessment_item(
     id: String,
 ) -> AppResult<bool> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (_, school_id) = auth::authorize_assessment_item_access(&conn, &sessions, &id, true)?;
     assessment_item::delete(&conn, &school_id, &id)
 }
 

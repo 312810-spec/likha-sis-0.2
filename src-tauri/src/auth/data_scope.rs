@@ -2,11 +2,149 @@
 //! Session identity is resolved by commands; relationships are always read here.
 use crate::error::AppResult;
 use crate::repository::role;
+use crate::repository::section_advisory;
 use crate::sync::EntityKind;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 pub fn manages_learners(conn: &Connection, user: &str, school: &str) -> AppResult<bool> {
     role::has_any_role(conn, user, school, &[role::REGISTRAR, role::SCHOOL_HEAD])
+}
+
+/// Form exports contain identifiable learners. School membership alone does
+/// not authorize a teacher to export an arbitrary section's roster/grades.
+pub fn can_read_section_form(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    section: &str,
+    as_of_date: &str,
+) -> AppResult<bool> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sections WHERE school_id=?1 AND id=?2)",
+        (school, section),
+        |row| row.get(0),
+    )?;
+    if !exists {
+        return Ok(false);
+    }
+    if manages_learners(conn, user, school)? {
+        return Ok(true);
+    }
+    section_advisory::is_current_adviser(conn, school, section, user, as_of_date)
+}
+
+/// A subject teacher may view the roster for a currently assigned class,
+/// but that does not authorize exporting all of the section's school forms.
+pub fn can_read_section_roster(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    section: &str,
+    as_of_date: &str,
+) -> AppResult<bool> {
+    if can_read_section_form(conn, user, school, section, as_of_date)? {
+        return Ok(true);
+    }
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM teaching_assignments \
+         WHERE school_id=?1 AND teacher_user_id=?2 AND section_id=?3)",
+        (school, user, section),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
+/// Subject/class ownership is taken from the current assignment rows, never
+/// the navigation state or an actor identifier supplied by the UI.
+pub fn can_edit_section_subject(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    section: &str,
+    subject: &str,
+) -> AppResult<bool> {
+    let valid: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sections sec JOIN subjects sub ON sub.school_id=sec.school_id \
+         WHERE sec.school_id=?1 AND sec.id=?2 AND sub.id=?3)",
+        (school, section, subject),
+        |row| row.get(0),
+    )?;
+    if !valid {
+        return Ok(false);
+    }
+    if role::has_any_role(conn, user, school, &[role::SCHOOL_HEAD])? {
+        return Ok(true);
+    }
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM teaching_assignments \
+         WHERE school_id=?1 AND teacher_user_id=?2 AND section_id=?3 AND subject_id=?4)",
+        (school, user, section, subject),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
+pub fn can_edit_class_record(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    record: &str,
+) -> AppResult<bool> {
+    let context: Option<(String, String)> = conn
+        .query_row(
+            "SELECT section_id, subject_id FROM class_records WHERE school_id=?1 AND id=?2",
+            (school, record),
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((section, subject)) = context else {
+        return Ok(false);
+    };
+    can_edit_section_subject(conn, user, school, &section, &subject)
+}
+
+pub fn can_read_class_record(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    record: &str,
+) -> AppResult<bool> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM class_records WHERE school_id=?1 AND id=?2)",
+        (school, record),
+        |row| row.get(0),
+    )?;
+    if !exists {
+        return Ok(false);
+    }
+    if manages_learners(conn, user, school)? {
+        return Ok(true);
+    }
+    can_edit_class_record(conn, user, school, record)
+}
+
+pub fn can_access_assessment_item(
+    conn: &Connection,
+    user: &str,
+    school: &str,
+    item: &str,
+    write: bool,
+) -> AppResult<bool> {
+    let record: Option<String> = conn
+        .query_row(
+            "SELECT class_record_id FROM assessment_items WHERE school_id=?1 AND id=?2",
+            (school, item),
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(record) = record else {
+        return Ok(false);
+    };
+    if write {
+        can_edit_class_record(conn, user, school, &record)
+    } else {
+        can_read_class_record(conn, user, school, &record)
+    }
 }
 
 pub fn can_read_learner(

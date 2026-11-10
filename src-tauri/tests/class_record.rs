@@ -6,7 +6,9 @@ use std::path::Path;
 
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
-use app_lib::repository::{class_record, grading, school, section, subject, user};
+use app_lib::repository::{
+    class_record, grading, school, section, subject, teaching_assignment, user,
+};
 
 const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
 const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
@@ -35,7 +37,7 @@ fn create_as_current_session(
     subject_id: &str,
     grading_period_id: &str,
 ) -> app_lib::error::AppResult<Option<class_record::ClassRecord>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id = auth::authorize_section_subject_write(conn, sessions, section_id, subject_id)?;
     class_record::create(
         conn,
         &school_id,
@@ -52,8 +54,17 @@ fn list_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
 ) -> app_lib::error::AppResult<Vec<class_record::ClassRecordDetail>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
-    class_record::list_by_school(conn, &school_id)
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    class_record::list_by_school(conn, &school_id)?
+        .into_iter()
+        .filter_map(|record| {
+            match auth::data_scope::can_read_class_record(conn, &user_id, &school_id, &record.id) {
+                Ok(true) => Some(Ok(record)),
+                Ok(false) => None,
+                Err(error) => Some(Err(error)),
+            }
+        })
+        .collect()
 }
 
 /// Builds a school with a section and a matching grading period (both
@@ -77,6 +88,8 @@ fn setup_school(
     )
     .unwrap()
     .unwrap();
+    let (teacher_id, _) = sessions.require_active_session(conn).unwrap();
+    teaching_assignment::create(conn, &school.id, &teacher_id, &sec.id, &sub.id).unwrap();
     (sessions, sec.id, sub.id, period.id)
 }
 
@@ -110,13 +123,9 @@ fn a_teacher_cannot_open_a_class_record_using_another_schools_section() {
         &foreign_section_id,
         &subject_a,
         &period_a,
-    )
-    .unwrap();
-
-    assert_eq!(
-        result, None,
-        "cross-school section reference must be rejected"
     );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]

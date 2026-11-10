@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::db;
@@ -29,7 +29,8 @@ pub fn roster_for_assessment_item(
     assessment_item_id: String,
 ) -> AppResult<Option<Vec<LearnerScoreRosterEntry>>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (_, school_id) =
+        auth::authorize_assessment_item_access(&conn, &sessions, &assessment_item_id, false)?;
     learner_score::roster_for_item(&conn, &school_id, &assessment_item_id)
 }
 
@@ -70,7 +71,8 @@ pub fn record_learner_score(
     correction_reason: Option<String>,
 ) -> AppResult<Option<LearnerScore>> {
     let conn = lock_db(&db);
-    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    let (user_id, school_id) =
+        auth::authorize_assessment_item_access(&conn, &sessions, &assessment_item_id, true)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     record_learner_score_with_optional_sync(

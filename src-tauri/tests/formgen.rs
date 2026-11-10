@@ -19,8 +19,8 @@
 
 use std::path::Path;
 
-use app_lib::auth::{self, Capability, SessionManager};
-use app_lib::error::AppResult;
+use app_lib::auth::{self, SessionManager};
+use app_lib::error::{AppError, AppResult};
 use app_lib::export::sanitize_filename_component;
 use app_lib::formgen::sf1::{Sf1GenerationRequest, Sf1GenerationResult, Sf1LearnerRow};
 use app_lib::formgen::sf9::{Sf9GenerationRequest, Sf9GenerationResult};
@@ -65,15 +65,7 @@ fn generate_sf1_form_as_current_session(
     as_of_date: &str,
     output_dir: &Path,
 ) -> AppResult<Option<Sf1GenerationResult>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
-    // Same capability every other data-scoped command in this crate
-    // uses -- `require_active_school_scope` alone is enough for THIS
-    // stand-in's authorization proof since the real command only needs
-    // an active session (no ManageLearners gate on generation itself,
-    // matching how SF2/report-card export are gated -- generation reads
-    // already-authorized data, it does not create/modify learner
-    // records).
-    let _ = Capability::ManageLearners; // referenced for clarity only; not required here
+    let school_id = auth::authorize_section_form_read(conn, sessions, section_id, as_of_date)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -139,7 +131,7 @@ fn a_registrar_can_generate_an_sf1_form_for_their_own_schools_section() {
 }
 
 #[test]
-fn generating_for_another_schools_section_returns_none_not_an_error() {
+fn generating_for_another_schools_section_is_unauthorized() {
     let conn = open_test_db();
     let (sessions, _school_id) = login_with_role(&conn, "registrar.a", role_repo::REGISTRAR);
     let other_school =
@@ -154,10 +146,9 @@ fn generating_for_another_schools_section_returns_none_not_an_error() {
         &foreign_section.id,
         "2026-06-15",
         dir.path(),
-    )
-    .unwrap();
+    );
 
-    assert!(result.is_none());
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]
@@ -300,7 +291,7 @@ fn generate_sf9_form_as_current_session(
     as_of_date: &str,
     output_dir: &Path,
 ) -> AppResult<Option<Sf9GenerationResult>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id = auth::authorize_section_form_read(conn, sessions, section_id, as_of_date)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -406,7 +397,7 @@ fn sf9_generation_reflects_the_existing_grading_computation_not_a_reimplementati
 }
 
 #[test]
-fn generating_sf9_for_another_schools_learner_returns_none_not_an_error() {
+fn generating_sf9_for_another_schools_learner_is_denied_without_output() {
     let conn = open_test_db();
     let (sessions, _school_id) = login_with_role(&conn, "registrar.a", role_repo::REGISTRAR);
     let other_school =
@@ -432,10 +423,14 @@ fn generating_sf9_for_another_schools_learner_returns_none_not_an_error() {
         &foreign_learner.id,
         "2026-06-15",
         dir.path(),
-    )
-    .unwrap();
+    );
 
-    assert!(result.is_none());
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    assert_eq!(
+        std::fs::read_dir(dir.path()).unwrap().count(),
+        0,
+        "an unauthorized cross-school request must not create an export"
+    );
 }
 
 #[test]
