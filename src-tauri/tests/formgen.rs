@@ -397,7 +397,7 @@ fn sf9_generation_reflects_the_existing_grading_computation_not_a_reimplementati
 }
 
 #[test]
-fn generating_sf9_for_another_schools_learner_returns_none_not_an_error() {
+fn generating_sf9_for_another_schools_learner_is_denied_without_output() {
     let conn = open_test_db();
     let (sessions, _school_id) = login_with_role(&conn, "registrar.a", role_repo::REGISTRAR);
     let other_school =
@@ -423,10 +423,14 @@ fn generating_sf9_for_another_schools_learner_returns_none_not_an_error() {
         &foreign_learner.id,
         "2026-06-15",
         dir.path(),
-    )
-    .unwrap();
+    );
 
-    assert!(result.is_none());
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    assert_eq!(
+        std::fs::read_dir(dir.path()).unwrap().count(),
+        0,
+        "an unauthorized cross-school request must not create an export"
+    );
 }
 
 #[test]
