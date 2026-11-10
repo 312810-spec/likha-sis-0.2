@@ -37,8 +37,7 @@ fn create_as_current_session(
     subject_id: &str,
     grading_period_id: &str,
 ) -> app_lib::error::AppResult<Option<class_record::ClassRecord>> {
-    let school_id =
-        auth::authorize_section_subject_write(conn, sessions, section_id, subject_id)?;
+    let school_id = auth::authorize_section_subject_write(conn, sessions, section_id, subject_id)?;
     class_record::create(
         conn,
         &school_id,
@@ -90,8 +89,7 @@ fn setup_school(
     .unwrap()
     .unwrap();
     let (teacher_id, _) = sessions.require_active_session(conn).unwrap();
-    teaching_assignment::create(conn, &school.id, &teacher_id, &sec.id, &sub.id)
-        .unwrap();
+    teaching_assignment::create(conn, &school.id, &teacher_id, &sec.id, &sub.id).unwrap();
     (sessions, sec.id, sub.id, period.id)
 }
 

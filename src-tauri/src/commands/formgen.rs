@@ -51,8 +51,7 @@ pub fn generate_sf1_form(
     as_of_date: String,
 ) -> AppResult<Option<Sf1GenerationResult>> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
+    let school_id = auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -137,8 +136,7 @@ pub fn generate_sf9_form(
     as_of_date: String,
 ) -> AppResult<Option<Sf9GenerationResult>> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
+    let school_id = auth::authorize_section_form_read(&conn, &sessions, &section_id, &as_of_date)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);

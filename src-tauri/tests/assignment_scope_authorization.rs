@@ -58,8 +58,7 @@ fn only_the_current_adviser_or_administrator_may_export_a_section_form() {
     ));
 
     let mathematics = subject::create(&conn, &own_school.id, "Mathematics").unwrap();
-    teaching_assignment::create(&conn, &own_school.id, &actor, &b.id, &mathematics.id)
-        .unwrap();
+    teaching_assignment::create(&conn, &own_school.id, &actor, &b.id, &mathematics.id).unwrap();
     assert!(matches!(
         auth::authorize_section_form_read(&conn, &sessions, &b.id, "2026-08-31"),
         Err(AppError::Unauthorized)
@@ -92,22 +91,45 @@ fn class_record_and_assessment_access_follow_current_subject_assignment() {
     .unwrap()
     .unwrap();
     let math_a = class_record::create(
-        &conn, &own_school.id, &a.id, &mathematics.id, &period.id, K10_POLICY, None,
+        &conn,
+        &own_school.id,
+        &a.id,
+        &mathematics.id,
+        &period.id,
+        K10_POLICY,
+        None,
     )
     .unwrap()
     .unwrap();
     let tle_a = class_record::create(
-        &conn, &own_school.id, &a.id, &tle.id, &period.id, K10_POLICY, None,
+        &conn,
+        &own_school.id,
+        &a.id,
+        &tle.id,
+        &period.id,
+        K10_POLICY,
+        None,
     )
     .unwrap()
     .unwrap();
     let math_b = class_record::create(
-        &conn, &own_school.id, &b.id, &mathematics.id, &period.id, K10_POLICY, None,
+        &conn,
+        &own_school.id,
+        &b.id,
+        &mathematics.id,
+        &period.id,
+        K10_POLICY,
+        None,
     )
     .unwrap()
     .unwrap();
     let item = assessment_item::create(
-        &conn, &own_school.id, &math_a.id, WRITTEN_WORKS, "Synthetic quiz", 10.0,
+        &conn,
+        &own_school.id,
+        &math_a.id,
+        WRITTEN_WORKS,
+        "Synthetic quiz",
+        10.0,
     )
     .unwrap()
     .unwrap();
@@ -117,11 +139,10 @@ fn class_record_and_assessment_access_follow_current_subject_assignment() {
         auth::authorize_class_record_write(&conn, &sessions, &math_a.id),
         Err(AppError::Unauthorized)
     ));
-    let assignment = teaching_assignment::create(
-        &conn, &own_school.id, &teacher, &a.id, &mathematics.id,
-    )
-    .unwrap()
-    .unwrap();
+    let assignment =
+        teaching_assignment::create(&conn, &own_school.id, &teacher, &a.id, &mathematics.id)
+            .unwrap()
+            .unwrap();
     assert!(auth::authorize_class_record_write(&conn, &sessions, &math_a.id).is_ok());
     assert!(auth::authorize_class_record_read(&conn, &sessions, &math_a.id).is_ok());
     assert!(matches!(
@@ -156,24 +177,96 @@ fn class_record_and_assessment_access_follow_current_subject_assignment() {
 #[test]
 fn exposed_commands_recheck_authorization_before_learner_and_grade_reads() {
     let commands = [
-        (include_str!("../src/commands/formgen.rs"), "generate_sf1_form", "authorize_section_form_read"),
-        (include_str!("../src/commands/formgen.rs"), "generate_sf9_form", "authorize_section_form_read"),
-        (include_str!("../src/commands/export.rs"), "export_section_monthly_sf2", "authorize_section_form_read"),
-        (include_str!("../src/commands/export.rs"), "export_learner_roster", "Capability::ManageLearners"),
-        (include_str!("../src/commands/export.rs"), "export_class_record_report_card", "authorize_class_record_read"),
-        (include_str!("../src/commands/export.rs"), "export_class_record_summary", "authorize_class_record_read"),
-        (include_str!("../src/commands/class_record.rs"), "list_class_records_by_school", "can_read_class_record"),
-        (include_str!("../src/commands/class_record.rs"), "create_class_record", "authorize_section_subject_write"),
-        (include_str!("../src/commands/assessment_item.rs"), "list_assessment_items_by_class_record", "authorize_class_record_read"),
-        (include_str!("../src/commands/assessment_item.rs"), "create_assessment_item", "authorize_class_record_write"),
-        (include_str!("../src/commands/assessment_item.rs"), "rename_assessment_item", "authorize_assessment_item_access"),
-        (include_str!("../src/commands/assessment_item.rs"), "update_assessment_item", "authorize_assessment_item_access"),
-        (include_str!("../src/commands/assessment_item.rs"), "delete_assessment_item", "authorize_assessment_item_access"),
-        (include_str!("../src/commands/learner_score.rs"), "roster_for_assessment_item", "authorize_assessment_item_access"),
-        (include_str!("../src/commands/learner_score.rs"), "record_learner_score", "authorize_assessment_item_access"),
-        (include_str!("../src/commands/section.rs"), "section_roster", "can_read_section_roster"),
-        (include_str!("../src/commands/section.rs"), "list_learner_enrollment_history", "can_read_learner"),
-        (include_str!("../src/commands/section.rs"), "get_current_enrollment", "can_read_learner"),
+        (
+            include_str!("../src/commands/formgen.rs"),
+            "generate_sf1_form",
+            "authorize_section_form_read",
+        ),
+        (
+            include_str!("../src/commands/formgen.rs"),
+            "generate_sf9_form",
+            "authorize_section_form_read",
+        ),
+        (
+            include_str!("../src/commands/export.rs"),
+            "export_section_monthly_sf2",
+            "authorize_section_form_read",
+        ),
+        (
+            include_str!("../src/commands/export.rs"),
+            "export_learner_roster",
+            "Capability::ManageLearners",
+        ),
+        (
+            include_str!("../src/commands/export.rs"),
+            "export_class_record_report_card",
+            "authorize_class_record_read",
+        ),
+        (
+            include_str!("../src/commands/export.rs"),
+            "export_class_record_summary",
+            "authorize_class_record_read",
+        ),
+        (
+            include_str!("../src/commands/class_record.rs"),
+            "list_class_records_by_school",
+            "can_read_class_record",
+        ),
+        (
+            include_str!("../src/commands/class_record.rs"),
+            "create_class_record",
+            "authorize_section_subject_write",
+        ),
+        (
+            include_str!("../src/commands/assessment_item.rs"),
+            "list_assessment_items_by_class_record",
+            "authorize_class_record_read",
+        ),
+        (
+            include_str!("../src/commands/assessment_item.rs"),
+            "create_assessment_item",
+            "authorize_class_record_write",
+        ),
+        (
+            include_str!("../src/commands/assessment_item.rs"),
+            "rename_assessment_item",
+            "authorize_assessment_item_access",
+        ),
+        (
+            include_str!("../src/commands/assessment_item.rs"),
+            "update_assessment_item",
+            "authorize_assessment_item_access",
+        ),
+        (
+            include_str!("../src/commands/assessment_item.rs"),
+            "delete_assessment_item",
+            "authorize_assessment_item_access",
+        ),
+        (
+            include_str!("../src/commands/learner_score.rs"),
+            "roster_for_assessment_item",
+            "authorize_assessment_item_access",
+        ),
+        (
+            include_str!("../src/commands/learner_score.rs"),
+            "record_learner_score",
+            "authorize_assessment_item_access",
+        ),
+        (
+            include_str!("../src/commands/section.rs"),
+            "section_roster",
+            "can_read_section_roster",
+        ),
+        (
+            include_str!("../src/commands/section.rs"),
+            "list_learner_enrollment_history",
+            "can_read_learner",
+        ),
+        (
+            include_str!("../src/commands/section.rs"),
+            "get_current_enrollment",
+            "can_read_learner",
+        ),
     ];
     for (source, name, gate) in commands {
         let start = format!("pub fn {name}(");

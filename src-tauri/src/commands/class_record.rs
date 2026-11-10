@@ -21,12 +21,7 @@ pub fn list_class_records_by_school(
     class_record::list_by_school(&conn, &school_id)?
         .into_iter()
         .filter_map(|record| {
-            match auth::data_scope::can_read_class_record(
-                &conn,
-                &user_id,
-                &school_id,
-                &record.id,
-            ) {
+            match auth::data_scope::can_read_class_record(&conn, &user_id, &school_id, &record.id) {
                 Ok(true) => Some(Ok(record)),
                 Ok(false) => None,
                 Err(error) => Some(Err(error)),

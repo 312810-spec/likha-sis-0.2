@@ -87,8 +87,7 @@ fn export_learner_roster_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
 ) -> app_lib::error::AppResult<Option<LearnerRosterExport>> {
-    let school_id =
-        auth::authorize_capability(conn, sessions, auth::Capability::ManageLearners)?;
+    let school_id = auth::authorize_capability(conn, sessions, auth::Capability::ManageLearners)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -125,8 +124,7 @@ fn assign_logged_in_adviser(
 #[test]
 fn a_teacher_can_export_their_own_sections_monthly_sf2() {
     let conn = open_test_db();
-    let (school_id, section_id, sessions) =
-        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
     assign_logged_in_adviser(&conn, &school_id, &section_id, &sessions);
 
     let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
@@ -140,7 +138,8 @@ fn a_teacher_can_export_their_own_sections_monthly_sf2() {
 #[test]
 fn sf2_export_renders_assigned_adviser_name() {
     let conn = open_test_db();
-    let (school_id, section_id, _sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_id, section_id, _sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
     let adviser = user::create_user(&conn, "adviser.a", "password", "Maria Clara").unwrap();
     user::add_school_membership(&conn, &adviser.id, &school_id).unwrap();
     section_advisory::assign(&conn, &school_id, &section_id, &adviser.id, "2026-06-01").unwrap();
